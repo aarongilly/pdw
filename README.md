@@ -1,3 +1,12 @@
+# Aaron's Notes to Self
+
+Alright, I created THIS version in the HyVee Market Grille while someone was supposed to be looking 
+at our house. It's using the Create React App -template Typescript starter. I'm trying to push to
+GitHub as well so I can play around with this stuff in Working Copy. It's still fairly clear how
+little I know what I'm doing.  
+I'm creating a singleton where there's one instance of the Personal Data Warehouse class. But I have
+no real good idea on how to take *that* and turn it into a webapp.
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
