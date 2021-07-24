@@ -1,8 +1,10 @@
-class PDW {
+/**
+ * The main class
+ */
+export default class PDW {
     _testManifest: Manifest;
-    constructor(){
+    constructor() {
         this._testManifest = new Manifest("1");
-        console.log("constructed an instance");
     }
 
     /**
@@ -12,17 +14,41 @@ class PDW {
      * It goes on for a few lines. But contains no test
      * code yet.
      * 
+     * ```
+     * let x = testFun('whatever'); // returns 'whatever!'
+     * ```
+     * 
      * @param aThing whatver you want to log
      */
-    testFun(aThing: string){
+    testFun(aThing: string): string {
         console.log(aThing);
+        return aThing + "!";
+    }
+
+
+    createManifestList(data: any): Manifest[] {
+        //check data
+        let manifestArray: Manifest[] = [];
+        if (Array.isArray(data)) {
+            data.forEach(d => {
+                if (Manifest.isManifest(d)) {
+                    let newManifest = new Manifest(d._mid);
+                    manifestArray.push(newManifest);
+                }
+            })
+        } else {
+            if (Manifest.isManifest(data)) {
+                if (Manifest.isManifest(data)) {
+                    let newManifest = new Manifest(data._mid);
+                    manifestArray.push(newManifest);
+                }
+            }
+        }
+        return manifestArray;
     }
 }
 
-/**
- * This comment _supports_ [Markdown](https://marked.js.org/)... but doesn't show up?
- */
- class Manifest {
+class Manifest {
     /**
      * The human-readable reference to the Manifest
      */
@@ -50,6 +76,17 @@ class PDW {
         //if(andLog) console.log("Logged, per your request");
         console.log("getting label or something")
         return this._mid;
+    }
+
+    /**
+     * This checks whether an import object can be parsed as a manifest.
+     * 
+     * Manifests require a "mid" property.
+     * 
+     * @param data object to check for manifest-i-ness
+     */
+    public static isManifest(data: Object): boolean {
+        return data.hasOwnProperty("_mid") && !data.hasOwnProperty("_eid");
     }
 }
 
@@ -84,7 +121,7 @@ enum Scope {
 
 interface IRollupMethod {
     label: string;
-    rollup(): any; 
+    rollup(): any;
 }
 
 enum PointFormat {
@@ -105,11 +142,9 @@ enum RollupMethod {
  * @param two any sort of number
  * @returns the word 'done'
  */
-function testFunction(one: Manifest, two: number = 4): string{
+function testFunction(one: Manifest, two: number = 4): string {
     console.log("This function does nothing useful");
     console.log(one.getMid());
     console.log("You also passed in " + two);
     return "Done"
 }
-
-export { PDW, Manifest, testFunction}

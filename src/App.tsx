@@ -1,11 +1,12 @@
 // import React from 'react';
 import logo from './logo.svg';
 import './App.css';
-import {PDW} from './PDW-Lib'
+import PDW from './PDW-Lib'
 
 function App() {
   let pdw = new PDW();
-  console.log(pdw._testManifest.getMid());
+  // console.log(pdw._testManifest.getMid());
+  console.log(pdw.testFun('huzzah'));
   return (
     <div className="App">
       <header className="App-header">
