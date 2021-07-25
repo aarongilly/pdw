@@ -6,15 +6,15 @@ import PDW from "./PDW-Lib";
 function App() {
   let pdw = new PDW();
   // console.log(pdw._testManifest.getMid());
-  console.log(pdw.testFun(pdw.quickCheck));
+  console.log(pdw.testFun("Boom"));
+  let x = "This is how React works, oh yeah";
+  let testP = pdw.makeId();
   return (
     <div className="App">
       <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload. Adding the library
-          doesn't fail.
-        </p>
+        <p>{x}</p>
+        <p>{testP}</p>
         <a
           className="App-link"
           href="https://reactjs.org"

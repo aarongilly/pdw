@@ -19,18 +19,29 @@ export default class PDW {
     console.log(aThing);
     return aThing + "?!";
   }
-  
+
   /**
-  * Returns an ID string sufficiently unique for entries
-  */
-  makeId(): string {
-    let pre = 'e'; // ensure excel doesnt treat as number
+   * Returns an ID string sufficiently unique for entries
+   * @param seedDate optionally specify date component
+   */
+  makeId(seedDate?: Date | string): string {
+    // if(seedDate){
+    //   if(typeof seedDate === "string"){
+    //     if(PDW.isParsableDate(seedDate)){
+    //       seedDate = new Date(seedDate);
+    //     }
+    //   }
+    // }
+    let pre = "e"; // ensure excel doesnt treat as number
     let millis = new Date().getTime().toString();
+    // if(seedDate) millis = seedDate.getTime().toString();
     let randSix = Math.random().toString(36).substring(6);
-    return pre+millis+randSix;
+    return pre + "." + millis + "." + randSix;
   }
 
-  quickCheck: string = "premative var.";
+  static isParsableDate(dateStr: string): boolean {
+    return new Date(dateStr) != "Invalid Date" && !isNaN(new Date(dateStr));
+  }
 
   getManifests(): Manifest[] | void {
     //I need an object of a class that
