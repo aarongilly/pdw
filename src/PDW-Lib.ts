@@ -22,48 +22,14 @@ export default class PDW {
 
   quickCheck: string = "premative var.";
 
-  /*
-  interProp: testInterface = {
-    propOne: "fart",
-    propTwo: 69,
-    optProp: "is here",
-    funProp: () => {
-      return "heyo";
-    }
-  };
-  */
-
-  createManifestList(data: any): Manifest[] {
-    //check data
-    let manifestArray: Manifest[] = [];
-    if (Array.isArray(data)) {
-      data.forEach((d) => {
-        if (Manifest.isManifest(d)) {
-          let newManifest = new Manifest(d._mid);
-          manifestArray.push(newManifest);
-        }
-      });
-    } else {
-      if (Manifest.isManifest(data)) {
-        if (Manifest.isManifest(data)) {
-          let newManifest = new Manifest(data._mid);
-          manifestArray.push(newManifest);
-        }
-      }
-    }
-    return manifestArray;
+  getManifests(): Manifest[] | void {
+    //I need an object of a class that
+    //implements StorageConnector...
+    //but I don't want to implment that code here
+    //@TODO THINK ABOUT THIS TOO
+    //return manifestArray;
   }
 }
-
-/*
-interface testInterface {
-  propOne: string;
-  propTwo: number;
-  optProp?: string;
-  funProp(): string;
-  //   funOne:
-}
-*/
 
 /**
  * Minimum viable manifest. Just a label.
@@ -210,6 +176,7 @@ interface QueryParams {
   updatedTo?: ISOString | Date;
   eid?: string | string[];
   mid?: string | string[];
+  pid?: string | string[];
   tid?: string | string[];
   tag?: string | string[];
   includeDeleted?: boolean;
@@ -217,9 +184,12 @@ interface QueryParams {
   includeInactive?: boolean;
   onlyInactive?: boolean;
   scope?: Scope | Scope[];
+  //@TODO - query params to the StorageConnector should
+  //not have any shaping properties. getData should.
   terse?: any;
   verbose?: any;
   shape?: Shape;
+  search?: any; //@TODO - think about this too
   includeEmptyPeriods?: boolean;
   rollupMethod?: RollupMethod;
 }
@@ -304,11 +274,6 @@ enum Scope {
   "year"
 }
 
-// interface RollupMethod {
-//   label: string;
-//   rollup(): any;
-// }
-
 enum PointFormat {
   "@",
   "#",
@@ -322,17 +287,10 @@ enum PointFormat {
 enum PointType {}
 
 //@TODO - is this really an enum?
-enum RollupMethod {}
-
-/**
- *
- * @param one whatever Manifest you want to include, yo
- * @param two any sort of number
- * @returns the word 'done'
- */
-function testFunction(one: Manifest, two: number = 4): string {
-  console.log("This function does nothing useful");
-  console.log(one.getMid());
-  console.log("You also passed in " + two);
-  return "Done";
+// enum RollupMethod {}
+//how do I have a bound sent of rollup methods?
+//they are both an interface and an enum.
+interface RollupMethod {
+  label: string;
+  rollup(params?: any): any;
 }
