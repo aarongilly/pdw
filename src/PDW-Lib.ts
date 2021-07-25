@@ -19,6 +19,16 @@ export default class PDW {
     console.log(aThing);
     return aThing + "?!";
   }
+  
+  /**
+  * Returns an ID string sufficiently unique for entries
+  */
+  makeId(): string {
+    let pre = 'e'; // ensure excel doesnt treat as number
+    let millis = new Date().getTime().toString();
+    let randSix = Math.random().toString(36).substring(6);
+    return pre+millis+randSix;
+  }
 
   quickCheck: string = "premative var.";
 
