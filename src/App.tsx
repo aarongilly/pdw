@@ -5,8 +5,8 @@ import PDW from "./PDW-Lib";
 
 function App() {
   let pdw = new PDW();
-  console.log(pdw.testFun("pretty similar to VS Code?"));
   // console.log(pdw._testManifest.getMid());
+  console.log(pdw.testFun(pdw.quickCheck));
   return (
     <div className="App">
       <header className="App-header">
