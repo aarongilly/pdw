@@ -6,4 +6,8 @@ import "@testing-library/jest-dom";
 import pdw from "./PDW-Lib";
 
 //untested. Probably wrong.
-expect(pdw.isParsableDate("2021-04-02")).toBe(true);
+test("parsable date testing", () => {
+  expect(pdw.isParsableDate("2021-04-02")).toBe(true);
+  expect(pdw.isParsableDate("")).toBe(false);
+  expect(pdw.isParsableDate("failing string")).toBe(false);
+});

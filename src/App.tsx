@@ -1,19 +1,19 @@
 // import React from 'react';
+//@ts-ignore
 import logo from "./logo.svg";
 import "./App.css";
-import PDW from "./PDW-Lib";
+import PDW, { outsideFun } from "./PDW-Lib";
 
 function App() {
   let pdw = new PDW();
-  // console.log(pdw._testManifest.getMid());
-  console.log(pdw.testFun("Boom"));
-  let x = "This is how React works, oh yeah";
+  console.log(outsideFun());
+  let x = PDW.scopes.day.isScope("2021-08-09");
   let testP = pdw.makeId();
   return (
     <div className="App">
       <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
-        <p>{x}</p>
+        <p>{x.toString()}</p>
         <p>{testP}</p>
         <a
           className="App-link"

@@ -3,24 +3,6 @@
  */
 export default class PDW {
   /**
-   * A simple test function. First line.
-   *
-   * This is a paragraph that describes the function.
-   * It goes on for a few lines. But contains no test
-   * code yet.
-   *
-   * ```
-   * let x = testFun('whatever'); // returns 'whatever!'
-   * ```
-   *
-   * @param aThing whatver you want to log
-   */
-  testFun(aThing: string): string {
-    console.log(aThing);
-    return aThing + "?!";
-  }
-
-  /**
    * Returns an ID string sufficiently unique for entries
    * @param seedDate optionally specify date component
    */
@@ -40,8 +22,75 @@ export default class PDW {
   }
 
   static isParsableDate(dateStr: string): boolean {
-    return new Date(dateStr) != "Invalid Date" && !isNaN(new Date(dateStr));
+    //@ts-ignore //@TODO - figure out if htis is really an error
+    return new Date(dateStr) !== "Invalid Date" && !isNaN(new Date(dateStr));
   }
+
+  /**
+   * Checks whether a string can resolve to the scope
+   *
+   * @param stringIn string to test
+   * @param scopeStr scope to test against
+   */
+  static periodStringValid(stringIn: string, scopeStr: ScopeName) {
+    // /https://xkcd.com/208/
+    let regex = PDW.scopes[scopeStr].regex;
+    return regex.test(stringIn);
+  }
+
+  /**
+   *
+   * @param testStr the string to test
+   */
+  static inferScope(testStr: string): ScopeName | void {}
+
+  /**
+   * The various scopes a Manifest can have.
+   *
+   * Implments related functions as well.
+   */
+  static scopes: Record<ScopeName, ScopeMember> = {
+    time: {
+      label: "time",
+      regex: /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+(?:[+-][0-2]\d:[0-5]\d|Z)/i,
+      size: 0, //smallest
+      isScope: function (testStr) {
+        return this.regex.test(testStr);
+      }
+    },
+    day: {
+      label: "day",
+      regex: /^([12]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$/,
+      size: 1,
+      isScope: function (testStr) {
+        return this.regex.test(testStr);
+      }
+    },
+    week: {
+      label: "week",
+      regex: /^([0-9]{4})-?W(5[0-3]|[1-4][0-9]|0[1-9])$/i,
+      size: 7,
+      isScope: function (testStr) {
+        return this.regex.test(testStr);
+      }
+    },
+    month: {
+      label: "month",
+      regex: /^([0-9]{4})-(1[0-2]|0[1-9])$/,
+      size: 30,
+      isScope: function (testStr) {
+        return this.regex.test(testStr);
+      }
+    },
+    year: {
+      label: "year",
+      regex: /^([0-9]{4})$/,
+      size: 365,
+      isScope: function (testStr) {
+        return this.regex.test(testStr);
+      }
+    }
+  };
 
   getManifests(): Manifest[] | void {
     //I need an object of a class that
@@ -50,6 +99,10 @@ export default class PDW {
     //@TODO THINK ABOUT THIS TOO
     //return manifestArray;
   }
+}
+
+export function outsideFun(): string {
+  return "now within pdw";
 }
 
 /**
@@ -80,7 +133,7 @@ interface FullManifest extends MinimumManifest {
   /**
    * What length of time an entry covers
    */
-  _scope: Scope;
+  _scope: ScopeName;
   /**
    * Earliest-dated entry's entry.periodEnd
    */
@@ -189,12 +242,12 @@ interface StorageConnector {
  * These are the ways to search for and shape entry data.
  */
 interface QueryParams {
-  from?: ISOString | Date;
-  to?: ISOString | Date;
-  createdFrom?: ISOString | Date;
-  createdTo?: ISOString | Date;
-  updatedFrom?: ISOString | Date;
-  updatedTo?: ISOString | Date;
+  from?: string | Date;
+  to?: string | Date;
+  createdFrom?: string | Date;
+  createdTo?: string | Date;
+  updatedFrom?: string | Date;
+  updatedTo?: string | Date;
   eid?: string | string[];
   mid?: string | string[];
   pid?: string | string[];
@@ -204,7 +257,7 @@ interface QueryParams {
   onlyDeleted?: boolean;
   includeInactive?: boolean;
   onlyInactive?: boolean;
-  scope?: Scope | Scope[];
+  scope?: ScopeName | ScopeName[];
   //@TODO - query params to the StorageConnector should
   //not have any shaping properties. getData should.
   terse?: any;
@@ -267,14 +320,6 @@ class PointsManifest {
   // desc: string;
 }
 
-class ISOString {
-  //@TODO
-}
-
-class Period {
-  //@TODO
-}
-
 //@TODO - think about this
 enum Shape {
   "a",
@@ -286,24 +331,45 @@ enum Shape {
 /**
  * The valid scopes a Manifest can take.
  */
-enum Scope {
-  "time",
-  "day",
-  "week",
-  "month",
-  "quarter",
-  "year"
+type ScopeName =
+  | "time"
+  | "day"
+  | "week"
+  | "month"
+  // "quarter" |
+  | "year";
+
+interface ScopeMember {
+  /**
+   * Human-readable descriptor, eg 'day' or 'week'
+   */
+  label: string;
+  /**
+   * The regex for testing against
+   */
+  regex: RegExp;
+  /**
+   * How "big" the scope is, for ordering
+   */
+  size: number;
+  /**
+   * test if string is at that scope level
+   *
+   * returns 'true' if string is specifically
+   * at that level of scope.
+   * ```
+   * //for scope.label == 'day'
+   * dateStr("2021-07-25"); //returns true, exact match
+   * dateStr("2021-07"); //returns false, too big
+   * dateStr("2021-07-25T12:05:05") //returns false, too little
+   * ```
+   *
+   * @param dateStr the string to check
+   */
+  isScope(dateStr: string): boolean;
 }
 
-enum PointFormat {
-  "@",
-  "#",
-  "#.#",
-  "yes/no",
-  "(hide)",
-  "list",
-  "json"
-}
+type PointFormat = "@" | "#" | "#.#" | "yes/no" | "(hide)" | "list" | "json";
 
 enum PointType {}
 
