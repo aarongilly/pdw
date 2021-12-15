@@ -1,12 +1,26 @@
+import { MongoConnector as DB} from "./mongo-connector";
+
+/**
+ * db, from a connector Module, implements StorageConnector
+ */
+const db = new DB();
+
 /**
  * The main class
  */
-export default class PDW {
+export class PDW {
+
+  getManifests(): Promise<FullManifest[]>{
+    console.log("pdw.getManifest runs.")
+    return db.getManifests();
+  }
+
+  //#region ### STATIC METHODS ###
   /**
    * Returns an ID string sufficiently unique for entries
    * @param seedDate optionally specify date component
    */
-  makeId(seedDate?: Date | string): string {
+  static makeId(seedDate?: Date | string): string {
     // if(seedDate){
     //   if(typeof seedDate === "string"){
     //     if(PDW.isParsableDate(seedDate)){
@@ -91,19 +105,9 @@ export default class PDW {
       }
     }
   };
-
-  getManifests(): Manifest[] | void {
-    //I need an object of a class that
-    //implements StorageConnector...
-    //but I don't want to implment that code here
-    //@TODO THINK ABOUT THIS TOO
-    //return manifestArray;
-  }
 }
 
-export function outsideFun(): string {
-  return "now within pdw";
-}
+ //#region #### INTERFACES ####
 
 /**
  * Minimum viable manifest. Just a label.
@@ -111,7 +115,7 @@ export function outsideFun(): string {
  * All other manifest properties have default
  * valuse that can be assumed or are calculated.
  */
-interface MinimumManifest {
+ export interface MinimumManifest {
   /**
    * Human-readable name. Like a column header in Excel.
    */
@@ -121,7 +125,7 @@ interface MinimumManifest {
 /**
  * Full manifest including all properties
  */
-interface FullManifest extends MinimumManifest {
+export interface FullManifest extends MinimumManifest {
   /**
    * The manifest identifier
    */
@@ -138,11 +142,11 @@ interface FullManifest extends MinimumManifest {
    * Earliest-dated entry's entry.periodEnd
    */
 
-  _first: Date;
+  _first: Date | string; //FORTESTONLY string
   /**
    * Latest-dated entry's entry.periodEnd
    */
-  _latest: Date;
+  _latest: Date | string; //FORTESTONLY string
   /**
    * Still being recorded.
    */
@@ -159,6 +163,10 @@ interface FullManifest extends MinimumManifest {
    * A longer-form description.
    */
   _desc: string;
+  /**
+   * A place for a given database implementation's native "id"
+   */
+  _id?: string;
 }
 
 /**
@@ -169,7 +177,7 @@ interface FullManifest extends MinimumManifest {
  * to actually change the _tid associated with
  * every Manifest with that tag.
  */
-interface ManifestTag {
+export interface ManifestTag {
   _tid: string; //surrogate key
   _label: string; //human-readable tag
 }
@@ -180,7 +188,7 @@ interface ManifestTag {
  * there should not be any two entries that
  * share the same _mid and _period.
  */
-interface MinimumEntry {
+export interface MinimumEntry {
   _mid: string;
   _period: string;
 }
@@ -188,7 +196,7 @@ interface MinimumEntry {
 /**
  * Full entries include all required properties.
  */
-interface FullEntry extends MinimumEntry {
+export interface FullEntry extends MinimumEntry {
   _eid: string;
   _created: Date;
   _updated: Date;
@@ -203,9 +211,19 @@ interface FullEntry extends MinimumEntry {
  * Entry Points are a map keyed with an
  * arbitrary quantity of _pid identifiers
  */
-interface EntryPointMap {
+export interface EntryPointMap {
   1?: any;
   2?: any;
+}
+
+export interface PointsManifest{
+  _pid: string;
+  _label: string;
+  _emoji: string;
+  _type: PointType;
+  _format: PointFormat;
+  _rollup: RollupMethod;
+  _desc: string;
 }
 
 /**
@@ -213,7 +231,7 @@ interface EntryPointMap {
  * any storage provider can be used that meets
  * this interface. This is the whole point, really.
  */
-interface StorageConnector {
+export interface StorageConnector {
   /**
    * This would be the main "data getter". I need
    * to think about this more.
@@ -230,7 +248,7 @@ interface StorageConnector {
   /**
    * Return all Manifests' data.
    */
-  getManifests(): FullManifest[];
+  getManifests(): Promise<FullManifest[]>;
   /**
    * The main "data setter" for manifests.
    * @param manifests Manifest data to create or update
@@ -241,7 +259,7 @@ interface StorageConnector {
 /**
  * These are the ways to search for and shape entry data.
  */
-interface QueryParams {
+export interface QueryParams {
   from?: string | Date;
   to?: string | Date;
   createdFrom?: string | Date;
@@ -268,58 +286,6 @@ interface QueryParams {
   rollupMethod?: RollupMethod;
 }
 
-class Manifest {
-  /**
-   * The human-readable reference to the Manifest
-   */
-  // label: string;
-  // _mid: string;
-  // scope: Scope;
-  // first: Date;
-  // latest: Date;
-  // active: boolean;
-  // tags: string[];
-  // desc: string;
-  // points: Array<PointsManifest>
-  constructor(public _mid: string) {}
-
-  /**
-   * This is the first line of my JSDoc Comment.
-   *
-   * This is the paragraph underneath the first line. There are blank lines
-   * between the first line and this line. This line is long enough to
-   * include some line breaks. Let's so how this renders.
-   *
-   * @returns Placeholder text, for now.
-   */
-  getMid(): string {
-    //if(andLog) console.log("Logged, per your request");
-    console.log("getting label or something");
-    return this._mid;
-  }
-
-  /**
-   * This checks whether an import object can be parsed as a manifest.
-   *
-   * Manifests require a "mid" property.
-   *
-   * @param data object to check for manifest-i-ness
-   */
-  public static isManifest(data: Object): boolean {
-    return data.hasOwnProperty("_mid") && !data.hasOwnProperty("_eid");
-  }
-}
-
-class PointsManifest {
-  // pid: string;
-  // label: string;
-  // format: PointFormat;
-  // emoji: string;
-  // type: PointType;
-  // rollup: RollupMethod;
-  // desc: string;
-}
-
 //@TODO - think about this
 enum Shape {
   "a",
@@ -339,7 +305,7 @@ type ScopeName =
   // "quarter" |
   | "year";
 
-interface ScopeMember {
+export interface ScopeMember {
   /**
    * Human-readable descriptor, eg 'day' or 'week'
    */
@@ -371,13 +337,62 @@ interface ScopeMember {
 
 type PointFormat = "@" | "#" | "#.#" | "yes/no" | "(hide)" | "list" | "json";
 
-enum PointType {}
+type PointType = 'text' | 'number' | 'yes/no' | 'list' | 'json'; // @TODO - duration/file/photo
+export interface PointTypeMember {
+  label: string;
+  possibleFormats: PointFormat[];
+  possibleRollups: RollupMethod[];
+}
 
 //@TODO - is this really an enum?
 // enum RollupMethod {}
 //how do I have a bound sent of rollup methods?
 //they are both an interface and an enum.
-interface RollupMethod {
+type RollupMethod = 'count' | 'average' | 'count distinct' | 'count yes/no' | 'sum' | 'count of each';
+export interface RollupMethodMember {
   label: string;
   rollup(params?: any): any;
 }
+//#endregion
+
+// class Manifest {
+//   /**
+//    * The human-readable reference to the Manifest
+//    */
+//   // label: string;
+//   // _mid: string;
+//   // scope: Scope;
+//   // first: Date;
+//   // latest: Date;
+//   // active: boolean;
+//   // tags: string[];
+//   // desc: string;
+//   // points: Array<PointsManifest>
+//   constructor(public _mid: string) {}
+
+//   /**
+//    * This is the first line of my JSDoc Comment.
+//    *
+//    * This is the paragraph underneath the first line. There are blank lines
+//    * between the first line and this line. This line is long enough to
+//    * include some line breaks. Let's so how this renders.
+//    *
+//    * @returns Placeholder text, for now.
+//    */
+//   getMid(): string {
+//     //if(andLog) console.log("Logged, per your request");
+//     console.log("getting label or something");
+//     return this._mid;
+//   }
+
+//   /**
+//    * This checks whether an import object can be parsed as a manifest.
+//    *
+//    * Manifests require a "mid" property.
+//    *
+//    * @param data object to check for manifest-i-ness
+//    */
+//   public static isManifest(data: Object): boolean {
+//     return data.hasOwnProperty("_mid") && !data.hasOwnProperty("_eid");
+//   }
+// }
