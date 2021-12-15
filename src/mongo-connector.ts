@@ -6,6 +6,7 @@ export class MongoConnector implements StorageConnector {
         throw new Error('Method not implemented.');
     }
     setEntries(entries: FullEntry[], forceUpdate?: boolean) {
+        console.log('test');
         throw new Error('Method not implemented.');
     }
 
