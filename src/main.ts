@@ -1,23 +1,30 @@
 import './style.css'
-import typescriptLogo from './typescript.svg'
-import { setupCounter } from './counter'
+import { makeTemp } from './pdw'
+import { createXLSXFile } from './connectors/excelConnector';
+
+//This is not the library, but instead what drives the html view & imports the library.
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>
-    <a href="https://vitejs.dev" target="_blank">
-      <img src="/vite.svg" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://www.typescriptlang.org/" target="_blank">
-      <img src="${typescriptLogo}" class="logo vanilla" alt="TypeScript logo" />
-    </a>
-    <h1>Vite + TypeScript</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite and TypeScript logos to learn more
+    <h1>Personal Data Warehouse Library Development</h1>
+    <p>
+      See the <a href="/docs/">TypeDoc-generated documentation</a> for the documentation.
     </p>
+    <h2>Reminders</h2>
+    <ul>
+      <li>Don't inject dependencies to front end stuff or database stuff!</li>
+      <li>Utilize Temporal</li>
+    </ul>
   </div>
+  <h2>Basic Tester Button</h2>
 `
+makeTemp();
 
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
+let button = document.createElement('button');
+button.textContent = "Click me, yo";
+
+button.onclick = ()=>{
+  createXLSXFile();
+}
+
+document.querySelector<HTMLDivElement>('#app')!.appendChild(button);
