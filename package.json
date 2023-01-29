@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "localtest": "node src/local-test.js",
     "makedocs": "typedoc",
     "preview": "vite preview"
   },
@@ -15,6 +16,9 @@
     "vite": "^3.0.7"
   },
   "dependencies": {
+    "fs": "^0.0.1-security",
+    "node-fetch": "^3.3.0",
+    "sqlite3": "^5.1.4",
     "temporal-polyfill": "^0.0.8",
     "xlsx": "^0.18.5"
   }

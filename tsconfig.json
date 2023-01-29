@@ -24,7 +24,8 @@
   ],
   "typedocOptions": {
     "entryPoints": [
-      "src/pdw.ts"
+      "src/pdw.ts",
+      "src/connectors/excelConnector.ts"
     ],
     "out": "docs"
   }

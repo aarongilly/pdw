@@ -1,5 +1,7 @@
 import { Temporal } from "temporal-polyfill";
 
+//#region ### INTERFACES ###
+
 /**
  * This function exists temporarily to stop errors from unused **Temporal** imports
  */
@@ -21,9 +23,47 @@ export interface StorageConnector {
      * This coment explains getDefs in the storageconnenctor
      */
     getDefs(params?: getDefParam[]): any;
+
+    //setDefs()
+    //getEntries()
+    //setEntries()
+    /**
+     * The file name for local files, or some reference to
+     * the database name for cloud databases.
+     */
+    connectedDbName: string;
+    /**
+     * The name of the connector, essentially. Examples: "Excel", "Firestore"
+     */
+    serviceName: string;
+
 }
 
 /**
- * This is a comment for getDefParam
+ * Can be either the _lbl or _did
  */
-type getDefParam = string;
+export type getDefParam = string;
+
+/**
+ * This interface is extended by {@link DefLike}
+ */
+export interface Element {
+    _did: string;
+    _deleted: boolean;
+    _created: Temporal.ZonedDateTime;
+    _updated: Temporal.ZonedDateTime;
+}
+
+export interface DefLike extends Element {
+    _lbl: string;
+    _desc: string;
+    _emoji: string;
+    _tags: string[];
+}
+
+//#endregion
+
+//#region ### CLASSES ###
+
+//#endregion
+
