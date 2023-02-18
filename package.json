@@ -7,7 +7,7 @@
     "dev": "vite",
     "test": "vitest --reporter verbose",
     "build": "tsc && vite build",
-    "localtest": "node src/local-test.js",
+    "localtest": "tsc && node out/local-test.js",
     "makedocs": "typedoc",
     "preview": "vite preview"
   },

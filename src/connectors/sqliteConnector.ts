@@ -21,7 +21,7 @@ export class SqliteConnector implements StorageConnector {
      * For interim testing... nothing to do with PDW 
      */
     createDatabase() {
-        const db = new sql.Database('generatedDatabase.db');
+        const db = new sql.Database('fs-test/generatedDatabase.db');
 
         db.serialize(() => {
             db.run("CREATE TABLE lorem (info TEXT)");

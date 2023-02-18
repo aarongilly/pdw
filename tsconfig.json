@@ -22,7 +22,7 @@
   },
   "include": [
     "src"
-  ],
+, "out/local-test.js"  ],
   "typedocOptions": {
     "entryPoints": [
       "src/pdw.ts",

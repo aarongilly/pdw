@@ -2,9 +2,9 @@ import * as XLSX from 'xlsx';
 import fetch from 'node-fetch'
 // import sql from 'sqlite3';
 
-import {test} from '../src/pdw.js'
+// import {test} from './pdw.js'
 // import * as fs from 'fs';
-// import {SqliteConnector} from './connectors/sqliteConnector';
+import {SqliteConnector} from './connectors/sqliteConnector.js';
 
 export async function createXLSXFile(){
     const f = await (await fetch("https://sheetjs.com/pres.xlsx")).arrayBuffer();
@@ -18,10 +18,10 @@ export async function createXLSXFile(){
 }
 
 export const testFun = () => {
-    console.log(test);
-    // const sql = new SqliteConnector();
-    // console.log('creating a DB');
-    // sql.createDatabase();
+    // console.log(test);
+    const sql = new SqliteConnector();
+    console.log('creating a DB');
+    sql.createDatabase();
      /**
      * For interim testing... nothing to do with PDW 
      */
