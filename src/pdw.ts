@@ -1,5 +1,10 @@
 import { Temporal } from "temporal-polyfill";
 
+/**
+ * A synonym for string, implying one with the structure of:
+ */
+export type _uid = string;
+
 //#region ### INTERFACES ###
 
 /**
@@ -67,3 +72,21 @@ export interface DefLike extends Element {
 
 //#endregion
 
+//#region ### UTILITIES ###
+
+//TODO - do you want a utils class?
+
+export function makeUid(): _uid {
+    const randomLength = 4
+    return new Date().getTime().toString(36)+"."+Math.random().toString(36).slice(13-randomLength).padStart(randomLength,"0")
+}
+
+export function parseTemporalFromUid(uid: _uid): any { //Temporal.Instant{
+    const epochMillis = parseInt(uid.split(".")[0],36)
+    const parsedTemporal = Temporal.Instant.fromEpochMilliseconds(epochMillis);
+    // const timezone = Temporal.Now.timeZone();
+    // console.log(parsedTemporal.toString({ timeZone: Temporal.TimeZone.from(timezone)}));
+    return parsedTemporal
+}
+
+//#endregion
