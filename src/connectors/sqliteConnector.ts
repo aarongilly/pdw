@@ -1,5 +1,6 @@
 import { StorageConnector } from "../pdw";
-import sql from 'sqlite3';
+import sql from 'sqlite3'; // straight up doesn't work right now.
+//tried installing better-sqlite3, which ran into issues with Apple Silicon
 
 /**
  * Try not to chase 3 rabbits. This is intended to KEEP THE END IN MIND.

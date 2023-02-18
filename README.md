@@ -12,7 +12,7 @@ Also to develop (some) **LOCAL FIRST** storage connector(s)
 
 # Connector Dev
 
-Try to remain connector agnostic! Also to have the API work in-browser and in Node.
+Try to **remain connector agnostic!** Also to have the API work in-browser and in Node.
 (can you use the Temporal polyfill in node?)
 
 Anyway, `npm run dev` for Docs & browser-based stuff
