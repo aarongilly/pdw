@@ -3,9 +3,10 @@ import { Temporal } from "temporal-polyfill";
 //#region ### TYPES ###
 
 /**
- * Did, Definition ID, a string of a certain format
+ * A synonym for string, implying one with the structure of:
+ * 
  */
-export type Did = string;
+export type _uid = string;
 
 //#endregion
 
@@ -16,11 +17,6 @@ export type Did = string;
  */
 export function makeTemp(){
     console.log(Temporal.Now.zonedDateTimeISO());    
-}
-
-export interface DefLike {
-    did: Did;
-    created: string
 }
 
 /**
@@ -68,11 +64,19 @@ export interface Element {
     _updated: Temporal.ZonedDateTime;
 }
 
+/**
+ * Definitions Data Shape
+ */
 export interface DefLike extends Element {
     _lbl: string;
     _desc: string;
     _emoji: string;
     _tags: string[];
+}
+
+export interface Tags {
+    _tid: string;
+    _lbl: string
 }
 
 //#endregion
@@ -81,3 +85,17 @@ export interface DefLike extends Element {
 
 //#endregion
 
+//#region ### UTILITIES ###
+
+//TODO - do you want a utils class?
+
+export function makeUid(): _uid {
+    
+    return Math.random().toString(36).slice(13);//.padStart(len,"0") 
+}
+
+// export function parseDateFromUid(): Temporal.Instant{
+
+// }
+
+//#endregion
