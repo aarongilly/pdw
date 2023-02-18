@@ -13,6 +13,7 @@ dist-ssr
 *.local
 # I added this
 fs-test
+docs
 
 # Editor directories and files
 .vscode/*
