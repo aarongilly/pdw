@@ -1,5 +1,7 @@
 import { Temporal } from "temporal-polyfill";
 
+export const test = 'butthole'
+
 /**
  * A synonym for string, implying one with the structure of:
  */

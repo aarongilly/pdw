@@ -30,6 +30,7 @@ export class SqliteConnector implements StorageConnector {
             for (let i = 0; i < 10; i++) {
                 stmt.run("Ipsum " + i);
             }
+            stmt.run('And I am here too!')
             stmt.finalize();
 
             db.each("SELECT rowid AS id, info FROM lorem", (err, row) => {
