@@ -26,7 +26,10 @@
   "typedocOptions": {
     "entryPoints": [
       "src/pdw.ts",
-      "src/connectors/excelConnector.ts"
+      "src/connectors/excelConnector.ts",
+      "src/connectors/firestoreConnector.ts",
+      "src/connectors/plainTextConnector.ts",
+      "src/connectors/sqliteConnector.ts"
     ],
     "out": "docs"
   }

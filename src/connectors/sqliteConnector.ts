@@ -1,9 +1,12 @@
 import { StorageConnector } from "../pdw";
-import sql from 'sqlite3'; // straight up doesn't work right now.
+import sql from 'sqlite3';
+
 //tried installing better-sqlite3, which ran into issues with Apple Silicon
 
 /**
  * Try not to chase 3 rabbits. This is intended to KEEP THE END IN MIND.
+ * 
+ * Seems [helpful](https://www.linode.com/docs/guides/getting-started-with-nodejs-sqlite/)
  */
 export class SqliteConnector implements StorageConnector {
     constructor() {
