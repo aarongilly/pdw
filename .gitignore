@@ -15,6 +15,7 @@ dist-ssr
 fs-test
 docs
 docs/*
+out/*
 
 # Editor directories and files
 .vscode/*
