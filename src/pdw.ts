@@ -1,5 +1,14 @@
 import { Temporal } from "temporal-polyfill";
 
+//#region ### TYPES ###
+
+/**
+ * Did, Definition ID, a string of a certain format
+ */
+export type Did = string;
+
+//#endregion
+
 //#region ### INTERFACES ###
 
 /**
@@ -7,6 +16,11 @@ import { Temporal } from "temporal-polyfill";
  */
 export function makeTemp(){
     console.log(Temporal.Now.zonedDateTimeISO());    
+}
+
+export interface DefLike {
+    did: Did;
+    created: string
 }
 
 /**
