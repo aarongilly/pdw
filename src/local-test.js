@@ -11,9 +11,9 @@ export async function createXLSXFile(){
     console.log(data);
     
 
-    /* Write File */
+    // Write File 
     XLSX.writeFile(wb, "node.xlsx");
-    
+    ii
 }
 
 export const test = () => {
