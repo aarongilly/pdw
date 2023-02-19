@@ -13,19 +13,23 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "esModuleInterop": true,
-    "noEmit": true,
+    // "noEmit": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "outDir": "out"
   },
   "include": [
     "src"
-  ],
+, "out/local-test.js"  ],
   "typedocOptions": {
     "entryPoints": [
       "src/pdw.ts",
-      "src/connectors/excelConnector.ts"
+      "src/connectors/excelConnector.ts",
+      "src/connectors/firestoreConnector.ts",
+      "src/connectors/plainTextConnector.ts",
+      "src/connectors/sqliteConnector.ts"
     ],
     "out": "docs"
   }

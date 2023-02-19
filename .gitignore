@@ -11,6 +11,11 @@ node_modules
 dist
 dist-ssr
 *.local
+# I added this
+fs-test
+docs
+docs/*
+out/*
 
 # Editor directories and files
 .vscode/*

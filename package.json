@@ -5,19 +5,22 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test": "vitest --reporter verbose",
     "build": "tsc && vite build",
-    "localtest": "node src/local-test.js",
+    "localtest": "tsc && node out/local-test.js",
     "makedocs": "typedoc",
     "preview": "vite preview"
   },
   "devDependencies": {
     "typedoc": "^0.23.10",
     "typescript": "^4.6.4",
-    "vite": "^3.0.7"
+    "vite": "^3.0.7",
+    "vitest": "^0.28.5"
   },
   "dependencies": {
     "fs": "^0.0.1-security",
     "node-fetch": "^3.3.0",
+    "sqlite3": "^5.1.4",
     "temporal-polyfill": "^0.0.8",
     "xlsx": "^0.18.5"
   }

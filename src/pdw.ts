@@ -90,12 +90,16 @@ export interface Tags {
 //TODO - do you want a utils class?
 
 export function makeUid(): _uid {
-    
-    return Math.random().toString(36).slice(13);//.padStart(len,"0") 
+    const randomLength = 4
+    return new Date().getTime().toString(36)+"."+Math.random().toString(36).slice(13-randomLength).padStart(randomLength,"0")
 }
 
-// export function parseDateFromUid(): Temporal.Instant{
-
-// }
+export function parseTemporalFromUid(uid: _uid): any { //Temporal.Instant{
+    const epochMillis = parseInt(uid.split(".")[0],36)
+    const parsedTemporal = Temporal.Instant.fromEpochMilliseconds(epochMillis);
+    // const timezone = Temporal.Now.timeZone();
+    // console.log(parsedTemporal.toString({ timeZone: Temporal.TimeZone.from(timezone)}));
+    return parsedTemporal
+}
 
 //#endregion

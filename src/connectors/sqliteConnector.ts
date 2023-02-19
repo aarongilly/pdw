@@ -1,9 +1,12 @@
 import { StorageConnector } from "../pdw";
-import sql from 'sqlite3'; // straight up doesn't work right now.
+import sql from 'sqlite3';
+
 //tried installing better-sqlite3, which ran into issues with Apple Silicon
 
 /**
  * Try not to chase 3 rabbits. This is intended to KEEP THE END IN MIND.
+ * 
+ * Seems [helpful](https://www.linode.com/docs/guides/getting-started-with-nodejs-sqlite/)
  */
 export class SqliteConnector implements StorageConnector {
     constructor() {
@@ -21,7 +24,7 @@ export class SqliteConnector implements StorageConnector {
      * For interim testing... nothing to do with PDW 
      */
     createDatabase() {
-        const db = new sql.Database('generatedDatabase.db');
+        const db = new sql.Database('fs-test/generatedDatabase.db');
 
         db.serialize(() => {
             db.run("CREATE TABLE lorem (info TEXT)");
@@ -30,6 +33,7 @@ export class SqliteConnector implements StorageConnector {
             for (let i = 0; i < 10; i++) {
                 stmt.run("Ipsum " + i);
             }
+            stmt.run('And I am here too!')
             stmt.finalize();
 
             db.each("SELECT rowid AS id, info FROM lorem", (err, row) => {
