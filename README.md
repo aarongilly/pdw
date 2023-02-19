@@ -27,7 +27,10 @@ You've made good progress:
 - [x] made functioning `npm run localtest` script
 - [x] created poc local .txt files
 - [x] created poc local sqlite database
-- [ ] create local .csv files
+- [x] create local .csv files
+- [x] read local .csv files
+    - [ ] had to use `npm i --save https://cdn.sheetjs.com/xlsx-0.19.2/xlsx-0.19.2.tgz`
+
 
 You can use [this site](https://tsuml-demo.firebaseapp.com/) to generate UML maps and insert them into the markup here.
 
@@ -52,4 +55,4 @@ Anyway, `npm run dev` for Docs & browser-based stuff
 
 |Firebase|XLSX|SQLite|
 |:-:|:-:|:-:|
-|Browser|Both?|Local|
+|Browser|Both?|Local|i
