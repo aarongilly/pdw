@@ -8,6 +8,20 @@ import { Temporal } from "temporal-polyfill";
  */
 export type _uid = string;
 
+export enum PointType {
+  /**
+   * number
+   */
+  num,
+  text,
+  select,
+  bool,
+  duration,
+  file,
+  photo,
+  
+}
+
 //#endregion
 
 //#region ### INTERFACES ###
@@ -16,7 +30,7 @@ export type _uid = string;
  * This function exists temporarily to stop errors from unused **Temporal** imports
  */
 export function makeTemp(){
-    console.log(Temporal.Now.zonedDateTimeISO());    
+    console.log(Temporal.Now.zonedDateTimeISO());
 }
 
 /**
@@ -32,9 +46,12 @@ export interface StorageConnector {
     /**
      * This coment explains getDefs in the storageconnenctor
      */
-    getDefs(params?: getDefParam[]): any;
+    getDefs(params?: getDefParam[]): DefLike[];
 
-    //setDefs()
+    /**
+     * Creates (or updates) definitions. 
+     */
+    setDefs(): any;
     //getEntries()
     //setEntries()
     /**
@@ -71,12 +88,33 @@ export interface DefLike extends Element {
     _lbl: string;
     _desc: string;
     _emoji: string;
-    _tags: string[];
+    _tags: Tag[];
 }
 
-export interface Tags {
+export interface Tag {
     _tid: string;
     _lbl: string
+}
+
+export interface PointDef extends Element {
+ /**
+  * Point ID, a tiny ID
+  */
+  _pid: string; 
+  /**
+  * Label for the point
+  */
+  _lbl: string; 
+  /**
+  * Point description
+  */
+  _desc: string; 
+  /**
+  * Point type
+  */
+  _type: PointType; 
+  
+  
 }
 
 //#endregion
@@ -89,6 +127,9 @@ export interface Tags {
 
 //TODO - do you want a utils class?
 
+/**
+ * Makes a unique identifier for use with _uid and _eid
+ */
 export function makeUid(): _uid {
     const randomLength = 4
     return new Date().getTime().toString(36)+"."+Math.random().toString(36).slice(13-randomLength).padStart(randomLength,"0")
