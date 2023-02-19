@@ -44,6 +44,8 @@ outDir = out //property didnt' exist
 
 - You were able to create & read straight up text files. This is what the 'fs-test' directory is for
 
+- You were able to set up a launch.json to run localtest.ts by simply pressing `f5`
+
 # Connector Dev
 
 Try to **remain connector agnostic!** Also to have the API work in-browser and in Node.
