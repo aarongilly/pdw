@@ -1,11 +1,14 @@
 import { Temporal } from "temporal-polyfill";
 
-export const test = 'butthole'
+//#region ### TYPES ###
 
 /**
  * A synonym for string, implying one with the structure of:
+ * 
  */
 export type _uid = string;
+
+//#endregion
 
 //#region ### INTERFACES ###
 
@@ -61,11 +64,19 @@ export interface Element {
     _updated: Temporal.ZonedDateTime;
 }
 
+/**
+ * Definitions Data Shape
+ */
 export interface DefLike extends Element {
     _lbl: string;
     _desc: string;
     _emoji: string;
     _tags: string[];
+}
+
+export interface Tags {
+    _tid: string;
+    _lbl: string
 }
 
 //#endregion
