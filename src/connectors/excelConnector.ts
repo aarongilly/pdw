@@ -1,43 +1,7 @@
 import * as XLSX from 'xlsx';
-import { StorageConnector } from '../pdw';
+import * as fs from 'fs';
+import * as pdw from '../pdw.js';
 
-/**
- * Testing basic connection
- */
-export async function createXLSXFile(){
-    // const f = await (await fetch("https://sheetjs.com/pres.xlsx")).arrayBuffer();
-    // const wb = XLSX.read(f);
-    const rows = [
-        {
-            "Name": "Bill Clinton",
-            "Index": 42
-        },
-        {
-            "Name": "GeorgeW Bush",
-            "Index": 43
-        },
-        {
-            "Name": "Barack Obama",
-            "Index": 44
-        },
-        {
-            "Name": "Donald Trump",
-            "Index": 45
-        },
-        {
-            "Name": "Joseph Biden",
-            "Index": 46
-        }
-    ]
-    const sht = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,sht,"My Data")
-    ; //XLSX.utils.sheet_to_json<President>(wb.Sheets[wb.SheetNames[0]]);
-    // console.log(data);
-    
-    /* Write File */
-    XLSX.writeFile(wb, "node.xlsx");
-}
 
 /**
  * The Excel Storage Connector is going to be developed in-tandem with this
@@ -45,15 +9,31 @@ export async function createXLSXFile(){
  * 
  * **For God's Sake don't let the co-development of this pollute the PDW library**.
  */
-export class ExcelConnector implements StorageConnector{
+export class ExcelConnector implements pdw.StorageConnector{
     connectedDbName: string;
     serviceName: string;
+    connectionStatus: "error" | "not connected" | "connected"
+    private wb?: XLSX.WorkBook;
+    private defSht?: XLSX.WorkSheet;
+    private pointDefSht?: XLSX.WorkSheet;
     
-    constructor(){
+    constructor(filename = 'PDW Data.xlsx'){
+        XLSX.set_fs(fs);
         this.connectedDbName = 'temporary';
-        this.serviceName = "Excel";
+        this.serviceName = 'Excel';
+        this.connectionStatus = 'not connected';
+        try{
+            this.wb = XLSX.readFile(filename);
+        }catch(e){
+            this.initNewWorkbook(filename);
+        }
     }
+
     setDefs() {
+        if(this.connectionStatus !== 'connected') throw new Error('Excel is not Connector')
+        
+        console.log('CALLED IN THE CONNECTOR');
+        
         throw new Error('Method not implemented.');
     }
     
@@ -63,4 +43,39 @@ export class ExcelConnector implements StorageConnector{
         return []
     }
     
+    static connect(fileNameWithDotXlsx: string): pdw.StorageConnector{
+        let instance = new ExcelConnector(fileNameWithDotXlsx);
+        return instance;
+    }
+
+    private initNewWorkbook(filename: string){
+        this.wb = XLSX.utils.book_new();
+        this.defSht = XLSX.utils.aoa_to_sheet([pdw.standardTabularDefHeaders]);
+        this.pointDefSht = XLSX.utils.aoa_to_sheet([pdw.standardTabularPointDefHeaders]);
+        XLSX.utils.book_append_sheet(this.wb, this.defSht);
+        XLSX.utils.book_append_sheet(this.wb, this.pointDefSht);
+        XLSX.writeFile(this.wb, filename);
+    }
 }
+
+/*
+XLSX.set_fs(fs);
+let demoSwitch = 'write';
+demoSwitch = 'read';
+if (demoSwitch == 'write') {
+    const date = new Date();
+    const myObj = { "hello": "world" }
+    var wb = XLSX.utils.book_new(); var ws = XLSX.utils.aoa_to_sheet([
+        ["Dynamic would be too nice", "<3", "CSV Test"],
+        [72, , 'Then he said, "This should trip you up, dad".'],
+        [, 62, myObj],
+        [true, false, date],
+    ]);
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    XLSX.writeFile(wb, "fs-test/textport.xlsx");
+} else {
+    let contents = XLSX.readFile('fs-test/textport.xlsx');
+    console.log(contents.Sheets.Sheet1.A1.v);
+}
+
+*/

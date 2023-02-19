@@ -1,6 +1,6 @@
 import './style.css'
 import { makeTemp } from './pdw'
-import { createXLSXFile } from './connectors/excelConnector';
+// import { createXLSXFile } from './connectors/excelConnector';
 
 //This is not the library, but instead what drives the html view & imports the library.
 
@@ -24,7 +24,9 @@ let button = document.createElement('button');
 button.textContent = "Click me, yo";
 
 button.onclick = ()=>{
-  createXLSXFile();
+  console.log('Does nothing right now');
+  
+  // createXLSXFile();
 }
 
 document.querySelector<HTMLDivElement>('#app')!.appendChild(button);

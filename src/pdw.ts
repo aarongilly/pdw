@@ -1,5 +1,32 @@
 import { Temporal } from "temporal-polyfill";
 
+//#region ### CLASSES ###
+
+export class PDW {
+    connection?: StorageConnector;
+    private static instance: PDW;
+    constructor() {
+
+    }
+    registerConnection(connectorInstance: StorageConnector) {
+        this.connection = connectorInstance;
+    }
+
+    /**
+     * Singleton pattern.
+     * @returns the PDW
+     */
+    public static getInstance() {
+        if (!PDW.instance) {
+            PDW.instance = new PDW();
+        }
+        return PDW.instance;
+    }
+
+}
+
+//#endregion
+
 //#region ### TYPES ###
 
 /**
@@ -9,17 +36,25 @@ import { Temporal } from "temporal-polyfill";
 export type _uid = string;
 
 export enum PointType {
-  /**
-   * number
-   */
-  num,
-  text,
-  select,
-  bool,
-  duration,
-  file,
-  photo,
-  
+    /**
+     * number
+     */
+    num,
+    text,
+    select,
+    bool,
+    duration,
+    file,
+    photo,
+}
+
+export enum Scope {
+    second,
+    day,
+    week,
+    month,
+    quarter,
+    year,
 }
 
 //#endregion
@@ -29,7 +64,7 @@ export enum PointType {
 /**
  * This function exists temporarily to stop errors from unused **Temporal** imports
  */
-export function makeTemp(){
+export function makeTemp() {
     console.log(Temporal.Now.zonedDateTimeISO());
 }
 
@@ -51,7 +86,7 @@ export interface StorageConnector {
     /**
      * Creates (or updates) definitions. 
      */
-    setDefs(): any;
+    setDefs(defs: DefLike[]): any;
     //getEntries()
     //setEntries()
     /**
@@ -88,6 +123,7 @@ export interface DefLike extends Element {
     _lbl: string;
     _desc: string;
     _emoji: string;
+    _scope: Scope;
     _tags: Tag[];
 }
 
@@ -97,24 +133,24 @@ export interface Tag {
 }
 
 export interface PointDef extends Element {
- /**
-  * Point ID, a tiny ID
-  */
-  _pid: string; 
-  /**
-  * Label for the point
-  */
-  _lbl: string; 
-  /**
-  * Point description
-  */
-  _desc: string; 
-  /**
-  * Point type
-  */
-  _type: PointType; 
-  
-  
+    /**
+     * Point ID, a tiny ID
+     */
+    _pid: string;
+    /**
+    * Label for the point
+    */
+    _lbl: string;
+    /**
+    * Point description
+    */
+    _desc: string;
+    /**
+    * Point type
+    */
+    _type: PointType;
+
+
 }
 
 //#endregion
@@ -132,15 +168,23 @@ export interface PointDef extends Element {
  */
 export function makeUid(): _uid {
     const randomLength = 4
-    return new Date().getTime().toString(36)+"."+Math.random().toString(36).slice(13-randomLength).padStart(randomLength,"0")
+    return new Date().getTime().toString(36) + "." + Math.random().toString(36).slice(13 - randomLength).padStart(randomLength, "0")
 }
 
 export function parseTemporalFromUid(uid: _uid): any { //Temporal.Instant{
-    const epochMillis = parseInt(uid.split(".")[0],36)
+    const epochMillis = parseInt(uid.split(".")[0], 36)
     const parsedTemporal = Temporal.Instant.fromEpochMilliseconds(epochMillis);
     // const timezone = Temporal.Now.timeZone();
     // console.log(parsedTemporal.toString({ timeZone: Temporal.TimeZone.from(timezone)}));
     return parsedTemporal
 }
+
+//#endregion
+
+//#region ### CONSTANTS ###
+
+export const standardTabularDefHeaders = ['_did','_lbl','_emoji','_deleted','_desc','_scope','_created','_updated','_tags'];
+export const standardTabularPointDefHeaders = ['_did','_lbl','_emoji','_deleted','_desc','_scope','_created','_updated'];
+export const standardTabularEntryHeaders = ['_did','_lbl','_emoji','_deleted','_desc','_scope','_created','_updated'];
 
 //#endregion
