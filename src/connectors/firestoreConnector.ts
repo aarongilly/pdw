@@ -1,4 +1,6 @@
-import { StorageConnector } from "../pdw";
+export {} //delete this line when starting development
+
+//import { StorageConnector } from "../pdw";
 
 /**
  * Try not to chase 3 rabbits. This is intended to KEEP THE END IN MIND.
@@ -7,6 +9,8 @@ import { StorageConnector } from "../pdw";
  * It's not obvious to me yet whether the PDW library needs to know about
  * or be involved with that at all. Probably not?
  */
+
+/*
 export class FirestoreConnector implements StorageConnector{
     constructor(){
         this.connectedDbName = 'Temporary';
@@ -22,5 +26,5 @@ export class FirestoreConnector implements StorageConnector{
     }
     connectedDbName: string;
     serviceName: string;
-
 }
+*/
