@@ -1,4 +1,5 @@
 import { StorageConnector } from "../pdw";
+// import * as csv from 'csv-writer';
 
 /**
  * Try not to chase 3 rabbits. This is intended to KEEP THE END IN MIND.
@@ -12,9 +13,15 @@ export class PlainTextConnector implements StorageConnector{
         this.connectedDbName = 'Temporary';
         this.serviceName = "PlainText";
     }
+
+    setDefs() {
+        throw new Error("Method not implemented.");
+    }
+
     getDefs(params?: string[] | undefined) {
         if(params) console.log('I see your', params);
         throw new Error("Method not implemented.");
+        return [];
     }
     connectedDbName: string;
     serviceName: string;

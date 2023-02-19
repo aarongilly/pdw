@@ -18,10 +18,11 @@
     "vitest": "^0.28.5"
   },
   "dependencies": {
+    "fast-csv": "^4.3.6",
     "fs": "^0.0.1-security",
     "node-fetch": "^3.3.0",
     "sqlite3": "^5.1.4",
     "temporal-polyfill": "^0.0.8",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.19.2/xlsx-0.19.2.tgz"
   }
 }

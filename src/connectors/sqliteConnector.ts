@@ -13,9 +13,13 @@ export class SqliteConnector implements StorageConnector {
         this.connectedDbName = 'Temporary';
         this.serviceName = "SQLite3";
     }
-    getDefs(params?: string[] | undefined) {
-        if (params) console.log('I see your', params);
+    setDefs() {
         throw new Error("Method not implemented.");
+    }
+    getDefs(params?: string[] | undefined) {
+        throw new Error("Method not implemented.");
+        if (params) console.log('I see your', params);
+        return []
     }
     connectedDbName: string;
     serviceName: string;

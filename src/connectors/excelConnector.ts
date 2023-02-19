@@ -53,10 +53,14 @@ export class ExcelConnector implements StorageConnector{
         this.connectedDbName = 'temporary';
         this.serviceName = "Excel";
     }
+    setDefs() {
+        throw new Error('Method not implemented.');
+    }
     
     getDefs(params?: string[] | undefined) {
         if(params) console.log('I see your ', params);
         throw new Error('Method not implemented.');
+        return []
     }
     
 }

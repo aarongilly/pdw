@@ -12,9 +12,13 @@ export class FirestoreConnector implements StorageConnector{
         this.connectedDbName = 'Temporary';
         this.serviceName = "Firestore";
     }
+    setDefs() {
+        throw new Error("Method not implemented.");
+    }
     getDefs(params?: string[] | undefined) {
         if(params) console.log('I see your', params);
         throw new Error("Method not implemented.");
+        return [];
     }
     connectedDbName: string;
     serviceName: string;
