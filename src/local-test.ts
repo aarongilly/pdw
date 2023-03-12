@@ -1,11 +1,13 @@
-import {PDW} from './pdw.js'
-import { ExcelConnector } from "./connectors/excelConnector.js";
+import {PDW, sampleDefinitions} from './pdw.js'
+import { FileConnector } from "./connectors/fileConnector.js";
 
 const pdw = PDW.getInstance();
 const filename = 'fs-test/ExcelDevFile.xlsx';
 
-pdw.registerConnection(ExcelConnector.connect(filename));
+pdw.registerConnection(FileConnector.newWorkbook());
 
+const testDef = sampleDefinitions[0];
 
+pdw.setDefs([testDef]);
 
-// pdw.connection?.setDefs([]);
+(<FileConnector> pdw.connection).writeToFile(filename);
