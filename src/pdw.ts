@@ -132,6 +132,11 @@ export interface StorageConnector {
      */
     serviceName: string;
 
+    /**
+     * A reference to the Personal Data Warehouse instance to 
+     * which the storage connector is connected.
+     */
+    pdw?: PDW;
     //property for whether or not the PDW should be using 
     //a "pass along all getters and setters" mode or
     //a "do everything in memory, then do saves"
@@ -385,6 +390,7 @@ export class PDW {
     }
     registerConnection(connectorInstance: StorageConnector) {
         this.connection = connectorInstance;
+        connectorInstance.pdw = this;
     }
 
     setDefs(defs: DefLike[]) {

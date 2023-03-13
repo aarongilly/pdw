@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as pdw from '../pdw.js';
+import { Temporal } from 'temporal-polyfill';
 
 
 /**
@@ -26,6 +27,12 @@ export class FileConnector implements pdw.StorageConnector{
     serviceName: string;
     connectionStatus: "error" | "not connected" | "connected"
     private defs: pdw.Def[];
+    /**
+     * A reference to the PDW instance this connection was
+     * created to connect to. This variable is set in the 
+     * {@link registerConnection} method
+     */
+    public pdw?: pdw.PDW;
     // private entries: pdw.Entry[];
     // private tags: pdw.Tag[];
     
@@ -86,26 +93,55 @@ export class FileConnector implements pdw.StorageConnector{
     mergeWithFile(){
 
     }
+
+    loadFromExcel(filepath: string){
+        console.log('loading...');
+        XLSX.set_fs(fs);
+        let myWb = XLSX.readFile(filepath);
+        const shts = myWb.SheetNames;
+        if(!shts.some(name=>name==='Defs')){
+            console.warn('No Defs sheet found in ' + filepath);
+        }else{
+            const defSht = myWb.Sheets['Defs'];
+            const pointDefSht = myWb.Sheets['Point Defs'];
+
+            //will be all plain text
+            let defBaseRawArr = XLSX.utils.sheet_to_json(defSht) as pdw.DefLike[];
+            let pointDefRawArr = XLSX.utils.sheet_to_json(pointDefSht) as pdw.PointDefLike[];
+
+            //FUTURE WORK ---
+            //handle additional paring situations --- excel dates, for one.
+
+            //must convert to pdw-expected types
+            let defBaseParsedArr: pdw.DefLike[] = defBaseRawArr.map(raw=> destringifyObj(raw));
+
+            let pointDefParsedArr: pdw.PointDefLike[] = pointDefRawArr.map(raw=> destringifyObj(raw));
+
+            const combined = defBaseParsedArr.map(base=>{
+                if(defBaseParsedArr.some(pd=> pd._did === base._did && pd._deleted === false)){
+                    console.log('should see this twice');
+                    base._points = pointDefParsedArr.filter(pd=>pd._did === base._did && pd._deleted === false)
+                }
+                return base;
+            });
+            combined.forEach(def=>{
+                this.defs.push(new pdw.Def(def));
+            })
+            console.log(this.defs);
+        }   
+    }
 }
 
-/*
-XLSX.set_fs(fs);
-let demoSwitch = 'write';
-demoSwitch = 'read';
-if (demoSwitch == 'write') {
-    const date = new Date();
-    const myObj = { "hello": "world" }
-    var wb = XLSX.utils.book_new(); var ws = XLSX.utils.aoa_to_sheet([
-        ["Dynamic would be too nice", "<3", "CSV Test"],
-        [72, , 'Then he said, "This should trip you up, dad".'],
-        [, 62, myObj],
-        [true, false, date],
-    ]);
-    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-    XLSX.writeFile(wb, "fs-test/textport.xlsx");
-} else {
-    let contents = XLSX.readFile('fs-test/textport.xlsx');
-    console.log(contents.Sheets.Sheet1.A1.v);
+/**
+ * Converts a map of strings into a map of properly-typed values, 
+ * based on the observed key.
+ * @param obj object containing properties to convert
+ */
+function destringifyObj(obj: pdw.DefLike | pdw.PointDefLike | pdw.EntryLike | pdw.TagLike): any {
+    let returnObj = {...obj}; //shallow copy deemed okay by Aaron circa 2023-03-12, get mad at him
+    if(returnObj._created !== undefined) returnObj._created = Temporal.PlainDateTime.from(returnObj._created);
+    if(returnObj._updated !== undefined) returnObj._updated = Temporal.PlainDateTime.from(returnObj._updated);
+    if(returnObj._deleted !== undefined) returnObj._deleted = returnObj._deleted.toString().toUpperCase() === 'TRUE';
+    //...others?
+    return returnObj
 }
-
-*/
