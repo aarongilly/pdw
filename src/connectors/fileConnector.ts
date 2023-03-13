@@ -25,76 +25,66 @@ export class FileConnector implements pdw.StorageConnector{
     connectedDbName: string;
     serviceName: string;
     connectionStatus: "error" | "not connected" | "connected"
-    private wb?: XLSX.WorkBook;
-    //@ts-ignore
-    private defSht?: XLSX.WorkSheet;
-    private pointDefSht?: XLSX.WorkSheet;
-    private entrySht?: XLSX.WorkSheet;
-    private tagSht?: XLSX.WorkSheet;
+    private defs: pdw.Def[];
+    // private entries: pdw.Entry[];
+    // private tags: pdw.Tag[];
     
-    constructor(filename = 'PDW Data.xlsx'){
-        XLSX.set_fs(fs);
+    constructor(){
         this.connectedDbName = 'temporary';
-        this.serviceName = 'Excel';
+        this.serviceName = 'In Memory';
         this.connectionStatus = 'not connected';
-        try{
-            this.wb = XLSX.readFile(filename);
-        }catch(e){
-            this.initNewWorkbook(filename);
-        }
+        this.defs = [];
     }
 
-    setDefs() {
-        if(this.wb === undefined) throw new Error('No workbook identified')
-        
-        /* #TODO
-        Do I keep an array of Def objects in memory?
-        Do I really want to implement that in a connector?
-        **/
-        console.log('TODO-- how will this work?');
-        
-        // throw new Error('Method not implemented.');
+    setDefs(defs: pdw.MinimumDef[]) {
+        defs.forEach(def => {
+            this.defs.push(new pdw.Def(def));
+        })
     }
     
     getDefs(params?: string[] | undefined) {
         if(params) console.log('I see your ', params);
-        throw new Error('Method not implemented.');
-        return []
+        return this.defs;
     }
 
-    writeToFile(filename: string){
-        if(this.wb === undefined) throw new Error('No workbook identified')
-       
-        this.defSht = XLSX.utils.aoa_to_sheet([pdw.standardTabularDefHeaders],);
-        this.pointDefSht = XLSX.utils.aoa_to_sheet([pdw.standardTabularPointDefHeaders]);
-        this.entrySht = XLSX.utils.aoa_to_sheet([pdw.standardTabularEntryHeaders]);
-        this.tagSht = XLSX.utils.aoa_to_sheet([pdw.standardTabularTagHeaders]);
+    writeToFile(fileType: 'excel' | 'json' | 'yaml' | 'csv', filename: string){
+        //this one line feels out of place... makes the connector filesystem specific
+        XLSX.set_fs(fs);
+        if(fileType === 'excel') return this.writeToExcel(filename);
+        throw new Error('Unimplementd write type: ' + fileType)
+    }
 
-        XLSX.utils.book_append_sheet(this.wb, this.defSht, "Defs");
-        XLSX.utils.book_append_sheet(this.wb, this.pointDefSht, "Point Defs");
-        XLSX.utils.book_append_sheet(this.wb, this.entrySht, "Entries");
-        XLSX.utils.book_append_sheet(this.wb, this.tagSht, "Tags");
-        XLSX.writeFile(this.wb, filename);
+    writeToExcel(filename: string){
+        const wb = XLSX.utils.book_new();
+
+        let defBaseArr = this.defs.map(def=>def.getTabularDefBase());
+        defBaseArr.unshift(pdw.standardTabularDefHeaders);
+
+        let pointDefArr = [pdw.standardTabularPointDefHeaders];
+        this.defs.forEach(def => {
+            const pointArr = def.getTabularPointDefs();
+            pointArr?.forEach(point => {
+                const stringifiedPoint = point.map(attr=> attr.toString());
+                pointDefArr.push(stringifiedPoint);
+            })
+        })
+
+        let defSht = XLSX.utils.aoa_to_sheet(defBaseArr);
+        let pointDefSht = XLSX.utils.aoa_to_sheet(pointDefArr);
+        let entryBaseSht = XLSX.utils.aoa_to_sheet([pdw.standardTabularFullEntryHeaders]);
+        let entryPointSht = XLSX.utils.aoa_to_sheet([pdw.standardTabularEntryPointHeaders]);
+        let tagSht = XLSX.utils.aoa_to_sheet([pdw.standardTabularTagHeaders]);
+
+        XLSX.utils.book_append_sheet(wb, defSht, "Defs");
+        XLSX.utils.book_append_sheet(wb, pointDefSht, "Point Defs");
+        XLSX.utils.book_append_sheet(wb, entryBaseSht, "Entries Base");
+        XLSX.utils.book_append_sheet(wb, entryPointSht, "Entry Points");
+        XLSX.utils.book_append_sheet(wb, tagSht, "Tags");
+        XLSX.writeFile(wb, filename);
     }
 
     mergeWithFile(){
 
-    }
-
-    static newWorkbook(): pdw.StorageConnector{
-        let instance = new FileConnector();
-        return instance;
-    }
-    
-    static loadWorkbook(fileNameWithDotXlsx: string): pdw.StorageConnector{
-        let instance = new FileConnector(fileNameWithDotXlsx);
-        return instance;
-    }
-
-    private initNewWorkbook(filename: string){
-        console.log('Do you want to use a filename?' + filename);
-        
-        this.wb = XLSX.utils.book_new();
     }
 }
 

@@ -3,11 +3,10 @@ import { FileConnector } from "./connectors/fileConnector.js";
 
 const pdw = PDW.getInstance();
 const filename = 'fs-test/ExcelDevFile.xlsx';
+const fileConnector = new FileConnector();
 
-pdw.registerConnection(FileConnector.newWorkbook());
+pdw.registerConnection(fileConnector);
 
-const testDef = sampleDefinitions[0];
+pdw.setDefs(sampleDefinitions);
 
-pdw.setDefs([testDef]);
-
-(<FileConnector> pdw.connection).writeToFile(filename);
+(<FileConnector> pdw.connection).writeToFile('excel', filename);
