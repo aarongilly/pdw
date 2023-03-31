@@ -97,34 +97,34 @@ export class FileConnector implements pdw.StorageConnector{
     loadFromExcel(filepath: string){
         console.log('loading...');
         XLSX.set_fs(fs);
-        let myWb = XLSX.readFile(filepath);
-        const shts = myWb.SheetNames;
+        let loadedWb = XLSX.readFile(filepath);
+        const shts = loadedWb.SheetNames;
         if(!shts.some(name=>name==='Defs')){
             console.warn('No Defs sheet found in ' + filepath);
         }else{
-            const defSht = myWb.Sheets['Defs'];
-            const pointDefSht = myWb.Sheets['Point Defs'];
+            const defSht = loadedWb.Sheets['Defs'];
+            const pointDefSht = loadedWb.Sheets['Point Defs'];
 
             //will be all plain text
             let defBaseRawArr = XLSX.utils.sheet_to_json(defSht) as pdw.DefLike[];
             let pointDefRawArr = XLSX.utils.sheet_to_json(pointDefSht) as pdw.PointDefLike[];
 
-            //FUTURE WORK ---
-            //handle additional paring situations --- excel dates, for one.
-
-            //must convert to pdw-expected types
-            let defBaseParsedArr: pdw.DefLike[] = defBaseRawArr.map(raw=> destringifyObj(raw));
-
-            let pointDefParsedArr: pdw.PointDefLike[] = pointDefRawArr.map(raw=> destringifyObj(raw));
+            //convert dates & booleans - (#TODO  - handle some variability)
+            let defBaseParsedArr: pdw.DefLike[] = defBaseRawArr.map(raw=> destringifyElement(raw));
+            let pointDefParsedArr: pdw.PointDefLike[] = pointDefRawArr.map(raw=> destringifyElement(raw));
 
             const combined = defBaseParsedArr.map(base=>{
                 if(defBaseParsedArr.some(pd=> pd._did === base._did && pd._deleted === false)){
-                    console.log('should see this twice');
                     base._points = pointDefParsedArr.filter(pd=>pd._did === base._did && pd._deleted === false)
                 }
                 return base;
             });
+
             combined.forEach(def=>{
+                /*
+                #TODO - check for whether this.defs **should** load the new def 
+                & if a previous needs marked deleted
+                */
                 this.defs.push(new pdw.Def(def));
             })
             console.log(this.defs);
@@ -137,9 +137,12 @@ export class FileConnector implements pdw.StorageConnector{
  * based on the observed key.
  * @param obj object containing properties to convert
  */
-function destringifyObj(obj: pdw.DefLike | pdw.PointDefLike | pdw.EntryLike | pdw.TagLike): any {
+function destringifyElement(obj: pdw.DefLike | pdw.PointDefLike | pdw.EntryLike | pdw.TagLike): any {
     let returnObj = {...obj}; //shallow copy deemed okay by Aaron circa 2023-03-12, get mad at him
-    if(returnObj._created !== undefined) returnObj._created = Temporal.PlainDateTime.from(returnObj._created);
+    if(returnObj._created !== undefined) {
+        //TODO - check for and handle native Excel dates
+        returnObj._created = Temporal.PlainDateTime.from(returnObj._created);
+    }
     if(returnObj._updated !== undefined) returnObj._updated = Temporal.PlainDateTime.from(returnObj._updated);
     if(returnObj._deleted !== undefined) returnObj._deleted = returnObj._deleted.toString().toUpperCase() === 'TRUE';
     //...others?

@@ -8,6 +8,6 @@ const fileConnector = new FileConnector();
 pdw.registerConnection(fileConnector);
 
 (<FileConnector> pdw.connection).loadFromExcel(filename);
-// pdw.setDefs(sampleDefinitions);
 
+// pdw.setDefs(sampleDefinitions);
 // (<FileConnector> pdw.connection).writeToFile('excel', filename);
