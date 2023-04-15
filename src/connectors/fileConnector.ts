@@ -70,10 +70,11 @@ export class FileConnector implements pdw.StorageConnector{
         //this one line feels out of place... makes the connector filesystem specific
         XLSX.set_fs(fs);
         if(fileType === 'excel') return this.writeToExcel(filename);
+        if(fileType === 'json') return this.writeToJson(filename);
         throw new Error('Unimplementd write type: ' + fileType)
     }
 
-    writeToExcel(filename: string){
+    private writeToExcel(filename: string){
         const wb = XLSX.utils.book_new();
 
         let defBaseArr = this.defs.map(def=>def.getTabularDefBase());
@@ -102,8 +103,13 @@ export class FileConnector implements pdw.StorageConnector{
         XLSX.writeFile(wb, filename);
     }
 
-    mergeWithFile(){
-        
+    private writeToJson(filename: string){
+        let callback = ()=>{
+            console.log('Wrote successfully?');
+        }
+        //#TODO - test to ensure pointDefs come along, also Entries & tags eventually
+        let json = JSON.stringify(this.defs);
+        fs.writeFile(filename, json, 'utf8', callback);
     }
 
     loadFromExcel(filepath: string){

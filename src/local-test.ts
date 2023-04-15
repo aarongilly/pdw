@@ -10,15 +10,16 @@ pdw.registerConnection(fileConnector);
 loadFile('fs-test/PDW-OutFile.xlsx')
 loadFile('fs-test/PDW-OutFile2.xlsx')
 
-
 // const localDefCopy = pdw.getDefs(['Event', 'doae', 'seae']);
 
 // console.log(localDefCopy);
 
 // pdw.setDefs(sampleDefinitions);
 
-let outFilename = 'fs-test/PDW-OutFile3.xlsx';
-(<FileConnector> pdw.connection).writeToFile('excel', outFilename);
+// let outFilename = 'fs-test/PDW-OutFile3.xlsx';
+// (<FileConnector> pdw.connection).writeToFile('excel', outFilename);
+let outFilename = 'fs-test/PDW-OutFile3.json';
+(<FileConnector> pdw.connection).writeToFile('json', outFilename);
 
 // console.log(makeUID());
 
