@@ -1,5 +1,4 @@
 import './style.css'
-import { makeTemp } from './pdw'
 // import { createXLSXFile } from './connectors/excelConnector';
 
 //This is not the library, but instead what drives the html view & imports the library.
@@ -18,7 +17,6 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   </div>
   <h2>Basic Tester Button</h2>
 `
-makeTemp();
 
 let button = document.createElement('button');
 button.textContent = "Click me, yo";

@@ -4,14 +4,14 @@ import { Temporal } from "temporal-polyfill";
 
 /**
  * A synonym for string, implying one with the structure of:
- * tinytimestamp-{@link smallID}
+ * tinytimestamp-{@link SmallID}
  */
 export type UID = string;
 
 /**
  * A synonym for string, a string of 4 random characters
  */
-export type smallID = string;
+export type SmallID = string;
 
 /**
  * A synonym for string, a string of structure
@@ -48,7 +48,7 @@ export enum PointType {
     TEXT = 'TEXT',
     SELECT = 'SELECT', //
     BOOL = 'BOOL', //true false
-    DURATION = 'DURTION', //Temporal.duration
+    DURATION = 'DURATION', //Temporal.duration
     TIME = 'TIME', //Temporal.plainTime
     MULTISELECT = 'MULTISELECT', //#TODO --- think
     FILE = 'FILE',
@@ -93,13 +93,6 @@ export enum Format {
 //#region ### INTERFACES ###
 
 /**
- * This function exists temporarily to stop errors from unused **Temporal** imports
- */
-export function makeTemp() {
-    console.log(Temporal.Now.plainDateTimeISO());
-}
-
-/**
  * The `StorageConnector` interface is what you must implement when creating code to
  * hook up a new database. It is what sits between the data store of choice and the PDW.
  * It's designed to be as simple-to-implement as possible.
@@ -110,9 +103,12 @@ export function makeTemp() {
  */
 export interface StorageConnector {
     /**
-     * This coment explains getDefs in the storageconnenctor
+     * Get Definitions. 
+     * Specifying no param will return all definitions.
+     * @param didsAndOrLbls array of _did or _lbl vales to get, leave empty to get all Defs
+     * @returns array of all matching definitions
      */
-    getDefs(params?: getDefParam[]): DefLike[];
+    getDefs(didsAndOrLbls?: getDefParam[]): DefLike[];
 
     /**
      * Creates (or updates) definitions. 
@@ -127,6 +123,7 @@ export interface StorageConnector {
      * the database name for cloud databases.
      */
     connectedDbName: string;
+    
     /**
      * The name of the connector, essentially. Examples: "Excel", "Firestore"
      */
@@ -152,7 +149,7 @@ export type getDefParam = string;
  */
 export interface Element {
     /**
-     * Universal ID - uniquely identifies an INSTANCE of any element
+     * Universal ID - uniquely identifies an INSTANCE of any element.
      */
     _uid: UID;
     /**
@@ -223,11 +220,11 @@ export interface PointDefLike extends Element {
     /**
      * Definition ID - the type of the thing.
      */
-    _did: string;
+    _did: SmallID;
     /**
      * Point ID, a tiny ID
      */
-    _pid: string;
+    _pid: SmallID;
     /**
     * Label for the point
     */
@@ -255,8 +252,39 @@ export interface PointDefLike extends Element {
 }
 
 export interface EntryLike extends Element {
+    /**
+     * Entry ID, a unique identifier for an entry - unlike {@link _uid} 
+     * _eid is not updated when an entry is updated. A new _uid is created
+     * for the updated Entry, but they will share _eid values.
+     */
+    _eid: UID,
+    /**
+     * A generic note about an entry, all entries can have them
+     */
+    _note: string,
+    /**
+     * An array of associated EntryPoints. May be empty.
+     */
+    _points: EntryPointLike[]
+    /**
+     * Associated definition ID
+     */
+    _did: SmallID,
+}
 
-
+export interface EntryPointLike extends Element {
+    /**
+     * The Entry the Point is Associated With
+     */
+    _eid: UID,
+    /**
+     * Associated Point Definition ID
+     */
+    _pid: SmallID,
+    /**
+     * The actual value of the entry
+     */
+    _val: any
 }
 
 export interface MinimumDef {
@@ -289,7 +317,7 @@ export interface MinimumDef {
      * Definition ID
      * Defaults to a new smallID
      */
-    _did?: smallID;
+    _did?: SmallID;
     /**
      * Description
      * Defaults to 'Set a description'
@@ -325,7 +353,7 @@ export interface MinimumPointDef {
     /**
      * To create a brand new PointDef, you must provide a label, did, & type
      */
-    _did: smallID;
+    _did: SmallID;
     /**
      * To create a brand new PointDef, you must provide a label, did & type
      */
@@ -354,7 +382,7 @@ export interface MinimumPointDef {
      * Point ID
      * Defaults to a new smallID
      */
-    _pid?: smallID;
+    _pid?: SmallID;
     /**
      * Description
      * Defaults to 'Set a description'
@@ -396,7 +424,16 @@ export class PDW {
     setDefs(defs: DefLike[]) {
         if (this.connection === undefined) throw new Error("No connector registered");
         //pass along function call to the connector
-        this.connection.setDefs(defs);
+        return this.connection.setDefs(defs);
+    }
+
+    getDefs(didOrLbls: string[] | string){
+        //force array type
+        if(!Array.isArray(didOrLbls)) didOrLbls = [didOrLbls];
+
+        if (this.connection === undefined) throw new Error("No connector registered");
+        //pass along function call to the connector
+        return this.connection.getDefs(didOrLbls);
     }
 
     /**
@@ -416,7 +453,7 @@ export class PDW {
 }
 
 export class Def implements DefLike {
-    _did: smallID;
+    _did: SmallID;
     _lbl: string;
     _desc: string;
     _emoji: string;
@@ -526,7 +563,7 @@ export function makeUID(): UID {
     return new Date().getTime().toString(36) + "." + makeSmallID();
 }
 
-export function makeSmallID(length = 4): smallID {
+export function makeSmallID(length = 4): SmallID {
     return Math.random().toString(36).slice(13 - length).padStart(length, "0")
 }
 
@@ -552,90 +589,3 @@ export const standardTabularTagHeaders = ['_uid', '_created', '_updated', '_dele
 export const standardTabularFullEntryHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_note']; //think
 
 //#endregion
-
-export const sampleDefinitions: DefLike[] = [
-    {
-        _uid: 'lep62vrw.hfvm',
-        _created: Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
-        _updated: Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
-        _deleted: false,
-        _desc: 'A test definition, for plain events',
-        _did: 'doae',
-        _emoji: '🧪',
-        _lbl: 'Event',
-        _scope: Scope.SECOND,
-        _tags: [{
-            _uid: 'lep6353w.hnkp',
-            _created: Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
-            _updated: Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
-            _deleted: false,
-            _lbl: 'Testing',
-            _tid: 'spak'
-        }],
-        _points: [
-            {
-                _did: 'doae',
-                _uid: 'lep65ghw.rghw',
-                _created: Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
-                _updated: Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
-                _deleted: false,
-                _pid: 'apox',
-                _lbl: 'Event',
-                _desc: 'The main text for the event',
-                _emoji: '🏷️',
-                _type: PointType.TEXT,
-                _rollup: Rollup.COUNT,
-                _format: Format.MARKDOWN,
-            }
-        ]
-    },
-    {
-        _uid: 'lep62vpsx.doqd',
-        _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-        _updated: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-        _deleted: false,
-        _desc: 'A 2nd definition, with two points',
-        _did: 'seae',
-        _emoji: '2️⃣',
-        _lbl: 'Movie',
-        _scope: Scope.SECOND,
-        _tags: [{
-            _uid: 'lep6353w.hnkp',
-            _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-            _updated: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-            _deleted: false,
-            _lbl: 'Media',
-            _tid: 'pwpa'
-        }],
-        _points: [
-            {
-                _did: 'seae',
-                _uid: 'lep65gcy.rghw',
-                _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-                _updated: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-                _deleted: false,
-                _pid: 'oese',
-                _lbl: 'Title',
-                _desc: 'The name of hte movie',
-                _emoji: '🎬',
-                _type: PointType.TEXT,
-                _rollup: Rollup.COUNTUNIQUE,
-                _format: Format.TEXT,
-            },
-            {
-                _did: 'seae',
-                _uid: 'lep65g3sq.rghw',
-                _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-                _updated: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-                _deleted: false,
-                _pid: 'momm',
-                _lbl: 'First time?',
-                _desc: 'Have you seen this before?',
-                _emoji: '🎍',
-                _type: PointType.BOOL,
-                _rollup: Rollup.COUNTOFEACH,
-                _format: Format.YESNO,
-            }
-        ]
-    }
-]

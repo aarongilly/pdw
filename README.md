@@ -1,40 +1,25 @@
 # Personal Data Warehouse
 
-## TODO NEXT TIME
-
-### Get a Local Connector Workflow
-Pick up on trying out [CSV writer](https://www.npmjs.com/package/csv-writer)  
-and/or  
-Figure out how to set xlsx to write to file via localtest
-
-XLSX coudl be extra powerful given it can work in-browser & locally
-
-### Build Up pdw.ts Directly
-Connectors are cool, but the product is vital... and not really started.
-
-## Project Meta
-
-This is made with Vite: ![test image input](/vite.svg)
-
 This is the README.md - it also generates the top-level documentation page.
 
-The goal here is to have a pdw.ts library you could publish to NPM - along with a connector or two.
+The goal here is to have a pdw.ts library you could publish to NPM - along with a connector or two. This is a library development project, for a single codebase that can be used to interact with local data or data in the cloud, depending on the storage connector.
 
-Also to develop (some) **LOCAL FIRST** storage connector(s)
+Also want to develop a few StorageConnectors - in order:
+1. Excel
+2. Firebase --- and a front-end with Svelte(Kit?)
+3. SQLite
 
-You've made good progress:
+Regarding TypeDoc - you can use images:  
+This is made with Vite: ![test image input](/vite.svg)
 
-- [x] made functioning `npm run localtest` script
-- [x] created poc local .txt files
-- [x] created poc local sqlite database
-- [x] create local .csv files
-- [x] read local .csv files
-    - [ ] had to use `npm i --save https://cdn.sheetjs.com/xlsx-0.19.2/xlsx-0.19.2.tgz`
+You *could* also use Excalidraw for neat documentation. StarUML for legit UML documentaiton, or [this site](https://tsuml-demo.firebaseapp.com/) to generate UML maps and insert them into the markup here.
 
+## TODO NEXT TIME
+Pick up with these things 👇
 
-You can use [this site](https://tsuml-demo.firebaseapp.com/) to generate UML maps and insert them into the markup here.
-
-You could also use Excalidraw for neat documentation.
+- [ ] Build up the `loadFromExcel` function to handle variability of inputs for defs
+- [ ] Start working on setDefs
+- [ ] Start working on getEntries/setEntries
 
 ## Reminders
 
@@ -46,14 +31,18 @@ outDir = out //property didnt' exist
 
 - You were able to set up a launch.json to run localtest.ts by simply pressing `f5`
 
+- You can use [this site](https://tsuml-demo.firebaseapp.com/) to generate UML maps and insert them into the markup here.
+
+### Local Development
+`npm run localtest` -or- `f5` runs src/local-test.ts --- it works great!
+
+### Cloud Development
+`npm run dev` for Docs & browser-based stuff
+
 # Connector Dev
 
 Try to **remain connector agnostic!** Also to have the API work in-browser and in Node.
 (can you use the Temporal polyfill in node?)
-
-Anyway, `npm run dev` for Docs & browser-based stuff
-
-- [ ] TODO - make a LOCAL tester script and add it to package.json to test SQL
 
 |Firebase|XLSX|SQLite|
 |:-:|:-:|:-:|

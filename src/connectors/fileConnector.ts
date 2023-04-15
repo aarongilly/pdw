@@ -49,9 +49,21 @@ export class FileConnector implements pdw.StorageConnector{
         })
     }
     
-    getDefs(params?: string[] | undefined) {
-        if(params) console.log('I see your ', params);
-        return this.defs;
+    /**
+     * Get Defs searches the array of Definitions. 
+     * Specifying no param will return all definitions.
+     * I think this one is done & working.
+     * @param didsAndOrLbls array of _did or _lbl vales to get, leave empty to get all Defs
+     * @returns array of all matching definitions
+     */
+    getDefs(didsAndOrLbls?: string[] | undefined) {
+        if(didsAndOrLbls === undefined) return this.defs;
+        if(didsAndOrLbls) console.log('I see your ', didsAndOrLbls);
+        const labelMatches = this.defs.filter(def=>didsAndOrLbls.some(p=>p===def._lbl));
+        const didMatches = this.defs.filter(def=>didsAndOrLbls.some(p=>p===def._did));
+        //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
+        let noDupes = new Set([...labelMatches, ...didMatches]);
+        return Array.from(noDupes);
     }
 
     writeToFile(fileType: 'excel' | 'json' | 'yaml' | 'csv', filename: string){
@@ -91,7 +103,7 @@ export class FileConnector implements pdw.StorageConnector{
     }
 
     mergeWithFile(){
-
+        
     }
 
     loadFromExcel(filepath: string){
@@ -145,6 +157,8 @@ function destringifyElement(obj: pdw.DefLike | pdw.PointDefLike | pdw.EntryLike 
     }
     if(returnObj._updated !== undefined) returnObj._updated = Temporal.PlainDateTime.from(returnObj._updated);
     if(returnObj._deleted !== undefined) returnObj._deleted = returnObj._deleted.toString().toUpperCase() === 'TRUE';
+    // if(returnObj._scope !== undefined) returnObj._deleted = returnObj._deleted.toString().toUpperCase() === 'TRUE';
+    
     //...others?
     return returnObj
 }
