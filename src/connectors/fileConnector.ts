@@ -133,11 +133,15 @@ export class FileConnector implements pdw.StorageConnector{
             });
 
             combined.forEach(def=>{
-                /*
-                #TODO - check for whether this.defs **should** load the new def 
-                & if a previous needs marked deleted
-                */
-                this.defs.push(new pdw.Def(def));
+                let existingDef = this.defs.find(existingDef => existingDef._did == def._did && existingDef._deleted == false)
+                if(existingDef === undefined){
+                    this.defs.push(new pdw.Def(def));
+                    return
+                }
+                if(existingDef.isOlderThan(def)){
+                    existingDef.markDeleted();
+                    this.defs.push(new pdw.Def(def));
+                }
             })
             console.log(this.defs);
         }   
@@ -157,7 +161,9 @@ function destringifyElement(obj: pdw.DefLike | pdw.PointDefLike | pdw.EntryLike 
     }
     if(returnObj._updated !== undefined) returnObj._updated = Temporal.PlainDateTime.from(returnObj._updated);
     if(returnObj._deleted !== undefined) returnObj._deleted = returnObj._deleted.toString().toUpperCase() === 'TRUE';
-    // if(returnObj._scope !== undefined) returnObj._deleted = returnObj._deleted.toString().toUpperCase() === 'TRUE';
+    if(returnObj.hasOwnProperty('_scope')){
+        (<pdw.DefLike> returnObj)._scope = (<pdw.DefLike> returnObj)._scope.toString().toUpperCase() as pdw.Scope;
+    }
     
     //...others?
     return returnObj
