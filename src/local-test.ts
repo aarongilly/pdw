@@ -1,4 +1,4 @@
-import {PDW} from './pdw.js'
+import {PDW, PointType} from './pdw.js'
 import { FileConnector } from "./connectors/fileConnector.js";
 // import { sampleDefinitions } from './sampleData.js';
 
@@ -14,14 +14,19 @@ loadFile('fs-test/PDW-OutFile1.xlsx')
 loadFile('fs-test/PDW-OutFile2.xlsx')
 // loadFile('fs-test/PDW-OutFile3.json')
 
-// const localDefCopy = pdw.getDefs(['Event', 'doae', 'seae']);
+const localDefCopy = pdw.getDefs(['test one'], false);
 
-// console.log(localDefCopy);
+pdw.createNewPointDef({
+    _lbl: 'Test Point',
+    _did: localDefCopy[0]._did,
+    _type: PointType.TEXT
+})
 
+console.log(fileConnector.getPointDefs())
 // pdw.setDefs(sampleDefinitions);
 
-let outFilename = 'fs-test/PDW-OutFile3.json';
-(<FileConnector> pdw.connection).writeToFile(outFilename);
+// let outFilename = 'fs-test/PDW-OutFile3.json';
+// (<FileConnector> pdw.connection).writeToFile(outFilename);
 // let outFilename = 'fs-test/DevFile.json';
 // (<FileConnector> pdw.connection).writeToFile(outFilename);
 

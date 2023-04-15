@@ -112,7 +112,7 @@ export interface StorageConnector {
      * @param didsAndOrLbls array of _did or _lbl vales to get, leave empty to get all Defs
      * @returns array of all matching definitions
      */
-    getDefs(didsAndOrLbls?: getDefParam[]): DefLike[];
+    getDefs(didsAndOrLbls?: getDefParam[], includeDeleted?: boolean): DefLike[];
 
     /**
      * Creates (or updates) definitions. 
@@ -455,13 +455,12 @@ export class PDW {
         return this.connection.setPointDefs(pointDefs);
     }
 
-    getDefs(didOrLbls: string[] | string){
+    getDefs(didOrLbls: string[] | string, includeDeleted = true){
         //force array type
         if(!Array.isArray(didOrLbls)) didOrLbls = [didOrLbls];
-
         if (this.connection === undefined) throw new Error("No connector registered");
         //pass along function call to the connector
-        return this.connection.getDefs(didOrLbls);
+        return this.connection.getDefs(didOrLbls, includeDeleted);
     }
     
     /**
@@ -633,11 +632,11 @@ export class Def extends Element implements DefLike {
         }
     }
 
-    createNewPointDef(){
+    // createNewPointDef(pd: {_lbl: string, _type: PointType}){
+        
+    // }
 
-    }
-
-    setPointDef() {
+    setPointDefs() {
 
     }
 

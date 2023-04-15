@@ -60,7 +60,6 @@ export class FileConnector implements pdw.StorageConnector{
         pointDefs.forEach(pd=>{
             this.pointDefs.push(new pdw.PointDef(pd));
         })
-        throw new Error('Method not implemented.');
     }
 
     setDefs(defs: pdw.MinimumDef[]) {
@@ -76,14 +75,15 @@ export class FileConnector implements pdw.StorageConnector{
      * @param didsAndOrLbls array of _did or _lbl vales to get, leave empty to get all Defs
      * @returns array of all matching definitions
      */
-    getDefs(didsAndOrLbls?: string[] | undefined) {
+    getDefs(didsAndOrLbls?: string[] | undefined, includeDeleted = true) {
         if(didsAndOrLbls === undefined) return this.defs;
         if(didsAndOrLbls) console.log('I see your ', didsAndOrLbls);
         const labelMatches = this.defs.filter(def=>didsAndOrLbls.some(p=>p===def._lbl));
         const didMatches = this.defs.filter(def=>didsAndOrLbls.some(p=>p===def._did));
         //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
-        let noDupes = new Set([...labelMatches, ...didMatches]);
-        return Array.from(noDupes);
+        let noDupes = Array.from(new Set([...labelMatches, ...didMatches]));
+        if(!includeDeleted) noDupes = noDupes.filter(def=> def._deleted === false);
+        return noDupes;
     }
 
     writeToFile(filepath: string){
