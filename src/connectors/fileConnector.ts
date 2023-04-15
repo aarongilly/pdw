@@ -27,6 +27,7 @@ export class FileConnector implements pdw.StorageConnector{
     serviceName: string;
     connectionStatus: "error" | "not connected" | "connected"
     private defs: pdw.Def[];
+    private pointDefs: pdw.PointDef[];
     /**
      * A reference to the PDW instance this connection was
      * created to connect to. This variable is set in the 
@@ -41,6 +42,25 @@ export class FileConnector implements pdw.StorageConnector{
         this.serviceName = 'In Memory';
         this.connectionStatus = 'not connected';
         this.defs = [];
+        this.pointDefs = [];
+    }
+
+    //#BUG - PointDefs require DID AND a pid or lbl... think
+    getPointDefs(didsAndOrLbls?: string[] | undefined): pdw.PointDef[] {
+        if(didsAndOrLbls === undefined) return this.pointDefs;
+        if(didsAndOrLbls) console.log('I see your ', didsAndOrLbls);
+        const labelMatches = this.pointDefs.filter(def=>didsAndOrLbls.some(p=>p===def._lbl));
+        const didMatches = this.pointDefs.filter(def=>didsAndOrLbls.some(p=>p===def._did));
+        //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
+        let noDupes = new Set([...labelMatches, ...didMatches]);
+        return Array.from(noDupes);
+    }
+
+    setPointDefs(pointDefs: pdw.PointDefLike[]) {
+        pointDefs.forEach(pd=>{
+            this.pointDefs.push(new pdw.PointDef(pd));
+        })
+        throw new Error('Method not implemented.');
     }
 
     setDefs(defs: pdw.MinimumDef[]) {
@@ -66,11 +86,17 @@ export class FileConnector implements pdw.StorageConnector{
         return Array.from(noDupes);
     }
 
-    writeToFile(fileType: 'excel' | 'json' | 'yaml' | 'csv', filename: string){
-        //this one line feels out of place... makes the connector filesystem specific
-        XLSX.set_fs(fs);
-        if(fileType === 'excel') return this.writeToExcel(filename);
-        if(fileType === 'json') return this.writeToJson(filename);
+    writeToFile(filepath: string){
+        const fileType = FileConnector.inferFileType(filepath)
+        if(fileType === 'excel') return this.writeToExcel(filepath);
+        if(fileType === 'json') return this.writeToJson(filepath);
+        throw new Error('Unimplementd write type: ' + fileType)
+    }
+
+    loadFromFile(filepath: string){
+        const fileType = FileConnector.inferFileType(filepath)
+        if(fileType === 'excel') return this.loadFromExcel(filepath);
+        if(fileType === 'json') return this.loadFromJson(filepath);
         throw new Error('Unimplementd write type: ' + fileType)
     }
 
@@ -108,7 +134,15 @@ export class FileConnector implements pdw.StorageConnector{
             console.log('Wrote successfully?');
         }
         //#TODO - test to ensure pointDefs come along, also Entries & tags eventually
-        let json = JSON.stringify(this.defs);
+        const singleObject = {
+            overview: '#TODO',
+            defs: this.defs,
+            //pointDefs: this.pointDefs, //??
+            tags: [],
+            entries: [],
+            //entryPoints: this.entryPoints //??
+        }
+        let json = JSON.stringify(singleObject);
         fs.writeFile(filename, json, 'utf8', callback);
     }
 
@@ -127,7 +161,6 @@ export class FileConnector implements pdw.StorageConnector{
             let defBaseRawArr = XLSX.utils.sheet_to_json(defSht) as pdw.DefLike[];
             let pointDefRawArr = XLSX.utils.sheet_to_json(pointDefSht) as pdw.PointDefLike[];
 
-            //convert dates & booleans - (#TODO  - handle some variability)
             let defBaseParsedArr: pdw.DefLike[] = defBaseRawArr.map(raw=> destringifyElement(raw));
             let pointDefParsedArr: pdw.PointDefLike[] = pointDefRawArr.map(raw=> destringifyElement(raw));
 
@@ -144,13 +177,27 @@ export class FileConnector implements pdw.StorageConnector{
                     this.defs.push(new pdw.Def(def));
                     return
                 }
-                if(existingDef.isOlderThan(def)){
-                    existingDef.markDeleted();
+                if(existingDef.shouldBeReplacedWith(def)){
+                    existingDef.markAsDeleted();
                     this.defs.push(new pdw.Def(def));
                 }
             })
             console.log(this.defs);
         }   
+    }
+        
+        loadFromJson(filepath: string) {
+            const file = JSON.parse(fs.readFileSync(filepath).toString());
+            console.log(file);
+            
+        }
+
+    private static inferFileType(path: string): "excel" | "json" | "csv" | "yaml" | "unknown" {
+        if(path.slice(-5)===".xlsx") return 'excel'
+        if(path.slice(-5)===".json") return 'json'
+        if(path.slice(-4)===".csv") return 'csv'
+        if(path.slice(-5)===".yaml") return 'yaml'
+        return "unknown"
     }
 }
 

@@ -14,6 +14,11 @@ export type UID = string;
 export type SmallID = string;
 
 /**
+ * A synonym for string, any valid Period.stringify string
+ */
+export type periodString = string;
+
+/**
  * A synonym for string, a string of structure
  * yyyy-mm-dd
  */
@@ -38,7 +43,6 @@ export type isoDuration = string
  * yyyy-mm-ddThh:mm:ss
  */
 export type isoDateTime = string;
-
 
 export enum PointType {
     /**
@@ -114,6 +118,22 @@ export interface StorageConnector {
      * Creates (or updates) definitions. 
      */
     setDefs(defs: DefLike[]): any;
+
+    /**
+     * Get PointDefinitions. 
+     * Specifying no param will return all definitions.
+     * @param didsAndOrLbls array of _did or _lbl vales to get, leave empty to get all Defs
+     * @returns array of all matching definitions
+     */
+    getPointDefs(didsAndOrLbls?: getDefParam[]): PointDefLike[];
+
+    /**
+     * Creates (or updates) point defintions
+     */
+    setPointDefs(pointDefs: PointDefLike[]): any
+
+
+
     //getEntries()
     //setEntries()
     //getTags()
@@ -267,6 +287,7 @@ export interface EntryLike extends ElementLike {
      * An array of associated EntryPoints. May be empty.
      */
     _points: EntryPointLike[]
+    
     /**
      * Associated definition ID
      */
@@ -428,6 +449,12 @@ export class PDW {
         return this.connection.setDefs(defs);
     }
 
+    setPointDefs(pointDefs: PointDefLike[]) {
+        if (this.connection === undefined) throw new Error("No connector registered");
+        //pass along function call to the connector
+        return this.connection.setPointDefs(pointDefs);
+    }
+
     getDefs(didOrLbls: string[] | string){
         //force array type
         if(!Array.isArray(didOrLbls)) didOrLbls = [didOrLbls];
@@ -442,7 +469,7 @@ export class PDW {
      * and adds it to the definition manifest of the connected storage
      * connector.
      * @param defInfo 
-     * @returns 
+     * @returns the newly created Definition
     */
    createNewDef(defInfo: MinimumDef): Def{
         if (this.connection === undefined) throw new Error("No connector registered");
@@ -450,6 +477,20 @@ export class PDW {
         this.setDefs([newDef]);
         return newDef;
     }
+
+    /**
+     * Creates a new definition from {@link MinimumDef} components
+     * and adds it to the definition manifest of the connected storage
+     * connector.
+     * @param pointDefInfo 
+     * @returns the newly created Point Definition
+    */
+   createNewPointDef(pointDefInfo: MinimumPointDef): PointDef{
+    if (this.connection === undefined) throw new Error("No connector registered");
+    let newPointDef = new PointDef(pointDefInfo);
+    this.setPointDefs([newPointDef]);
+    return newPointDef;
+}
 
     /**
      * Singleton pattern.
@@ -486,10 +527,16 @@ export abstract class Element implements ElementLike{
         this._updated = existingData.hasOwnProperty('_updated') ? existingData._updated : Temporal.Now.plainDateTimeISO();
 
     }
-    markDeleted(){
+    markAsDeleted(){
         this._deleted = true;
         this._updated = Temporal.Now.plainDateTimeISO();
     }
+
+    /**
+     * Checks if the argument was updated more recently than this
+     * @param elementData ElementLike data to compare against
+     * @returns true if argument is updated more recently than this
+     */
     isOlderThan(elementData: ElementLike){
         let until = this._updated.until(elementData._updated)
     
@@ -501,6 +548,19 @@ export abstract class Element implements ElementLike{
         //sign is 1 if and only if comp is newer
         return until.sign == 1
     }
+
+    /**
+     * Checks whether this is the same Element as the comparison AND if the 
+     * comparison is newer than this
+     * @param comparison ElementLike data that might be a newer copy of this
+     * @returns true if the argument is a newer version of the same Element
+     */
+    shouldBeReplacedWith(comparison: ElementLike): boolean{
+        if(!this.sameIdAs(comparison)) return false;
+        if(this.isOlderThan(comparison)) return true;
+        return false;
+    }
+
     /**
      * Get the type of an element. Not sure if I'll use this outside
      * of the 
@@ -512,6 +572,24 @@ export abstract class Element implements ElementLike{
         if(this.hasOwnProperty("_eid")) return "EntryLike"
         if(this.hasOwnProperty("_pid")) return "PointDefLike"
         return "DefLike"
+    }
+
+    /**
+     * Checks to see if this has the same _did (or _eid, _tid, _pid) as
+     * whatever is passed in
+     * @param comparison Element to compare against
+     */
+    sameIdAs(comparison: ElementLike){
+        if(!this.sameTypeAs(comparison)) return false;
+        const type = this.getType();
+        //@ts-expect-error
+        if(type==='DefLike') return this._did === comparison._did;
+        //@ts-expect-error
+        if(type==='EntryLike') return this._eid === comparison._eid;
+        //@ts-expect-error
+        if(type==='TagLike') return this._tid === comparison._tid;
+        //@ts-expect-error
+        return this._pid === comparison._pid && this._did === comparison._did;
     }
 
     sameTypeAs(comparison: ElementLike){
@@ -555,6 +633,10 @@ export class Def extends Element implements DefLike {
         }
     }
 
+    createNewPointDef(){
+
+    }
+
     setPointDef() {
 
     }
@@ -594,7 +676,7 @@ export class Def extends Element implements DefLike {
     }
 }
 
-class PointDef extends Element implements PointDefLike {
+export class PointDef extends Element implements PointDefLike {
     _did: string;
     _pid: string;
     _lbl: string;
@@ -608,7 +690,7 @@ class PointDef extends Element implements PointDefLike {
     declare _created: Temporal.PlainDateTime;
     declare _updated: Temporal.PlainDateTime;
     _def?: Def;
-    constructor(pd: MinimumPointDef, def: Def){
+    constructor(pd: MinimumPointDef, def?: Def){
         super(pd)
         this._did = pd._did;
         this._lbl = pd._lbl;
@@ -679,7 +761,7 @@ export function elementIsNewer(baseElement: ElementLike, comparisonElement: Elem
 
 export const standardTabularDefHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_lbl', '_emoji', '_desc', '_scope'];
 export const standardTabularPointDefHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_lbl', '_emoji', '_desc', '_type', '_rollup', '_format'];
-export const standardTabularBaseEntryHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_note'];
+export const standardTabularBaseEntryHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_period', '_note'];
 export const standardTabularEntryPointHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_val'];
 export const standardTabularTagHeaders = ['_uid', '_created', '_updated', '_deleted', '_tid', '_lbl'];
 
