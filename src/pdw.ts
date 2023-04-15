@@ -145,9 +145,10 @@ export interface StorageConnector {
 export type getDefParam = string;
 
 /**
- * This interface is extended by {@link DefLike}
+ * This interface is extended by the interfaces for the base Elements:
+ * {@link DefLike}, {@link PointDefLike}, {@link EntryLike}, & {@link EntryPointLike}
  */
-export interface Element {
+export interface ElementLike {
     /**
      * Universal ID - uniquely identifies an INSTANCE of any element.
      */
@@ -174,7 +175,7 @@ export interface Element {
 /**
  * Definitions Data Shape
  */
-export interface DefLike extends Element {
+export interface DefLike extends ElementLike {
     /**
      * Definition ID - the type of the thing.
      */
@@ -205,7 +206,7 @@ export interface DefLike extends Element {
     _points?: PointDefLike[];
 }
 
-export interface TagLike extends Element {
+export interface TagLike extends ElementLike {
     /**
      * Like the Definition ID, the ID of the Tag
      */
@@ -216,7 +217,7 @@ export interface TagLike extends Element {
     _lbl: string;
 }
 
-export interface PointDefLike extends Element {
+export interface PointDefLike extends ElementLike {
     /**
      * Definition ID - the type of the thing.
      */
@@ -251,7 +252,7 @@ export interface PointDefLike extends Element {
     _format: Format
 }
 
-export interface EntryLike extends Element {
+export interface EntryLike extends ElementLike {
     /**
      * Entry ID, a unique identifier for an entry - unlike {@link _uid} 
      * _eid is not updated when an entry is updated. A new _uid is created
@@ -272,7 +273,7 @@ export interface EntryLike extends Element {
     _did: SmallID,
 }
 
-export interface EntryPointLike extends Element {
+export interface EntryPointLike extends ElementLike {
     /**
      * The Entry the Point is Associated With
      */
@@ -435,6 +436,20 @@ export class PDW {
         //pass along function call to the connector
         return this.connection.getDefs(didOrLbls);
     }
+    
+    /**
+     * Creates a new definition from {@link MinimumDef} components
+     * and adds it to the definition manifest of the connected storage
+     * connector.
+     * @param defInfo 
+     * @returns 
+    */
+   createNewDef(defInfo: MinimumDef): Def{
+        if (this.connection === undefined) throw new Error("No connector registered");
+        let newDef = new Def(defInfo);
+        this.setDefs([newDef]);
+        return newDef;
+    }
 
     /**
      * Singleton pattern.
@@ -452,7 +467,67 @@ export class PDW {
     // }
 }
 
-export class Def implements DefLike {
+/**
+ * Base class 
+ */
+export abstract class Element implements ElementLike{
+    _uid: string;
+    _deleted: boolean;
+    _created: Temporal.PlainDateTime;
+    _updated: Temporal.PlainDateTime;
+    constructor(existingData: Object){
+        //@ts-expect-error
+        this._uid = existingData.hasOwnProperty('_uid') ? existingData._uid : makeUID();
+        //@ts-expect-error
+        this._deleted = existingData.hasOwnProperty('_deleted') ? existingData._deleted : false;
+        //@ts-expect-error
+        this._created = existingData.hasOwnProperty('_created') ? existingData._created : Temporal.Now.plainDateTimeISO();
+        //@ts-expect-error
+        this._updated = existingData.hasOwnProperty('_updated') ? existingData._updated : Temporal.Now.plainDateTimeISO();
+
+    }
+    markDeleted(){
+        this._deleted = true;
+        this._updated = Temporal.Now.plainDateTimeISO();
+    }
+    isOlderThan(elementData: ElementLike){
+        let until = this._updated.until(elementData._updated)
+    
+        console.log(this._updated.toLocaleString())
+        console.log(elementData._updated.toLocaleString())
+        // "until" is a Temporal.Duration instance
+        console.log(until.total('seconds'));
+        
+        //sign is 1 if and only if comp is newer
+        return until.sign == 1
+    }
+    /**
+     * Get the type of an element. Not sure if I'll use this outside
+     * of the 
+     * @returns string representing the type of element
+     */
+    getType(): 'DefLike' | 'PointDefLike' | 'EntryLike' | 'EntryPointLike' | 'TagLike' {
+        if(this.hasOwnProperty("_tid")) return "TagLike"
+        if(this.hasOwnProperty("_eid") && this.hasOwnProperty('_pid')) return "EntryPointLike"
+        if(this.hasOwnProperty("_eid")) return "EntryLike"
+        if(this.hasOwnProperty("_pid")) return "PointDefLike"
+        return "DefLike"
+    }
+
+    sameTypeAs(comparison: ElementLike){
+        return this.getType() === this.getTypeOfElementLike(comparison);
+    }
+
+    private getTypeOfElementLike(data: ElementLike) {
+        if(data.hasOwnProperty("_tid")) return "TagLike"
+        if(data.hasOwnProperty("_eid") && data.hasOwnProperty('_pid')) return "EntryPointLike"
+        if(data.hasOwnProperty("_eid")) return "EntryLike"
+        if(data.hasOwnProperty("_pid")) return "PointDefLike"
+        return "DefLike"
+    }
+}
+
+export class Def extends Element implements DefLike {
     _did: SmallID;
     _lbl: string;
     _desc: string;
@@ -460,20 +535,21 @@ export class Def implements DefLike {
     _scope: Scope;
     _tags?: TagLike[] | undefined;
     _points?: PointDefLike[] | undefined;
-    _uid: UID;
-    _deleted: boolean;
-    _created: Temporal.PlainDateTime;
-    _updated: Temporal.PlainDateTime;
+    declare _uid: UID;
+    declare _deleted: boolean;
+    declare _created: Temporal.PlainDateTime;
+    declare _updated: Temporal.PlainDateTime;
     constructor(defIn: MinimumDef) {
+        super(defIn)
         this._lbl = defIn._lbl;
         this._did = defIn._did ?? makeSmallID();
-        this._uid = defIn._uid ?? makeUID();
+        // this._uid = defIn._uid ?? makeUID();
         this._desc = defIn._desc ?? 'Set a description';
         this._emoji = defIn._emoji ?? '🆕';
         this._scope = defIn._scope ?? Scope.SECOND;
-        this._deleted = defIn._deleted ?? false;
-        this._created = defIn._created ?? Temporal.Now.plainDateTimeISO();
-        this._updated = defIn._updated ?? Temporal.Now.plainDateTimeISO();
+        // this._deleted = defIn._deleted ?? false;
+        // this._created = defIn._created ?? Temporal.Now.plainDateTimeISO();
+        // this._updated = defIn._updated ?? Temporal.Now.plainDateTimeISO();
         if(defIn._points !== undefined){
             this._points = defIn._points.map(point => new PointDef(point, this));
         }
@@ -518,7 +594,7 @@ export class Def implements DefLike {
     }
 }
 
-class PointDef implements PointDefLike {
+class PointDef extends Element implements PointDefLike {
     _did: string;
     _pid: string;
     _lbl: string;
@@ -527,20 +603,21 @@ class PointDef implements PointDefLike {
     _type: PointType;
     _rollup: Rollup;
     _format: Format;
-    _uid: string;
-    _deleted: boolean;
-    _created: Temporal.PlainDateTime;
-    _updated: Temporal.PlainDateTime;
+    declare _uid: string;
+    declare _deleted: boolean;
+    declare _created: Temporal.PlainDateTime;
+    declare _updated: Temporal.PlainDateTime;
     _def?: Def;
     constructor(pd: MinimumPointDef, def: Def){
+        super(pd)
         this._did = pd._did;
         this._lbl = pd._lbl;
         this._type = pd._type;
         this._pid = pd._pid ?? makeSmallID();
-        this._deleted = pd._deleted ?? false;
-        this._created = pd._created ?? Temporal.Now.plainDateTimeISO();
-        this._updated = pd._updated ?? Temporal.Now.plainDateTimeISO();
-        this._uid = pd._uid ?? makeUID();
+        // this._deleted = pd._deleted ?? false;
+        // this._created = pd._created ?? Temporal.Now.plainDateTimeISO();
+        // this._updated = pd._updated ?? Temporal.Now.plainDateTimeISO();
+        // this._uid = pd._uid ?? makeUID();
         this._desc = pd._desc ?? 'Set a description';
         this._emoji = pd._emoji ?? '🆕';
         this._rollup = pd._rollup ?? Rollup.COUNT;
@@ -574,6 +651,26 @@ export function parseTemporalFromUid(uid: UID): any { //Temporal.Instant{
     // const timezone = Temporal.Now.timeZone();
     // console.log(parsedTemporal.toString({ timeZone: Temporal.TimeZone.from(timezone)}));
     return parsedTemporal
+}
+
+/**
+ * To compare elements' {@link _updated} times, for use in determining
+ * if the comparisonElement is newer than the baseElement.
+ * @param baseElement The thing you have that might be outdated
+ * @param comparisonElement The thing that might be newer
+ * @returns true if baseElement is less recently updated than comparison
+ */
+export function elementIsNewer(baseElement: ElementLike, comparisonElement: ElementLike): Boolean{
+    
+    let until = baseElement._updated.until(comparisonElement._updated)
+    
+    // console.log(baseElement._updated.toLocaleString())
+    // console.log(comparisonElement._updated.toLocaleString())
+    // "until" is a Temporal.Duration instance
+    //console.log(until.total('seconds'));
+    
+    //sign is 1 if and only if comp is newer
+    return until.sign == 1
 }
 
 //#endregion
