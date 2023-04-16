@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import * as pdw from '../pdw.js';
 import { Temporal } from 'temporal-polyfill';
 
-
 /**
  * The File Storage Connector is going to be developed in-tandem with this
  * iteration of the PDW. This connector will be unique, in that it will work
@@ -101,6 +100,8 @@ export class FileConnector implements pdw.StorageConnector {
     }
 
     private writeToExcel(filename: string) {
+
+        XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();
 
         let defBaseArr = this.defs.map(def => def.getTabularDefBase());
