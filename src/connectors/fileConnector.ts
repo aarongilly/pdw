@@ -137,10 +137,10 @@ export class FileConnector implements pdw.StorageConnector {
         const singleObject = {
             overview: '#TODO',
             defs: this.defs,
-            //pointDefs: this.pointDefs, //??
-            tags: [],
-            entries: [],
-            //entryPoints: this.entryPoints //??
+            pointDefs: this.pointDefs,
+            tags: [], //this.tags
+            entries: [], //this.entries
+            entryPoints: [] //this.entryPoints //??
         }
         let json = JSON.stringify(singleObject);
         fs.writeFile(filename, json, 'utf8', callback);

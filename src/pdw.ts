@@ -284,10 +284,9 @@ export interface EntryLike extends ElementLike {
      */
     _note: string,
     /**
-     * An array of associated EntryPoints. May be empty.
+     * When the entry is for
      */
-    _points: EntryPointLike[]
-    
+    _period: periodString,
     /**
      * Associated definition ID
      */
