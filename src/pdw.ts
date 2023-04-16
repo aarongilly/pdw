@@ -219,11 +219,11 @@ export interface DefLike extends ElementLike {
     /**
      * Tags for grouping similar definitions easier in filters
      */
-    _tags?: TagLike[];
+    // _tags?: TagLike[];
     /**
      * The points on the definition
      */
-    _points?: PointDefLike[];
+    // _points?: PointDefLike[];
 }
 
 export interface TagLike extends ElementLike {
@@ -752,6 +752,19 @@ export function elementIsNewer(baseElement: ElementLike, comparisonElement: Elem
     
     //sign is 1 if and only if comp is newer
     return until.sign == 1
+}
+
+/**
+* Get the type of an element. Not sure if I'll use this outside
+* of the 
+* @returns string representing the type of element
+*/
+export function getElementType(element: ElementLike): 'DefLike' | 'PointDefLike' | 'EntryLike' | 'EntryPointLike' | 'TagLike' {
+   if(element.hasOwnProperty("_tid")) return "TagLike"
+   if(element.hasOwnProperty("_eid") && element.hasOwnProperty('_pid')) return "EntryPointLike"
+   if(element.hasOwnProperty("_eid")) return "EntryLike"
+   if(element.hasOwnProperty("_pid")) return "PointDefLike"
+   return "DefLike"
 }
 
 //#endregion
