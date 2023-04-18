@@ -22,7 +22,7 @@ import { Temporal } from 'temporal-polyfill';
  * 
  * **For God's Sake don't let the co-development of this pollute the PDW library**.
  */
-export class FileConnector implements pdw.StorageConnector{
+export class DefaultConnector implements pdw.StorageConnector{
     connectedDbName: string;
     serviceName: string;
     connectionStatus: "error" | "not connected" | "connected"
@@ -87,14 +87,14 @@ export class FileConnector implements pdw.StorageConnector{
     }
 
     writeToFile(filepath: string){
-        const fileType = FileConnector.inferFileType(filepath)
+        const fileType = DefaultConnector.inferFileType(filepath)
         if(fileType === 'excel') return this.writeToExcel(filepath);
         if(fileType === 'json') return this.writeToJson(filepath);
         throw new Error('Unimplementd write type: ' + fileType)
     }
 
     loadFromFile(filepath: string){
-        const fileType = FileConnector.inferFileType(filepath)
+        const fileType = DefaultConnector.inferFileType(filepath)
         if(fileType === 'excel') return this.loadFromExcel(filepath);
         if(fileType === 'json') return this.loadFromJson(filepath);
         throw new Error('Unimplementd write type: ' + fileType)
@@ -178,7 +178,7 @@ export class FileConnector implements pdw.StorageConnector{
                     return
                 }
                 if(existingDef.shouldBeReplacedWith(def)){
-                    existingDef.markAsDeleted();
+                    existingDef.markDeleted();
                     this.defs.push(new pdw.Def(def));
                 }
             })
