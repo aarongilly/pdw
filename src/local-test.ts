@@ -1,9 +1,9 @@
 import {PDW, PointType} from './pdw.js'
-import { FileConnector } from "./connectors/fileConnector.js";
+import { DefaultConnector } from "./connectors/defaultConnector.js";
 // import { sampleDefinitions } from './sampleData.js';
 
 const pdw = PDW.getInstance();
-const fileConnector = new FileConnector();
+const fileConnector = new DefaultConnector();
 pdw.registerConnection(fileConnector);
 
 // pdw.createNewDef({_lbl: "test one", _desc: 'Updated here'})
@@ -33,5 +33,5 @@ console.log(fileConnector.getPointDefs())
 // console.log(makeUID());
 
 function loadFile(fileName: string){
-    (<FileConnector> pdw.connection).loadFromFile(fileName);
+    (<DefaultConnector> pdw.connection).loadFromFile(fileName);
 }
