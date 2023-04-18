@@ -9,7 +9,7 @@ import { Temporal } from "temporal-polyfill";
 export type UID = string;
 
 /**
- * A synonym for string, a string of 4 random characters
+ * A synonym for string, a string of 5 random characters
  */
 export type SmallID = string;
 
@@ -523,10 +523,15 @@ export abstract class Element implements ElementLike{
         this._created = existingData.hasOwnProperty('_created') ? existingData._created : Temporal.Now.plainDateTimeISO();
         //@ts-expect-error
         this._updated = existingData.hasOwnProperty('_updated') ? existingData._updated : Temporal.Now.plainDateTimeISO();
-
     }
-    markAsDeleted(){
+    
+    markDeleted(){
         this._deleted = true;
+        this._updated = Temporal.Now.plainDateTimeISO();
+    }
+
+    markUndeleted(){
+        this._deleted = false;
         this._updated = Temporal.Now.plainDateTimeISO();
     }
 
