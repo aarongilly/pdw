@@ -133,7 +133,11 @@ export class ExcelTabularImportExport {
             throw new Error('Cannot parseExcelDefRow for ', defRow);
 
         defRow._created = Temporal.PlainDateTime.from(defRow._created);
-        defRow._deleted = defRow._deleted.toUpperCase() == 'TRUE';
+        if(typeof defRow._deleted === 'boolean'){
+            defRow._deleted = defRow._deleted;
+        }else{
+            defRow._deleted = defRow._deleted.toUpperCase() == 'TRUE';
+        }
         defRow._did = defRow._did.toString(); //in case I got unlucky with an all-numeric SmallID
 
         if (!pdw.Def.isDefLike(defRow)) throw new Error('Failed to correctly parseExcelDefRow for ', defRow);

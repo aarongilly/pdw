@@ -105,10 +105,12 @@ export enum Format {
  */
 export interface DataStore {
     /**
+     * /**
      * Get Definitions. 
-     * Specifying no param will return all definitions.
-     * @param didsAndOrLbls array of _did or _lbl vales to get, leave empty to get all Defs
-     * @returns array of all matching definitions
+     * By default, returns onl undeleted definitions.
+     * Specifying no param will return all NOT DELETED definitions.
+     * @param didsAndOrLbls array of lbls and/or _did to include
+     * @param includeDeleted defaults to false;
      */
     getDefs(didsAndOrLbls?: string[], includeDeleted?: boolean): DefLike[];
 
@@ -123,7 +125,7 @@ export interface DataStore {
      * @param didsAndOrLbls array of _did or _lbl vales to get, leave empty to get all Defs
      * @returns array of all matching definitions
      */
-    getPointDefs(didsAndOrLbls?: string[]): PointDefLike[];
+    getPointDefs(didsAndOrLbls?: string[], includeDeleted?: boolean): PointDefLike[];
 
     /**
      * Creates (or updates) point defintions
@@ -577,8 +579,8 @@ export class PDW {
     //#HACK - hardcoded right now
     allDataSince(): CompleteDataset {
         return {
-            defs: this.dataStores[0].getDefs(),
-            pointDefs: this.dataStores[0].getPointDefs()
+            defs: this.dataStores[0].getDefs(undefined,true),
+            pointDefs: this.dataStores[0].getPointDefs(undefined,true)
         }
     }
 
@@ -794,8 +796,8 @@ export class Def extends Element implements DefLike {
     _desc: string;
     _emoji: string;
     _scope: Scope;
-    _tags?: TagDefLike[] | undefined;
-    _points?: PointDefLike[] | undefined;
+    // _tags?: TagDefLike[] | undefined;
+    // _points?: PointDefLike[] | undefined;
     constructor(defIn: MinimumDef) {
         super(defIn)
         this._lbl = defIn._lbl;
@@ -803,7 +805,6 @@ export class Def extends Element implements DefLike {
         this._desc = defIn._desc ?? 'Set a description';
         this._emoji = defIn._emoji ?? '🆕';
         this._scope = defIn._scope ?? Scope.SECOND;
-        //#THINK - do you want to add _points back in as optional? Or make it a method?
     }
 
     // createNewPointDef(pd: {_lbl: string, _type: PointType}){
@@ -822,6 +823,17 @@ export class Def extends Element implements DefLike {
             })
         })
         return pointDefs
+    }
+
+    getPoints(includeDeleted = false): PointDef[]{
+        const pdwRef = PDW.getInstance();
+        //if there's only DataStore, bypass the combining stuff to save time
+        if (pdwRef.dataStores.length == 1) {
+            let pds = pdwRef.dataStores[0].getPointDefs([this._did], includeDeleted)
+            return pds.map(pointDef => new PointDef(pointDef));
+        }
+
+        throw new Error('Multiple Data Stores are #TODO') //#TODO
     }
 
     /**
