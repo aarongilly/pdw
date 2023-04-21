@@ -1,5 +1,5 @@
 import { Temporal } from "temporal-polyfill"
-import { DefLike, EntryLike, EntryPointLike, Format, PointDefLike, PointType, Rollup, Scope, TagLike } from "./pdw"
+import { DefLike, EntryLike, EntryPointLike, Format, PointDefLike, PointType, Rollup, Scope, TagDefLike } from "./pdw"
 
 export const samplePointDefs: PointDefLike[] = [
     {
@@ -72,7 +72,7 @@ export const sampleDefinitions: DefLike[] = [
     }
 ]
 
-export const sampleTags: TagLike[] = [
+export const sampleTags: TagDefLike[] = [
     {
         _uid: 'lep6353w.hnkp',
         _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
