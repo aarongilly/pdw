@@ -357,6 +357,10 @@ export interface MinimumElement {
     _updated?: EpochStr;
 }
 
+/**
+ * required: _lbl
+ * optional: all others
+ */
 export interface MinimumDef extends MinimumElement {
     /**
      * To create a brand new definition, this is the **only** required field.
@@ -395,6 +399,10 @@ export interface MinimumDef extends MinimumElement {
     // _points?: PointDefLike[];
 }
 
+/**
+ * required: _lbl, _did, _type
+ * optoinal: all others
+ */
 export interface MinimumPointDef extends MinimumElement {
     /**
      * To create a brand new PointDef, you must provide a label, did, & type
@@ -435,6 +443,10 @@ export interface MinimumPointDef extends MinimumElement {
     _format?: Format;
 }
 
+/**
+ * required: _period, _did
+ * optioonal: all others
+ */
 export interface MinimumEntry extends MinimumElement {
     /**
      * When the Entry took place
@@ -457,6 +469,9 @@ export interface MinimumEntry extends MinimumElement {
      */
 }
 
+/**
+ * required: _did, _pid, _eid, _val
+ */
 export interface MinimumEntryPoint extends MinimumElement {
     /**
      * What kind of entry it is
@@ -479,6 +494,10 @@ export interface MinimumEntryPoint extends MinimumElement {
      */
 }
 
+/**
+ * required: _lbl
+ * optional: _tid
+ */
 export interface MinimumTagDef extends MinimumElement {
     /**
      * Label to be applied to the tag
@@ -491,6 +510,10 @@ export interface MinimumTagDef extends MinimumElement {
     _tid?: SmallID;
 }
 
+/**
+ * required: _did, _tid,
+ * required if for select: _pid
+ */
 export interface MinimumTag extends MinimumElement {
     /**
      * Definition to apply to
@@ -543,19 +566,19 @@ export class PDW {
         } else {
             this.dataStores = [new DefaultDataStore(this)]
         }
+        PDW.instance = this; //for singleton
     }
+
     registerConnection(storeInstance: DataStore) {
-        console.log(storeInstance);
-        //#TODO        
-        // this.dataStore?.push(storeInstance);
-        // storeInstance.pdw = this;
+        //#THINK - is this how to do it? Right now you're coming in from the connector
+        this.dataStores.push(storeInstance);
     }
 
     //#HACK - hardcoded right now
     allDataSince(): CompleteDataset{
         return {
             defs: this.dataStores[0].getDefs(),
-            // pointDefs: this.dataStores[0].getPointDefs()
+            pointDefs: this.dataStores[0].getPointDefs()
         }
     }
 
@@ -567,8 +590,12 @@ export class PDW {
         return defs
     }
 
-    setPointDefs(pointDefs: MinimumPointDef[]) {
-        console.log(pointDefs);
+    setPointDefs(pointDefsIn: MinimumPointDef[]): PointDef[] {
+        let pointDefs: PointDef[] = pointDefsIn.map(minimumPD => new PointDef(minimumPD));
+        this.dataStores.forEach(connection => {
+            connection.setPointDefs(pointDefs)
+        })
+        return pointDefs
     }
 
     getDefs(didOrLbls?: string[] | string, includeDeleted = true): Def[] {
@@ -599,6 +626,7 @@ export class PDW {
                         //add replacement
                         combinedDefs.push(def);
                     }
+                    //else{ignore it. don't do anything}
                 }else{
                     combinedDefs.push(def);
                 }
@@ -645,6 +673,9 @@ export class PDW {
     */
     createNewPointDef(pointDefInfo: MinimumPointDef): PointDef {
         let newPointDef = new PointDef(pointDefInfo);
+        this.dataStores.forEach(connection => {
+            connection.setPointDefs([newPointDef])
+        })
         return newPointDef;
     }
 
@@ -652,16 +683,12 @@ export class PDW {
      * Singleton pattern.
      * @returns the PDW
      */
-    public static getInstance() {
+    public static getInstance(): PDW {
         if (!PDW.instance) {
             PDW.instance = new PDW();
         }
         return PDW.instance;
     }
-
-    // public static open(){
-    //     //TODO - this maybe how it makes the most sense to do this?
-    // }
 }
 
 /**
@@ -672,11 +699,13 @@ export abstract class Element implements ElementLike {
     _deleted: boolean;
     _created: Temporal.PlainDateTime | string;
     _updated: EpochStr;
+    _pdw?: PDW
     constructor(existingData: any) {
         this._uid = existingData._uid ?? makeUID();
         this._deleted = existingData._deleted ?? false;
         this._created = existingData._created ?? Temporal.Now.plainDateTimeISO();
         this._updated = existingData._updated ?? makeEpochStr();
+        this._pdw = PDW.getInstance(); //singletons rule
     }
 
     markDeleted() {
@@ -734,9 +763,15 @@ export abstract class Element implements ElementLike {
         //@ts-expect-error
         if (type === 'DefLike') return this._did === comparison._did;
         //@ts-expect-error
+        if (type === 'PointDefLike') return this._did === comparison._did && this._pid === comparison._pid;
+        //@ts-expect-error
         if (type === 'EntryLike') return this._eid === comparison._eid;
         //@ts-expect-error
-        if (type === 'TagLike') return this._tid === comparison._tid;
+        if (type === 'EntryPointLike') return this._eid === comparison._eid && this_pid === comparison._pid;
+        //@ts-expect-error
+        if (type === 'TagDefLike') return this._tid === comparison._tid;
+        //@ts-expect-error
+        if (type === 'TagLike') return this._tid === comparison._tid && this._did === comparison._did; //#UNTESTED - for selects
         //@ts-expect-error
         return this._pid === comparison._pid && this._did === comparison._did;
     }
@@ -766,24 +801,28 @@ export class Def extends Element implements DefLike {
         super(defIn)
         this._lbl = defIn._lbl;
         this._did = defIn._did ?? makeSmallID();
-        // this._uid = defIn._uid ?? makeUID();
         this._desc = defIn._desc ?? 'Set a description';
         this._emoji = defIn._emoji ?? '🆕';
         this._scope = defIn._scope ?? Scope.SECOND;
-        // this._deleted = defIn._deleted ?? false;
-        // this._created = defIn._created ?? Temporal.Now.plainDateTimeISO();
-        // this._updated = defIn._updated ?? Temporal.Now.plainDateTimeISO();
-        // if(defIn._points !== undefined){
-        //     this._points = defIn._points.map(point => new PointDef(point, this));
-        // }
+        //#THINK - do you want to add _points back in as optional?
     }
 
     // createNewPointDef(pd: {_lbl: string, _type: PointType}){
 
     // }
 
-    setPointDefs() {
-
+    setPointDefs(pointInfoIn: [{
+        _lbl: string,
+        _type: PointType
+    }]): PointDef[] {
+        let pointDefs = pointInfoIn.map(point=>{
+            return this._pdw!.createNewPointDef({
+                _lbl: point._lbl,
+                _did: this._did,
+                _type: point._type
+            })
+        })
+        return pointDefs
     }
 }
 
@@ -803,10 +842,6 @@ export class PointDef extends Element implements PointDefLike {
         this._lbl = pd._lbl;
         this._type = pd._type;
         this._pid = pd._pid ?? makeSmallID();
-        this._deleted = pd._deleted ?? false;
-        this._created = pd._created ?? Temporal.Now.plainDateTimeISO();
-        this._updated = pd._updated ?? makeEpochStr();
-        this._uid = pd._uid ?? makeUID();
         this._desc = pd._desc ?? 'Set a description';
         this._emoji = pd._emoji ?? '🆕';
         this._rollup = pd._rollup ?? Rollup.COUNT;
@@ -907,7 +942,7 @@ export class DefaultDataStore implements DataStore {
         this.tags = [];
     }
 
-    getDefs(didsAndOrLbls?: string[] | undefined, includeDeleted?: boolean | undefined): DefLike[] {
+    getDefs(didsAndOrLbls?: string[] | undefined, includeDeleted = false): DefLike[] {
         if (didsAndOrLbls === undefined) {
             if (includeDeleted) return this.defs;
             return this.defs.filter(def => def._deleted === false);
@@ -925,7 +960,7 @@ export class DefaultDataStore implements DataStore {
         let newDefs: Def[] = [];
         //mark any old defs as deleted
         defsIn.forEach(def => {
-            let existingDef = this.defs.find(existing => existing._did == def._did && existing._deleted === false);
+            let existingDef = this.defs.find(existing => existing.sameIdAs(def) && existing._deleted === false);
             if (existingDef !== undefined) {
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
                 if (existingDef.shouldBeReplacedWith(def)) {
@@ -941,11 +976,38 @@ export class DefaultDataStore implements DataStore {
         return defsIn;
     }
 
-    getPointDefs(_didsAndOrLbls?: string[] | undefined): PointDefLike[] {
-        throw new Error("Method not implemented.");
+    getPointDefs(didsAndOrLbls?: string[] | undefined, includeDeleted = false): PointDefLike[] {
+        if (didsAndOrLbls === undefined) {
+            if (includeDeleted) return this.pointDefs;
+            return this.pointDefs.filter(def => def._deleted === false);
+        }
+        if (didsAndOrLbls) console.log('I see your ', didsAndOrLbls);
+        const labelMatches = this.pointDefs.filter(def => didsAndOrLbls.some(p => p === def._lbl));
+        const didMatches = this.pointDefs.filter(def => didsAndOrLbls.some(p => p === def._did));
+        //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
+        let noDupes = new Set([...labelMatches, ...didMatches]);
+        if (includeDeleted) return Array.from(noDupes);
+        return Array.from(noDupes).filter(pd => pd._deleted === false);
+    
     }
-    setPointDefs(_pointDefs: PointDefLike | PointDefLike[]) {
-        throw new Error("Method not implemented.");
+    setPointDefs(pointDefsIn: PointDef[]) {
+        let newDefs: PointDef[] = [];
+        //mark any old defs as deleted
+        pointDefsIn.forEach(pd => {
+            let existingDef = this.pointDefs.find(existing => existing.sameIdAs(pd) && existing._deleted === false);
+            if (existingDef !== undefined) {
+                //only replace if the setDefs def is newer, necessary for StorageConnector merges
+                if (existingDef.shouldBeReplacedWith(pd)) {
+                    existingDef.markDeleted();
+                    newDefs.push(pd)
+                }
+            } else {
+                newDefs.push(pd);
+            }
+        })
+        //merge newDefs with defs in the DataStore
+        this.pointDefs.push(...newDefs);
+        return pointDefsIn;
     }
     getEntries(_query: QueryLike): Entry {
         throw new Error("Method not implemented.");

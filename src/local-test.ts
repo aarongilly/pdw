@@ -1,6 +1,7 @@
-import {PDW} from './pdw.js'
+import {PDW, PointType, parseTemporalFromEpochStr, parseTemporalFromUid} from './pdw.js'
 import {Scope} from './pdw.js'
 import { exportToFile } from './connectors/fileConnector.js';
+import { importFromFile } from './connectors/fileConnector.js';
 // import { FileConnector } from "./connectors/fileConnector.js";
 // import { sampleDefinitions } from './sampleData.js';
 
@@ -10,9 +11,17 @@ const pdw = PDW.getInstance();
 
 pdw.createNewDef({_lbl: "test one", _desc: 'Initial desc', _emoji: '1️⃣'})
 pdw.createNewDef({_lbl: "twooo", _scope: Scope.WEEK, _emoji: '2️⃣', _desc: 'now with a description'});
-pdw.createNewDef({_lbl: "four", _emoji: '🕒'});
+pdw.createNewDef({_lbl: "four", _emoji: '4️⃣'});
+let five = pdw.createNewDef({_lbl: "five", _desc: 'having fun', _emoji: '5️⃣'});
 
-console.log(pdw.getDefs());
+pdw.createNewPointDef({_did: five._did, _lbl: 'set alternatively', _type: PointType.BOOL, _emoji: '☝️'})
+let myPd = five.setPointDefs([{_lbl: 'test point', _type: PointType.TEXT}])
+
+console.log(
+    parseTemporalFromUid(myPd[0]._uid).toLocaleString()
+);
+
+// console.log(pdw.getDefs());
 
 //Testing implicit merge
 // loadFile('data-files/OutExcel.xlsx');
@@ -35,7 +44,3 @@ exportToFile(outFilename, pdw.allDataSince());
 // (<DefaultConnector> pdw.connection).writeToFile(outFilename);
 
 // console.log(makeUID());
-
-// function loadFile(fileName: string){
-//     (<DefaultConnector> pdw.connections).loadFromFile(fileName);
-// }

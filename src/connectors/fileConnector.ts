@@ -37,9 +37,10 @@ function exportToExcel(filename: string, data: pdw.CompleteDataset) {
 
     //#TODO - overview sheet
     
-    let overviewSht = XLSX.utils.aoa_to_sheet([['to','do'],['over'],['view']]);
-    XLSX.utils.book_append_sheet(wb, overviewSht, overViewShtName);
+    // let overviewSht = XLSX.utils.aoa_to_sheet([['to','do'],['over'],['view']]);
+    // XLSX.utils.book_append_sheet(wb, overviewSht, overViewShtName);
 
+    //###DEFS
     if (data.defs !== undefined) {
         let defBaseArr = data.defs.map(def => makeExcelDefRow(def));
         defBaseArr.unshift(tabularDefHeaders);
@@ -47,7 +48,7 @@ function exportToExcel(filename: string, data: pdw.CompleteDataset) {
         let defSht = XLSX.utils.aoa_to_sheet(defBaseArr);
         XLSX.utils.book_append_sheet(wb, defSht, defShtName);
     }
-
+    
     if (data.pointDefs !== undefined) {
         let pointDefArr = data.pointDefs.map(pd => makeExcelPointDefRow(pd));
         pointDefArr.unshift(tabularPointDefHeaders);
@@ -187,8 +188,8 @@ function importFromJson(filepath: string, pdwRef: pdw.PDW) {
 //#endregion
 
 //#region ### SHARED CONSTANTS ###
-export const tabularDefHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_lbl', '_emoji', '_desc', '_scope', '_active'];
-export const tabularPointDefHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_lbl', '_emoji', '_desc', '_active', '_type', '_rollup', '_format'];
+export const tabularDefHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_lbl', '_emoji', '_desc', '_scope'];
+export const tabularPointDefHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_lbl', '_emoji', '_desc', '_type', '_rollup', '_format'];
 export const tabularEntryHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_eid', '_period', '_note'];
 export const tabularEntryPointHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_eid', '_val'];
 export const tabularTagDefHeaders = ['_uid', '_created', '_updated', '_deleted', '_tid', '_lbl', '_emoji', '_desc'];
