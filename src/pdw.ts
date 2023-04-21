@@ -1,48 +1,46 @@
 import { Temporal } from "temporal-polyfill";
+import { DefaultConnector } from "./connectors/defaultConnector";
 
 //#region ### TYPES ###
 
 /**
  * A synonym for string, implying one with the structure of:
- * tinytimestamp-{@link SmallID}
+ * {@link EpochStr}-{@link SmallID}
  */
 export type UID = string;
 
 /**
- * A synonym for string, a string of 5 random characters
+ * A synonym for string, a string of 4 random characters
  */
 export type SmallID = string;
 
 /**
+ * An alias for string, a string that's made from the number of 
+ * milliseconds that have occurred since the epoch. A short way
+ * to track timezone-dependent "_updated" field that isn't 
+ * subject to alternative interpretations by, say, Excel
+ */
+export type EpochStr = string;
+
+/**
+ * An alias for string, a string that can be parsed by
+ * Temporal.Duration.from()
+ */
+export type DurationStr = string;
+
+/**
  * A synonym for string, any valid Period.stringify string
  */
-export type periodString = string;
+export type PeriodStr = string;
 
 /**
- * A synonym for string, a string of structure
- * yyyy-mm-dd
+ * A String that is likely to be markdown-enabled in use
  */
-export type isoDate = string;
+export type Markdown = string
 
-/**
- * A synonym for string, a string of structure
- * hh:mm:ss
- */
-export type isoTime = string;
+//#endregion
 
-/**
- * A synonym for string, a string of structure
- * P1Y1M1DT1H1M1.1S
- * 
- */
-export type isoDuration = string
-
-/**
- * A synonym for string, a string of structure
- * {@link isoDate}T{@link isoTime}
- * yyyy-mm-ddThh:mm:ss
- */
-export type isoDateTime = string;
+//#region ### ENUMS ###
 
 export enum PointType {
     /**
@@ -112,12 +110,12 @@ export interface StorageConnector {
      * @param didsAndOrLbls array of _did or _lbl vales to get, leave empty to get all Defs
      * @returns array of all matching definitions
      */
-    getDefs(didsAndOrLbls?: getDefParam[], includeDeleted?: boolean): DefLike[];
+    getDefs(didsAndOrLbls?: string[], includeDeleted?: boolean): DefLike[];
 
     /**
      * Creates (or updates) definitions. 
      */
-    setDefs(defs: DefLike[]): any;
+    setDefs(defs: DefLike[] | DefLike): Def[];
 
     /**
      * Get PointDefinitions. 
@@ -125,25 +123,31 @@ export interface StorageConnector {
      * @param didsAndOrLbls array of _did or _lbl vales to get, leave empty to get all Defs
      * @returns array of all matching definitions
      */
-    getPointDefs(didsAndOrLbls?: getDefParam[]): PointDefLike[];
+    getPointDefs(didsAndOrLbls?: string[]): PointDefLike[];
 
     /**
      * Creates (or updates) point defintions
      */
-    setPointDefs(pointDefs: PointDefLike[]): any
+    setPointDefs(pointDefs: PointDefLike[] | PointDefLike): any
 
+    getEntries(query: QueryLike): Entry
 
+    setEntries(): Entry[];
 
-    //getEntries()
-    //setEntries()
-    //getTags()
-    //setTags()
-    /**
-     * The file name for local files, or some reference to
-     * the database name for cloud databases.
-     */
-    connectedDbName: string;
-    
+    getTags(tidAndOrLbls?: string[]): TagLike[]
+
+    setTags(tagData: MinimumTag): TagLike[]
+
+    getTagDefs(pidAndOrDidAndOrLbls?: string[]): TagDefLike[]
+
+    setTagDefs(tagData: MinimumTagDef): TagDefLike[]
+
+    getOverview(): DataStoreOverview;
+
+    getAllSince(): CompleteDataset;
+
+    connect(...params: any): boolean;
+ 
     /**
      * The name of the connector, essentially. Examples: "Excel", "Firestore"
      */
@@ -153,16 +157,20 @@ export interface StorageConnector {
      * A reference to the Personal Data Warehouse instance to 
      * which the storage connector is connected.
      */
-    pdw?: PDW;
-    //property for whether or not the PDW should be using 
-    //a "pass along all getters and setters" mode or
-    //a "do everything in memory, then do saves"
+    pdw: PDW;
 }
 
 /**
- * Can be either the _lbl or _did
+ * A map of arrays of all types of {@link Element}.
  */
-export type getDefParam = string;
+export interface CompleteDataset{
+    defs: DefLike[];
+    pointDefs: PointDefLike[];
+    entries: EntryLike[];
+    entryPoints: EntryPointLike[];
+    tagDefs: TagDefLike[];
+    tags: TagLike[];
+}
 
 /**
  * This interface is extended by the interfaces for the base Elements:
@@ -183,13 +191,13 @@ export interface ElementLike {
     /**
      * When the element was created
      */
-    _created: Temporal.PlainDateTime;
+    _created: Temporal.PlainDateTime | PeriodStr;
     /**
      * When the element was updated, usually lines up with "_created"
      * unless the instance of the element was created via updating a 
      * previous instance
      */
-    _updated: Temporal.PlainDateTime;
+    _updated: EpochStr;
 }
 
 /**
@@ -224,17 +232,6 @@ export interface DefLike extends ElementLike {
      * The points on the definition
      */
     // _points?: PointDefLike[];
-}
-
-export interface TagLike extends ElementLike {
-    /**
-     * Like the Definition ID, the ID of the Tag
-     */
-    _tid: string;
-    /**
-     * Human-readable tag
-     */
-    _lbl: string;
 }
 
 export interface PointDefLike extends ElementLike {
@@ -286,7 +283,7 @@ export interface EntryLike extends ElementLike {
     /**
      * When the entry is for
      */
-    _period: periodString,
+    _period: PeriodStr | Period,
     /**
      * Associated definition ID
      */
@@ -308,12 +305,37 @@ export interface EntryPointLike extends ElementLike {
     _val: any
 }
 
-export interface MinimumDef {
+export interface TagDefLike extends ElementLike {
     /**
-     * To create a brand new definition, this is the **only** required field.
-     * All other fields *can* be provided, but will set to default if not provided.
+     * Like the Definition ID, the ID of the Tag
+     */
+    _tid: string;
+    /**
+     * Human-readable tag
      */
     _lbl: string;
+}
+
+export interface TagLike extends ElementLike {
+    /**
+     * Like the Definition ID, the ID of the Tag
+     */
+    _tid: SmallID;
+    /**
+     * The Definition the tag is associated with
+     */
+    _did: SmallID
+    /**
+     * The Point ID for 'Select'-type Points to
+     * use as a select option. (Like an Enum)
+     */
+    _pid?: SmallID
+}
+
+/**
+ * All properties in here are optional in all uses.
+ */
+export interface MinimumElement {
     /**
      * Unique ID
      * Defaults to a new UID
@@ -325,15 +347,21 @@ export interface MinimumDef {
      */
     _deleted?: boolean;
     /**
-     * Created
-     * Defaults to PlainDateTime for (now)
+     * The human-readable time of creation. Will generate for you.
      */
-    _created?: Temporal.PlainDateTime;
+    _created?: PeriodStr | Temporal.PlainDateTime;
     /**
-     * Updated
-     * Defaults to PlainDateTime for (now)
+     * EpochStr for when this was updated. Will geenrate for you.
      */
-    _updated?: Temporal.PlainDateTime;
+    _updated?: EpochStr;
+}
+
+export interface MinimumDef extends MinimumElement {
+    /**
+     * To create a brand new definition, this is the **only** required field.
+     * All other fields *can* be provided, but will set to default if not provided.
+     */
+    _lbl: string;
     /**
      * Definition ID
      * Defaults to a new smallID
@@ -358,15 +386,15 @@ export interface MinimumDef {
      * Tags
      * Defaults to empty array
      */
-    _tags?: TagLike[];
+    // _tags?: TagDefLike[];
     /**
      * Point Definitions
      * Defaults to empty array
      */
-    _points?: PointDefLike[];
+    // _points?: PointDefLike[];
 }
 
-export interface MinimumPointDef {
+export interface MinimumPointDef extends MinimumElement{
     /**
      * To create a brand new PointDef, you must provide a label, did, & type
      */
@@ -379,26 +407,6 @@ export interface MinimumPointDef {
      * To create a brand new PointDef, you must provide a label, did & type
      */
     _type: PointType;
-    /**
-     * Unique ID
-     * Defaults to a new UID
-     */
-    _uid?: UID;
-    /**
-     * Deleted
-     * Defaults to false
-     */
-    _deleted?: boolean;
-    /**
-     * Created
-     * Defaults to PlainDateTime for (now)
-     */
-    _created?: Temporal.PlainDateTime;
-    /**
-     * Updated
-     * Defaults to PlainDateTime for (now)
-     */
-    _updated?: Temporal.PlainDateTime;
     /**
      * Point ID
      * Defaults to a new smallID
@@ -423,43 +431,133 @@ export interface MinimumPointDef {
      * Rollup Type
      * Defaults to {@link Format.TEXT}
      */
-    _format?: Format;
-    
+    _format?: Format;   
 }
 
+export interface MinimumEntry extends MinimumElement{
+    /**
+     * When the Entry took place
+     */
+    _period: PeriodStr;
+    /**
+     * What kind of entry it is
+     */
+    _did: SmallID;
+    /**
+     * Entry ID
+     */
+    _eid?: UID;
+    /**
+     * Note about the entry
+     */
+    _note?: Markdown;
+    /**
+     * #TODO - finish this when building out the Entry Class
+     */
+}
+
+export interface MinimumEntryPoint extends MinimumElement {
+    /**
+     * What kind of entry it is
+     */
+    _did: SmallID;
+    /**
+     * Which Point is it
+     */
+    _pid: SmallID;
+    /**
+     * What is the entry value?
+     */
+    _val: string | number | boolean | object;
+    /**
+     * #TODO - finish this when building out the EntryPoint Class
+     */
+}
+
+export interface MinimumTagDef extends MinimumElement {
+    /**
+     * Label to be applied to the tag
+     */
+    _lbl: string
+    /**
+     * Tag ID, if known.
+     * Defaults to a new {@link SmallID}
+     */
+    _tid?: SmallID;
+}
+
+export interface MinimumTag extends MinimumElement{
+    /**
+     * Definition to apply to
+     */
+    _did: SmallID;
+    /**
+     * Tag ID to attach to the Definition (as a tag) 
+     * or to the PointDefinition (as a select value)
+     */
+    _tid: SmallID;
+    /**
+     * When used as a select value, a _pid is required
+     */
+    _pid?: SmallID;
+}
+
+export interface QueryLike{
+
+}
+
+export interface ReducedQuery{
+
+}
+
+interface CurrentAndDeleteeCounts{
+    current: number,
+    deleted: number
+}
+
+export interface DataStoreOverview{
+    storeName: string;
+    defs: CurrentAndDeleteeCounts;
+    pointDefs: CurrentAndDeleteeCounts;
+    entries: CurrentAndDeleteeCounts;
+    entryPoints: CurrentAndDeleteeCounts
+    tagDefs: CurrentAndDeleteeCounts;
+    tags: CurrentAndDeleteeCounts;
+    lastUpdated: EpochStr; //?? probably better to be human-readable?
+}
 //#endregion
 
 //#region ### CLASSES ###
 
 export class PDW {
-    connection?: StorageConnector;
+    connections: StorageConnector[];
     private static instance: PDW;
-    constructor() {
-
+    constructor(storeConnection?: StorageConnector) {
+        if(storeConnection !== undefined){
+            this.connections = [storeConnection];
+        }else{
+            this.connections = [new DefaultConnector(this)]
+        }
     }
     registerConnection(connectorInstance: StorageConnector) {
-        this.connection = connectorInstance;
+        this.connections?.push(connectorInstance);
         connectorInstance.pdw = this;
     }
 
     setDefs(defs: DefLike[]) {
-        if (this.connection === undefined) throw new Error("No connector registered");
-        //pass along function call to the connector
-        return this.connection.setDefs(defs);
+        console.log(defs);
+        
     }
 
     setPointDefs(pointDefs: PointDefLike[]) {
-        if (this.connection === undefined) throw new Error("No connector registered");
-        //pass along function call to the connector
-        return this.connection.setPointDefs(pointDefs);
+        console.log(pointDefs);
     }
 
     getDefs(didOrLbls: string[] | string, includeDeleted = true){
         //force array type
         if(!Array.isArray(didOrLbls)) didOrLbls = [didOrLbls];
-        if (this.connection === undefined) throw new Error("No connector registered");
-        //pass along function call to the connector
-        return this.connection.getDefs(didOrLbls, includeDeleted);
+        console.log(includeDeleted);
+        
     }
     
     /**
@@ -469,11 +567,12 @@ export class PDW {
      * @param defInfo 
      * @returns the newly created Definition
     */
-   createNewDef(defInfo: MinimumDef): Def{
-        if (this.connection === undefined) throw new Error("No connector registered");
+   createNewDef(defInfo: MinimumDef): Def {
         let newDef = new Def(defInfo);
-        this.setDefs([newDef]);
-        return newDef;
+        this.connections.forEach(connection => {
+            connection.setDefs([newDef])
+        })
+        return newDef
     }
 
     /**
@@ -484,9 +583,7 @@ export class PDW {
      * @returns the newly created Point Definition
     */
    createNewPointDef(pointDefInfo: MinimumPointDef): PointDef{
-    if (this.connection === undefined) throw new Error("No connector registered");
     let newPointDef = new PointDef(pointDefInfo);
-    this.setPointDefs([newPointDef]);
     return newPointDef;
 }
 
@@ -512,27 +609,23 @@ export class PDW {
 export abstract class Element implements ElementLike{
     _uid: string;
     _deleted: boolean;
-    _created: Temporal.PlainDateTime;
-    _updated: Temporal.PlainDateTime;
-    constructor(existingData: Object){
-        //@ts-expect-error
-        this._uid = existingData.hasOwnProperty('_uid') ? existingData._uid : makeUID();
-        //@ts-expect-error
-        this._deleted = existingData.hasOwnProperty('_deleted') ? existingData._deleted : false;
-        //@ts-expect-error
-        this._created = existingData.hasOwnProperty('_created') ? existingData._created : Temporal.Now.plainDateTimeISO();
-        //@ts-expect-error
-        this._updated = existingData.hasOwnProperty('_updated') ? existingData._updated : Temporal.Now.plainDateTimeISO();
+    _created: Temporal.PlainDateTime | string;
+    _updated: EpochStr;
+    constructor(existingData: any){
+        this._uid = existingData._uid ?? makeUID();
+        this._deleted = existingData._deleted ?? false;
+        this._created = existingData._created ?? Temporal.Now.plainDateTimeISO();
+        this._updated = existingData._updated ?? makeEpochStr();
     }
     
     markDeleted(){
         this._deleted = true;
-        this._updated = Temporal.Now.plainDateTimeISO();
+        this._updated = makeEpochStr();
     }
 
     markUndeleted(){
         this._deleted = false;
-        this._updated = Temporal.Now.plainDateTimeISO();
+        this._updated = makeEpochStr();
     }
 
     /**
@@ -541,15 +634,7 @@ export abstract class Element implements ElementLike{
      * @returns true if argument is updated more recently than this
      */
     isOlderThan(elementData: ElementLike){
-        let until = this._updated.until(elementData._updated)
-    
-        console.log(this._updated.toLocaleString())
-        console.log(elementData._updated.toLocaleString())
-        // "until" is a Temporal.Duration instance
-        console.log(until.total('seconds'));
-        
-        //sign is 1 if and only if comp is newer
-        return until.sign == 1
+        return this._updated < elementData._updated;
     }
 
     /**
@@ -614,12 +699,8 @@ export class Def extends Element implements DefLike {
     _desc: string;
     _emoji: string;
     _scope: Scope;
-    _tags?: TagLike[] | undefined;
+    _tags?: TagDefLike[] | undefined;
     _points?: PointDefLike[] | undefined;
-    declare _uid: UID;
-    declare _deleted: boolean;
-    declare _created: Temporal.PlainDateTime;
-    declare _updated: Temporal.PlainDateTime;
     constructor(defIn: MinimumDef) {
         super(defIn)
         this._lbl = defIn._lbl;
@@ -631,9 +712,9 @@ export class Def extends Element implements DefLike {
         // this._deleted = defIn._deleted ?? false;
         // this._created = defIn._created ?? Temporal.Now.plainDateTimeISO();
         // this._updated = defIn._updated ?? Temporal.Now.plainDateTimeISO();
-        if(defIn._points !== undefined){
-            this._points = defIn._points.map(point => new PointDef(point, this));
-        }
+        // if(defIn._points !== undefined){
+        //     this._points = defIn._points.map(point => new PointDef(point, this));
+        // }
     }
 
     // createNewPointDef(pd: {_lbl: string, _type: PointType}){
@@ -688,10 +769,6 @@ export class PointDef extends Element implements PointDefLike {
     _type: PointType;
     _rollup: Rollup;
     _format: Format;
-    declare _uid: string;
-    declare _deleted: boolean;
-    declare _created: Temporal.PlainDateTime;
-    declare _updated: Temporal.PlainDateTime;
     _def?: Def;
     constructor(pd: MinimumPointDef, def?: Def){
         super(pd)
@@ -699,10 +776,10 @@ export class PointDef extends Element implements PointDefLike {
         this._lbl = pd._lbl;
         this._type = pd._type;
         this._pid = pd._pid ?? makeSmallID();
-        // this._deleted = pd._deleted ?? false;
-        // this._created = pd._created ?? Temporal.Now.plainDateTimeISO();
-        // this._updated = pd._updated ?? Temporal.Now.plainDateTimeISO();
-        // this._uid = pd._uid ?? makeUID();
+        this._deleted = pd._deleted ?? false;
+        this._created = pd._created ?? Temporal.Now.plainDateTimeISO();
+        this._updated = pd._updated ?? makeEpochStr();
+        this._uid = pd._uid ?? makeUID();
         this._desc = pd._desc ?? 'Set a description';
         this._emoji = pd._emoji ?? '🆕';
         this._rollup = pd._rollup ?? Rollup.COUNT;
@@ -710,6 +787,36 @@ export class PointDef extends Element implements PointDefLike {
         if(def) this._def = def;
     }
 
+}
+
+export class Entry extends Element implements EntryLike {
+    _eid: string;
+    _note: Markdown;
+    _did: string;
+    _period: Period;
+    constructor(entryData: MinimumEntry){
+        super(entryData);
+        this._did = entryData._did;
+        this._period = entryData._period ;
+        this._eid = entryData._eid ?? makeUID();
+        this._note = entryData._note ?? '';
+    }
+
+}
+
+export class Period{
+
+}
+
+export class Query{
+    constructor(){
+
+    }
+    //#TODO - a lot
+    
+    run(): QueryLike{
+        throw new Error('Query.run not yet implemented')
+    }
 }
 
 //#endregion
@@ -722,7 +829,11 @@ export class PointDef extends Element implements PointDefLike {
  * Makes a unique identifier for use with _uid and _eid
  */
 export function makeUID(): UID {
-    return new Date().getTime().toString(36) + "." + makeSmallID();
+    return makeEpochStr() + "-" + makeSmallID();
+}
+
+export function makeEpochStr(): EpochStr {
+    return new Date().getTime().toString(36)
 }
 
 export function makeSmallID(length = 4): SmallID {
@@ -747,15 +858,10 @@ export function parseTemporalFromUid(uid: UID): any { //Temporal.Instant{
  */
 export function elementIsNewer(baseElement: ElementLike, comparisonElement: ElementLike): Boolean{
     
-    let until = baseElement._updated.until(comparisonElement._updated)
+    console.log('base: ' + baseElement._updated)
+    console.log('comp: ' + comparisonElement._updated)
+    return baseElement._updated > comparisonElement._updated
     
-    // console.log(baseElement._updated.toLocaleString())
-    // console.log(comparisonElement._updated.toLocaleString())
-    // "until" is a Temporal.Duration instance
-    //console.log(until.total('seconds'));
-    
-    //sign is 1 if and only if comp is newer
-    return until.sign == 1
 }
 
 /**

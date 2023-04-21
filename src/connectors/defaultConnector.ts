@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import * as pdw from '../pdw.js';
 import { Temporal } from 'temporal-polyfill';
 
-
 /**
  * The File Storage Connector is going to be developed in-tandem with this
  * iteration of the PDW. This connector will be unique, in that it will work
@@ -33,14 +32,15 @@ export class DefaultConnector implements pdw.StorageConnector{
      * created to connect to. This variable is set in the 
      * {@link registerConnection} method
      */
-    public pdw?: pdw.PDW;
+    public pdw: pdw.PDW;
     // private entries: pdw.Entry[];
     // private tags: pdw.Tag[];
     
-    constructor(){
+    constructor(pdw: pdw.PDW){
         this.connectedDbName = 'temporary';
         this.serviceName = 'In Memory';
         this.connectionStatus = 'not connected';
+        this.pdw = pdw;
         this.defs = [];
         this.pointDefs = [];
     }
@@ -101,6 +101,7 @@ export class DefaultConnector implements pdw.StorageConnector{
     }
 
     private writeToExcel(filename: string){
+        XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();
 
         let defBaseArr = this.defs.map(def=>def.getTabularDefBase());
@@ -146,50 +147,33 @@ export class DefaultConnector implements pdw.StorageConnector{
         fs.writeFile(filename, json, 'utf8', callback);
     }
 
-    loadFromExcel(filepath: string){
+    loadFromExcel(filepath: string) {
         console.log('loading...');
         XLSX.set_fs(fs);
         let loadedWb = XLSX.readFile(filepath);
         const shts = loadedWb.SheetNames;
-        if(!shts.some(name=>name==='Defs')){
+        if (!shts.some(name => name === 'Defs')) {
             console.warn('No Defs sheet found in ' + filepath);
-        }else{
+        } else {
             const defSht = loadedWb.Sheets['Defs'];
             const pointDefSht = loadedWb.Sheets['Point Defs'];
 
             //will be all plain text
             let defBaseRawArr = XLSX.utils.sheet_to_json(defSht) as pdw.DefLike[];
+            let defBaseParsedArr: pdw.DefLike[] = defBaseRawArr.map(raw => destringifyElement(raw));
+            this.mergeElements(defBaseParsedArr);
+
             let pointDefRawArr = XLSX.utils.sheet_to_json(pointDefSht) as pdw.PointDefLike[];
+            let pointDefParsedArr: pdw.PointDefLike[] = pointDefRawArr.map(raw => destringifyElement(raw));
+            this.mergeElements(pointDefParsedArr);
 
-            let defBaseParsedArr: pdw.DefLike[] = defBaseRawArr.map(raw=> destringifyElement(raw));
-            let pointDefParsedArr: pdw.PointDefLike[] = pointDefRawArr.map(raw=> destringifyElement(raw));
-
-            const combined = defBaseParsedArr.map(base=>{
-                if(defBaseParsedArr.some(pd=> pd._did === base._did && pd._deleted === false)){
-                    base._points = pointDefParsedArr.filter(pd=>pd._did === base._did && pd._deleted === false)
-                }
-                return base;
-            });
-
-            combined.forEach(def=>{
-                let existingDef = this.defs.find(existingDef => existingDef._did == def._did && existingDef._deleted == false)
-                if(existingDef === undefined){
-                    this.defs.push(new pdw.Def(def));
-                    return
-                }
-                if(existingDef.shouldBeReplacedWith(def)){
-                    existingDef.markDeleted();
-                    this.defs.push(new pdw.Def(def));
-                }
-            })
             console.log(this.defs);
-        }   
+        }
     }
         
         loadFromJson(filepath: string) {
             const file = JSON.parse(fs.readFileSync(filepath).toString());
             console.log(file);
-            
         }
 
     private static inferFileType(path: string): "excel" | "json" | "csv" | "yaml" | "unknown" {
@@ -199,6 +183,42 @@ export class DefaultConnector implements pdw.StorageConnector{
         if(path.slice(-5)===".yaml") return 'yaml'
         return "unknown"
     }
+    private mergeElements(newElements: pdw.ElementLike[]){
+        newElements.forEach(newElement => {
+            this.mergeElement(newElement)
+        })
+    }
+
+    private mergeElement(newElementData: pdw.ElementLike){
+        const type = pdw.getElementType(newElementData);
+        if(type==='DefLike'){
+            let existingDef = this.defs.find(def=>def._did == (<pdw.DefLike> newElementData)._did && def._deleted === false)
+            if (existingDef === undefined) {
+                this.defs.push(new pdw.Def((<pdw.DefLike> newElementData)));
+                return
+            }
+            if (existingDef.shouldBeReplacedWith(newElementData)) {
+                existingDef.markDeleted();
+                this.defs.push(new pdw.Def((<pdw.DefLike> newElementData)));
+            }
+            return
+        }
+
+        if(type==='PointDefLike'){
+            let existingPointDef = this.pointDefs.find(pd=> pd._did == (<pdw.PointDefLike> newElementData)._did && pd._pid == (<pdw.PointDefLike> newElementData)._pid && pd._deleted === false)
+            if (existingPointDef === undefined) {
+                this.pointDefs.push(new pdw.PointDef((<pdw.PointDefLike> newElementData)));
+                return
+            }
+            if (existingPointDef.shouldBeReplacedWith(newElementData)) {
+                existingPointDef.markDeleted();
+                this.pointDefs.push(new pdw.PointDef((<pdw.PointDefLike> newElementData)));
+            }
+            return
+        }
+        throw new Error('I saw type ' + type)
+        return undefined
+    }
 }
 
 /**
@@ -206,7 +226,7 @@ export class DefaultConnector implements pdw.StorageConnector{
  * based on the observed key.
  * @param obj object containing properties to convert
  */
-function destringifyElement(obj: pdw.DefLike | pdw.PointDefLike | pdw.EntryLike | pdw.TagLike): any {
+function destringifyElement(obj: pdw.DefLike | pdw.PointDefLike | pdw.EntryLike | pdw.TagDefLike): any {
     let returnObj = {...obj}; //shallow copy deemed okay by Aaron circa 2023-03-12, get mad at him
     if(returnObj._created !== undefined) {
         //TODO - check for and handle native Excel dates
