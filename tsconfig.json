@@ -14,15 +14,17 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     // "noEmit": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    // "noUnusedLocals": true, //uncomment this for prod
+    // "noUnusedParameters": true, //uncomment this for prod
     "noImplicitReturns": true,
     "skipLibCheck": true,
     "outDir": "out"
   },
   "include": [
-    "src"
-, "out/local-test.js"  ],
+    "src",
+    "out/local-test.js",
+    // "out/sampleData.js"
+  ],
   "typedocOptions": {
     "entryPoints": [
       "src/pdw.ts",
