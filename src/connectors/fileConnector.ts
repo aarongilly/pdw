@@ -1,9 +1,11 @@
 import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as pdw from '../pdw.js';
+import { Temporal } from 'temporal-polyfill';
 // import { Temporal } from 'temporal-polyfill';
 
 //#region ### EXPORTED FUNCTIONS ###
+//#THINK - can/should you make this into a DataStore?
 
 export function exportToFile(filepath: string, data: pdw.CompleteDataset) {
     const fileType = inferFileType(filepath)
@@ -12,10 +14,10 @@ export function exportToFile(filepath: string, data: pdw.CompleteDataset) {
     throw new Error('Unimplementd write type: ' + fileType)
 }
 
-export function importFromFile(filepath: string, pdwRef: pdw.PDW) {
+export function importFromFile(filepath: string) {
     const fileType = inferFileType(filepath)
-    if (fileType === 'excel') return importFromExcel(filepath, pdwRef);
-    if (fileType === 'json') return importFromJson(filepath, pdwRef);
+    if (fileType === 'excel') return importFromExcel(filepath);
+    if (fileType === 'json') return importFromJson(filepath);
     throw new Error('Unimplementd write type: ' + fileType)
 }
 
@@ -41,7 +43,7 @@ function exportToExcel(filename: string, data: pdw.CompleteDataset) {
     // XLSX.utils.book_append_sheet(wb, overviewSht, overViewShtName);
 
     //###DEFS
-    if (data.defs !== undefined) {
+    if (data.defs !== undefined && data.defs.length > 0) {
         let defBaseArr = data.defs.map(def => makeExcelDefRow(def));
         defBaseArr.unshift(tabularDefHeaders);
 
@@ -49,7 +51,7 @@ function exportToExcel(filename: string, data: pdw.CompleteDataset) {
         XLSX.utils.book_append_sheet(wb, defSht, defShtName);
     }
     
-    if (data.pointDefs !== undefined) {
+    if (data.pointDefs !== undefined && data.pointDefs.length > 0) {
         let pointDefArr = data.pointDefs.map(pd => makeExcelPointDefRow(pd));
         pointDefArr.unshift(tabularPointDefHeaders);
 
@@ -72,7 +74,7 @@ function exportToExcel(filename: string, data: pdw.CompleteDataset) {
     XLSX.writeFile(wb, filename);
 }
 
-function importFromExcel(filepath: string, pdwRef: pdw.PDW) {
+function importFromExcel(filepath: string) {
     console.log('loading...');
     XLSX.set_fs(fs);
     let loadedWb = XLSX.readFile(filepath);
@@ -82,10 +84,8 @@ function importFromExcel(filepath: string, pdwRef: pdw.PDW) {
     } else {
         const defSht = loadedWb.Sheets[defShtName];
         let defBaseRawArr = XLSX.utils.sheet_to_json(defSht) as pdw.DefLike[];
-        console.log(defBaseRawArr);
-        
-        // let defBaseParsedArr: pdw.DefLike[] = defBaseRawArr.map(raw => destringifyElement(raw));
-        // mergeElements(defBaseParsedArr);
+        let parsedDefs = defBaseRawArr.map(rawDef=>parseExcelDefRow(rawDef))
+        pdw.PDW.getInstance().setDefs(parsedDefs);
     }
 
     if (!shts.some(name => name === pointDefShtName)) {
@@ -93,12 +93,9 @@ function importFromExcel(filepath: string, pdwRef: pdw.PDW) {
     } else {
         const pointDefSht = loadedWb.Sheets[pointDefShtName];
         let pointDefRawArr = XLSX.utils.sheet_to_json(pointDefSht) as pdw.PointDefLike[];
-        console.log(pointDefRawArr);
-
-        // let pointDefParsedArr: pdw.PointDefLike[] = pointDefRawArr.map(raw => destringifyElement(raw));
-        // mergeElements(pointDefParsedArr);
+        let parsedPointDefs = pointDefRawArr.map(rawPointDef=>parseExcelPointDefRow(rawPointDef))
+        pdw.PDW.getInstance().setPointDefs(parsedPointDefs);
     }
-    if(false) console.log(pdwRef)
 }
 
 /**
@@ -127,19 +124,17 @@ function makeExcelDefRow(def: pdw.DefLike) {
  * Ying & Yang with {@link makeExcelDefRow}
  * @returns 
  */
-function parseExcelDefRow(defRow: any[]): pdw.DefLike {
-    let returnObj: pdw.DefLike = {
-        _uid: defRow[0],
-        _created: defRow[1],
-        _updated: defRow[2],
-        _deleted: defRow[3].toUpperCase() == 'TRUE',
-        _did: defRow[4].toString(), //in case I got unlucky
-        _lbl: defRow[5],
-        _emoji: defRow[6],
-        _desc: defRow[7],
-        _scope: defRow[8]
-    }
-    return returnObj
+function parseExcelDefRow(defRow: any): pdw.DefLike {
+    //check structure
+    if(!pdw.hasDefLikeProps(defRow)) throw new Error('Cannot parseExcelDefRow for ', defRow);
+
+    defRow._created = Temporal.PlainDateTime.from(defRow._created);
+    defRow._deleted = defRow._deleted.toUpperCase() == 'TRUE',
+    defRow._did = defRow._did.toString(); //in case I got unlucky with an all-numeric SmallID
+ 
+    if(!pdw.isDefLike(defRow)) throw new Error('Failed to correctly parseExcelDefRow for ', defRow);
+
+    return defRow
 }
 
 /**
@@ -148,9 +143,10 @@ function parseExcelDefRow(defRow: any[]): pdw.DefLike {
  * {@link tabularPointDefHeaders} positioning
  */
 function makeExcelPointDefRow(pointDef: pdw.PointDefLike) {
+
     return [
         pointDef._uid,
-        pointDef._created,
+        pointDef._created.toString(),
         pointDef._updated,
         pointDef._deleted,
         pointDef._did,
@@ -164,10 +160,6 @@ function makeExcelPointDefRow(pointDef: pdw.PointDefLike) {
     ]
 }
 
-
-
-
-
 //#endregion
 
 //#region ### JSON ###
@@ -180,9 +172,9 @@ function exportToJson(filename: string, data: pdw.CompleteDataset) {
     fs.writeFile(filename, json, 'utf8', callback);
 }
 
-function importFromJson(filepath: string, pdwRef: pdw.PDW) {
+function importFromJson(filepath: string) {
     const file = JSON.parse(fs.readFileSync(filepath).toString());
-    console.log(file, pdwRef); //#TODO
+    console.log(file, pdw.PDW.getInstance()); //#TODO
 }
 
 //#endregion

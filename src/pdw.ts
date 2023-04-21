@@ -192,7 +192,7 @@ export interface ElementLike {
     /**
      * When the element was created
      */
-    _created: Temporal.PlainDateTime | PeriodStr;
+    _created: Temporal.PlainDateTime;
     /**
      * When the element was updated, usually lines up with "_created"
      * unless the instance of the element was created via updating a 
@@ -350,7 +350,7 @@ export interface MinimumElement {
     /**
      * The human-readable time of creation. Will generate for you.
      */
-    _created?: PeriodStr | Temporal.PlainDateTime;
+    _created?: Temporal.PlainDateTime | PeriodStr;
     /**
      * EpochStr for when this was updated. Will geenrate for you.
      */
@@ -697,15 +697,14 @@ export class PDW {
 export abstract class Element implements ElementLike {
     _uid: string;
     _deleted: boolean;
-    _created: Temporal.PlainDateTime | string;
+    _created: Temporal.PlainDateTime;
     _updated: EpochStr;
-    _pdw?: PDW
     constructor(existingData: any) {
         this._uid = existingData._uid ?? makeUID();
         this._deleted = existingData._deleted ?? false;
-        this._created = existingData._created ?? Temporal.Now.plainDateTimeISO();
+        this._created = existingData._created ?? Temporal.Now.plainDateTimeISO();//new Temporal.TimeZone('UTC'));
+        if(typeof this._created == 'string') this._created = Temporal.PlainDateTime.from(this._created);
         this._updated = existingData._updated ?? makeEpochStr();
-        this._pdw = PDW.getInstance(); //singletons rule
     }
 
     markDeleted() {
@@ -816,7 +815,7 @@ export class Def extends Element implements DefLike {
         _type: PointType
     }]): PointDef[] {
         let pointDefs = pointInfoIn.map(point=>{
-            return this._pdw!.createNewPointDef({
+            return PDW.getInstance().createNewPointDef({
                 _lbl: point._lbl,
                 _did: this._did,
                 _type: point._type
@@ -1068,25 +1067,17 @@ export function parseTemporalFromEpochStr(epochStr: EpochStr): Temporal.Instant 
     const epochMillis = parseInt(epochStr, 36)
     const parsedTemporal = Temporal.Instant.fromEpochMilliseconds(epochMillis);
     // const zoneless = Temporal.Now.plainDateTimeISO();
-    // const timezone = Temporal.Now.timeZone();
     // console.log(parsedTemporal.toString({ timeZone: Temporal.TimeZone.from(timezone)}));
+    // const timezone = Temporal.Now.timeZone();
+    //#BUG - this is still having some time zone weirdness.
+    //bug demo
+    let tempStr = makeEpochStr();
+    const bugEpochMillis = parseInt(tempStr, 36)
+    const bugParsedTemporal = Temporal.Instant.fromEpochMilliseconds(bugEpochMillis);
+    console.log('bug demo: ' + bugParsedTemporal.toLocaleString()); //will be in the future
+    
     return parsedTemporal
 }
-
-// /**
-//  * To compare elements' {@link _updated} times, for use in determining
-//  * if the comparisonElement is newer than the baseElement.
-//  * @param baseElement The thing you have that might be outdated
-//  * @param comparisonElement The thing that might be newer
-//  * @returns true if baseElement is less recently updated than comparison
-//  */
-// export function elementIsNewer(baseElement: ElementLike, comparisonElement: ElementLike): Boolean {
-
-//     console.log('base: ' + baseElement._updated)
-//     console.log('comp: ' + comparisonElement._updated)
-//     return baseElement._updated > comparisonElement._updated
-
-// }
 
 /**
 * Get the type of an element. Not sure if I'll use this outside
@@ -1100,5 +1091,43 @@ export function getElementType(element: ElementLike): 'DefLike' | 'PointDefLike'
     if (element.hasOwnProperty("_pid")) return "PointDefLike"
     return "DefLike"
 }
+
+/**
+ * Predicate to check if an object has all {@link DefLike} properties
+ * @param data data to check
+ * @returns true if data have all required properties of {@link DefLike}
+ */
+export function hasDefLikeProps(data: any): boolean{
+        if(data._did == undefined) return false
+        if(data._lbl == undefined) return false
+        if(data._desc == undefined) return false
+        if(data._emoji == undefined) return false
+        if(data._scope == undefined) return false
+        if(data._uid == undefined) return false
+        if(data._deleted == undefined) return false
+        if(data._created == undefined) return false
+        if(data._updated == undefined) return false
+        return true;
+}
+
+/**
+ * Predicate to check if an object has all {@link DefLike} properties
+ * AND they are the right type.
+ * @param data data to check
+ * @returns true if data have all required properties of {@link DefLike}
+ */
+export function isDefLike(data: any): boolean{
+    if(data._did == undefined || typeof data._did !== 'string') return false
+    if(data._lbl == undefined || typeof data._lbl !== 'string') return false
+    if(data._desc == undefined || typeof data._desc !== 'string') return false
+    if(data._emoji == undefined || typeof data._emoji !== 'string') return false
+    if(data._scope == undefined || typeof data._scope !== 'string') return false
+    if(data._uid == undefined || typeof data._uid !== 'string') return false
+    if(data._created == undefined || typeof data._created.getISOFields !== 'function') return false //proxy check
+    if(data._deleted == undefined || typeof data._deleted !== 'boolean') return false
+    if(data._updated == undefined || typeof data._updated !== 'string') return false
+    return true;
+}
+
 
 //#endregion
