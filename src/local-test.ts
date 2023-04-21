@@ -24,7 +24,8 @@ const pdw = PDW.getInstance();
 //     parseTemporalFromUid(myPd[0]._uid).toLocaleString()
 // );
 
-importFromFile('data-files/OutExcel4.xlsx');
+// importFromFile('data-files/OutExcel4.xlsx');
+importFromFile('data-files/DevFile.json');
 
 console.log(pdw.getDefs());
 

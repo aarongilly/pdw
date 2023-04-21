@@ -1,20 +1,19 @@
 import { Temporal } from "temporal-polyfill"
-import { DefLike, EntryLike, EntryPointLike, Format, PointDefLike, PointType, Rollup, Scope, TagDefLike } from "./pdw"
 
-export const samplePointDefs: PointDefLike[] = [
+export const samplePointDefs = [
     {
         _did: 'doae',
         _uid: 'lep65ghw.rghw',
-        _created: Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
+        _created: undefined, //Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
         _updated:  'lep62vrw',
         _deleted: false,
         _pid: 'apox',
         _lbl: 'Event',
         _desc: 'The main text for the event',
         _emoji: '🏷️',
-        _type: PointType.TEXT,
-        _rollup: Rollup.COUNT,
-        _format: Format.MARKDOWN,
+        _type: "TEXT",
+        _rollup: "COUNT",
+        _format: "MARKDOWN",
     },            
     {
         _did: 'seae',
@@ -26,9 +25,9 @@ export const samplePointDefs: PointDefLike[] = [
         _lbl: 'Title',
         _desc: 'The name of hte movie',
         _emoji: '🎬',
-        _type: PointType.TEXT,
-        _rollup: Rollup.COUNTUNIQUE,
-        _format: Format.TEXT,
+        _type: "TEXT",
+        _rollup: "COUNTUNIQUE",
+        _format: "TEXT",
     },
     {
         _did: 'seae',
@@ -40,14 +39,14 @@ export const samplePointDefs: PointDefLike[] = [
         _lbl: 'First time?',
         _desc: 'Have you seen this before?',
         _emoji: '🎍',
-        _type: PointType.BOOL,
-        _rollup: Rollup.COUNTOFEACH,
-        _format: Format.YESNO,
+        _type: "BOOL",
+        _rollup: "COUNTOFEACH",
+        _format: "YESNO",
     }
 
 ]
 
-export const sampleDefinitions: DefLike[] = [
+export const sampleDefinitions = [
     {
         _uid: 'lep62vrw.hfvm',
         _created: Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
@@ -57,7 +56,7 @@ export const sampleDefinitions: DefLike[] = [
         _did: 'doae',
         _emoji: '🧪',
         _lbl: 'Event',
-        _scope: Scope.SECOND,
+        _scope: "SECOND",
     },
     {
         _uid: 'lep62vpsx.doqd',
@@ -68,11 +67,11 @@ export const sampleDefinitions: DefLike[] = [
         _did: 'seae',
         _emoji: '2️⃣',
         _lbl: 'Movie',
-        _scope: Scope.SECOND,
+        _scope: "SECOND",
     }
 ]
 
-export const sampleTags: TagDefLike[] = [
+export const sampleTags = [
     {
         _uid: 'lep6353w.hnkp',
         _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
@@ -83,7 +82,7 @@ export const sampleTags: TagDefLike[] = [
     }
 ]
 
-export const sampleEntries: EntryLike[] = [
+export const sampleEntries = [
     {
         _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
         _updated: 'lep62vrw',
@@ -96,7 +95,7 @@ export const sampleEntries: EntryLike[] = [
     }
 ]
 
-export const sampleEntryPoints: EntryPointLike[] = [
+export const sampleEntryPoints = [
     {
         _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
         _updated: 'lep62vrw',

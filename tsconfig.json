@@ -21,8 +21,10 @@
     "outDir": "out"
   },
   "include": [
-    "src"
-, "out/local-test.js"  ],
+    "src",
+    "out/local-test.js",
+    // "out/sampleData.js"
+  ],
   "typedocOptions": {
     "entryPoints": [
       "src/pdw.ts",

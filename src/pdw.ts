@@ -575,7 +575,7 @@ export class PDW {
     }
 
     //#HACK - hardcoded right now
-    allDataSince(): CompleteDataset{
+    allDataSince(): CompleteDataset {
         return {
             defs: this.dataStores[0].getDefs(),
             pointDefs: this.dataStores[0].getPointDefs()
@@ -603,9 +603,9 @@ export class PDW {
         if (didOrLbls !== undefined && !Array.isArray(didOrLbls)) didOrLbls = [didOrLbls]
 
         //if there's only DataStore, bypass the combining stuff to save time
-        if(this.dataStores.length == 1){
+        if (this.dataStores.length == 1) {
             let defLikes = this.dataStores[0].getDefs(didOrLbls, includeDeleted)
-            return defLikes.map(dl=>new Def(dl));
+            return defLikes.map(dl => new Def(dl));
         }
 
         //multiple DataStores need to be all pulled, then deconflicted
@@ -614,20 +614,20 @@ export class PDW {
         //#UNTESTED - test this!
         this.dataStores.forEach(dataStore => {
             let thisStoreDefLikes = dataStore.getDefs(didOrLbls as string[], includeDeleted);
-            let thisStoreDefs = thisStoreDefLikes.map(tsdl=>new Def(tsdl));
-            thisStoreDefs.forEach(def=>{
-                let existingCopy = combinedDefs.find(cd=>cd.sameIdAs(def));
-                if(existingCopy !== undefined){
+            let thisStoreDefs = thisStoreDefLikes.map(tsdl => new Def(tsdl));
+            thisStoreDefs.forEach(def => {
+                let existingCopy = combinedDefs.find(cd => cd.sameIdAs(def));
+                if (existingCopy !== undefined) {
                     //duplicate found, determine which is newer & keep only it
-                    if(existingCopy.shouldBeReplacedWith(def)){
+                    if (existingCopy.shouldBeReplacedWith(def)) {
                         //find & remove exising
-                        const ind = combinedDefs.findIndex(el=>el._uid === existingCopy!._uid)
+                        const ind = combinedDefs.findIndex(el => el._uid === existingCopy!._uid)
                         combinedDefs.splice(ind);
                         //add replacement
                         combinedDefs.push(def);
                     }
                     //else{ignore it. don't do anything}
-                }else{
+                } else {
                     combinedDefs.push(def);
                 }
             })
@@ -703,7 +703,7 @@ export abstract class Element implements ElementLike {
         this._uid = existingData._uid ?? makeUID();
         this._deleted = existingData._deleted ?? false;
         this._created = existingData._created ?? Temporal.Now.plainDateTimeISO();//new Temporal.TimeZone('UTC'));
-        if(typeof this._created == 'string') this._created = Temporal.PlainDateTime.from(this._created);
+        if (typeof this._created == 'string') this._created = Temporal.PlainDateTime.from(this._created);
         this._updated = existingData._updated ?? makeEpochStr();
     }
 
@@ -803,7 +803,7 @@ export class Def extends Element implements DefLike {
         this._desc = defIn._desc ?? 'Set a description';
         this._emoji = defIn._emoji ?? '🆕';
         this._scope = defIn._scope ?? Scope.SECOND;
-        //#THINK - do you want to add _points back in as optional?
+        //#THINK - do you want to add _points back in as optional? Or make it a method?
     }
 
     // createNewPointDef(pd: {_lbl: string, _type: PointType}){
@@ -814,7 +814,7 @@ export class Def extends Element implements DefLike {
         _lbl: string,
         _type: PointType
     }]): PointDef[] {
-        let pointDefs = pointInfoIn.map(point=>{
+        let pointDefs = pointInfoIn.map(point => {
             return PDW.getInstance().createNewPointDef({
                 _lbl: point._lbl,
                 _did: this._did,
@@ -823,6 +823,31 @@ export class Def extends Element implements DefLike {
         })
         return pointDefs
     }
+
+    /**
+    * Predicate to check if an object has all {@link DefLike} properties
+    * AND they are the right type.
+    * @param data data to check
+    * @returns true if data have all required properties of {@link DefLike}
+    */
+    static isDefLike(data: any): boolean {
+        if (data._did == undefined || typeof data._did !== 'string') return false
+        if (data._lbl == undefined || typeof data._lbl !== 'string') return false
+        if (data._desc == undefined || typeof data._desc !== 'string') return false
+        if (data._emoji == undefined || typeof data._emoji !== 'string') return false
+        if (data._scope == undefined || !this.isValidScope(data._scope)) return false
+        if (data._uid == undefined || typeof data._uid !== 'string') return false
+        if (data._created == undefined || typeof data._created.getISOFields !== 'function') return false //proxy check
+        if (data._deleted == undefined || typeof data._deleted !== 'boolean') return false
+        if (data._updated == undefined || typeof data._updated !== 'string') return false
+        return true;
+    }
+
+    static isValidScope(typeStr: string): boolean {
+        const values = Object.values(Scope);
+        return values.includes(typeStr as unknown as Scope)
+    }
+    
 }
 
 export class PointDef extends Element implements PointDefLike {
@@ -846,6 +871,44 @@ export class PointDef extends Element implements PointDefLike {
         this._rollup = pd._rollup ?? Rollup.COUNT;
         this._format = pd._format ?? Format.TEXT;
         if (def) this._def = def;
+    }
+
+    /**
+    * Predicate to check if an object has all {@link PointDefLike} properties
+    * AND they are the right type.
+    * @param data data to check
+    * @returns true if data have all required properties of {@link DefLike}
+    */
+    static isPointDefLike(data: any): boolean {
+        if (data._did == undefined || typeof data._did !== 'string') return false
+        if (data._pid == undefined || typeof data._pid !== 'string') return false
+        if (data._lbl == undefined || typeof data._lbl !== 'string') return false
+        if (data._desc == undefined || typeof data._desc !== 'string') return false
+        if (data._emoji == undefined || typeof data._emoji !== 'string') return false
+        if (data._type == undefined || !PointDef.isValidType(data._type)) return false
+        if (data._rollup == undefined || !PointDef.isValidRollup(data._rollup)) return false
+        if (data._format == undefined || !PointDef.isValidFormat(data._format)) return false
+        if (data._uid == undefined || typeof data._uid !== 'string') return false
+        if (data._created == undefined || typeof data._created.getISOFields !== 'function') return false //proxy check
+        if (data._deleted == undefined || typeof data._deleted !== 'boolean') return false
+        if (data._updated == undefined || typeof data._updated !== 'string') return false
+        return true;
+    }
+
+    static isValidType(typeStr: string): boolean {
+        //Handy bit of Enum functionality here for ref
+        const values = Object.values(PointType);
+        return values.includes(typeStr as unknown as PointType)
+    }
+
+    static isValidRollup(typeStr: string): boolean {
+        const values = Object.values(Rollup);
+        return values.includes(typeStr as unknown as Rollup)
+    }
+
+    static isValidFormat(typeStr: string): boolean {
+        const values = Object.values(Format);
+        return values.includes(typeStr as unknown as Format)
     }
 
 }
@@ -987,7 +1050,7 @@ export class DefaultDataStore implements DataStore {
         let noDupes = new Set([...labelMatches, ...didMatches]);
         if (includeDeleted) return Array.from(noDupes);
         return Array.from(noDupes).filter(pd => pd._deleted === false);
-    
+
     }
     setPointDefs(pointDefsIn: PointDef[]) {
         let newDefs: PointDef[] = [];
@@ -1075,7 +1138,7 @@ export function parseTemporalFromEpochStr(epochStr: EpochStr): Temporal.Instant 
     const bugEpochMillis = parseInt(tempStr, 36)
     const bugParsedTemporal = Temporal.Instant.fromEpochMilliseconds(bugEpochMillis);
     console.log('bug demo: ' + bugParsedTemporal.toLocaleString()); //will be in the future
-    
+
     return parsedTemporal
 }
 
@@ -1091,43 +1154,5 @@ export function getElementType(element: ElementLike): 'DefLike' | 'PointDefLike'
     if (element.hasOwnProperty("_pid")) return "PointDefLike"
     return "DefLike"
 }
-
-/**
- * Predicate to check if an object has all {@link DefLike} properties
- * @param data data to check
- * @returns true if data have all required properties of {@link DefLike}
- */
-export function hasDefLikeProps(data: any): boolean{
-        if(data._did == undefined) return false
-        if(data._lbl == undefined) return false
-        if(data._desc == undefined) return false
-        if(data._emoji == undefined) return false
-        if(data._scope == undefined) return false
-        if(data._uid == undefined) return false
-        if(data._deleted == undefined) return false
-        if(data._created == undefined) return false
-        if(data._updated == undefined) return false
-        return true;
-}
-
-/**
- * Predicate to check if an object has all {@link DefLike} properties
- * AND they are the right type.
- * @param data data to check
- * @returns true if data have all required properties of {@link DefLike}
- */
-export function isDefLike(data: any): boolean{
-    if(data._did == undefined || typeof data._did !== 'string') return false
-    if(data._lbl == undefined || typeof data._lbl !== 'string') return false
-    if(data._desc == undefined || typeof data._desc !== 'string') return false
-    if(data._emoji == undefined || typeof data._emoji !== 'string') return false
-    if(data._scope == undefined || typeof data._scope !== 'string') return false
-    if(data._uid == undefined || typeof data._uid !== 'string') return false
-    if(data._created == undefined || typeof data._created.getISOFields !== 'function') return false //proxy check
-    if(data._deleted == undefined || typeof data._deleted !== 'boolean') return false
-    if(data._updated == undefined || typeof data._updated !== 'string') return false
-    return true;
-}
-
 
 //#endregion
