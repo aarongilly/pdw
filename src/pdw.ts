@@ -1,5 +1,4 @@
 import { Temporal } from "temporal-polyfill";
-import { DefaultConnector } from "./connectors/defaultConnector";
 
 //#region ### TYPES ###
 
@@ -95,7 +94,7 @@ export enum Format {
 //#region ### INTERFACES ###
 
 /**
- * The `StorageConnector` interface is what you must implement when creating code to
+ * The `DataStore` interface is what you must implement when creating code to
  * hook up a new database. It is what sits between the data store of choice and the PDW.
  * It's designed to be as simple-to-implement as possible.
  * 
@@ -103,7 +102,7 @@ export enum Format {
  * one for Firebase, but would like to create ones for Excel (for pragmatics) and 
  * SQL (for learning)
  */
-export interface StorageConnector {
+export interface DataStore {
     /**
      * Get Definitions. 
      * Specifying no param will return all definitions.
@@ -115,7 +114,7 @@ export interface StorageConnector {
     /**
      * Creates (or updates) definitions. 
      */
-    setDefs(defs: DefLike[] | DefLike): Def[];
+    setDefs(defs: Def[]): Def[];
 
     /**
      * Get PointDefinitions. 
@@ -128,26 +127,26 @@ export interface StorageConnector {
     /**
      * Creates (or updates) point defintions
      */
-    setPointDefs(pointDefs: PointDefLike[] | PointDefLike): any
+    setPointDefs(pointDefs: PointDef[]): any
 
     getEntries(query: QueryLike): Entry
 
-    setEntries(): Entry[];
+    setEntries(entries: Entry[]): Entry[];
 
     getTags(tidAndOrLbls?: string[]): TagLike[]
 
-    setTags(tagData: MinimumTag): TagLike[]
+    setTags(tagData: Tag[]): TagLike[]
 
     getTagDefs(pidAndOrDidAndOrLbls?: string[]): TagDefLike[]
 
-    setTagDefs(tagData: MinimumTagDef): TagDefLike[]
+    setTagDefs(tagData: TagDef[]): TagDefLike[]
 
     getOverview(): DataStoreOverview;
 
     getAllSince(): CompleteDataset;
 
     connect(...params: any): boolean;
- 
+
     /**
      * The name of the connector, essentially. Examples: "Excel", "Firestore"
      */
@@ -163,7 +162,7 @@ export interface StorageConnector {
 /**
  * A map of arrays of all types of {@link Element}.
  */
-export interface CompleteDataset{
+export interface CompleteDataset {
     defs: DefLike[];
     pointDefs: PointDefLike[];
     entries: EntryLike[];
@@ -394,7 +393,7 @@ export interface MinimumDef extends MinimumElement {
     // _points?: PointDefLike[];
 }
 
-export interface MinimumPointDef extends MinimumElement{
+export interface MinimumPointDef extends MinimumElement {
     /**
      * To create a brand new PointDef, you must provide a label, did, & type
      */
@@ -431,10 +430,10 @@ export interface MinimumPointDef extends MinimumElement{
      * Rollup Type
      * Defaults to {@link Format.TEXT}
      */
-    _format?: Format;   
+    _format?: Format;
 }
 
-export interface MinimumEntry extends MinimumElement{
+export interface MinimumEntry extends MinimumElement {
     /**
      * When the Entry took place
      */
@@ -466,6 +465,10 @@ export interface MinimumEntryPoint extends MinimumElement {
      */
     _pid: SmallID;
     /**
+     * What Entry is it associated with?
+     */
+    _eid: SmallID;
+    /**
      * What is the entry value?
      */
     _val: string | number | boolean | object;
@@ -486,7 +489,7 @@ export interface MinimumTagDef extends MinimumElement {
     _tid?: SmallID;
 }
 
-export interface MinimumTag extends MinimumElement{
+export interface MinimumTag extends MinimumElement {
     /**
      * Definition to apply to
      */
@@ -502,20 +505,20 @@ export interface MinimumTag extends MinimumElement{
     _pid?: SmallID;
 }
 
-export interface QueryLike{
+export interface QueryLike {
 
 }
 
-export interface ReducedQuery{
+export interface ReducedQuery {
 
 }
 
-interface CurrentAndDeleteeCounts{
+interface CurrentAndDeleteeCounts {
     current: number,
     deleted: number
 }
 
-export interface DataStoreOverview{
+export interface DataStoreOverview {
     storeName: string;
     defs: CurrentAndDeleteeCounts;
     pointDefs: CurrentAndDeleteeCounts;
@@ -530,46 +533,68 @@ export interface DataStoreOverview{
 //#region ### CLASSES ###
 
 export class PDW {
-    connections: StorageConnector[];
+    dataStore: DataStore[];
     private static instance: PDW;
-    constructor(storeConnection?: StorageConnector) {
-        if(storeConnection !== undefined){
-            this.connections = [storeConnection];
-        }else{
-            this.connections = [new DefaultConnector(this)]
+    constructor(store?: DataStore) {
+        if (store !== undefined) {
+            this.dataStore = [store];
+        } else {
+            this.dataStore = [new DefaultDataStore(this)]
         }
     }
-    registerConnection(connectorInstance: StorageConnector) {
-        this.connections?.push(connectorInstance);
-        connectorInstance.pdw = this;
+    registerConnection(storeInstance: DataStore) {
+        console.log(storeInstance);
+        //#TODO        
+        // this.dataStore?.push(storeInstance);
+        // storeInstance.pdw = this;
     }
 
-    setDefs(defs: DefLike[]) {
-        console.log(defs);
-        
+    setDefs(defsIn: DefLike[]): Def[] {
+        let defs: Def[] = defsIn.map(defLike => new Def(defLike));
+        this.dataStore.forEach(connection => {
+            connection.setDefs(defs)
+        })
+        return defs
     }
 
     setPointDefs(pointDefs: PointDefLike[]) {
         console.log(pointDefs);
     }
 
-    getDefs(didOrLbls: string[] | string, includeDeleted = true){
-        //force array type
-        if(!Array.isArray(didOrLbls)) didOrLbls = [didOrLbls];
-        console.log(includeDeleted);
-        
+    getDefs(didOrLbls?: string[] | string, includeDeleted = true): Def[] {
+        let allDefs: DefLike[] = [];
+        if (didOrLbls !== undefined && !Array.isArray(didOrLbls)) didOrLbls = [didOrLbls]
+        //compile defs from all attached DataStores
+        this.dataStore.forEach(dataStore => {
+            allDefs.push(...dataStore.getDefs(didOrLbls as string[], includeDeleted));
+        })
+        //keep only the most recent defs
+        let mostRecent = this.deconflictElements(allDefs) as DefLike[];
+        return mostRecent.map(defLike => new Def(defLike));
     }
-    
+
+    /**
+     * Looks at an array of Elements and removes any duplicates and any
+     * older versions of an element (say, a Def from a DataStore that was 
+     * later updated in another DataStore). A CLASSIC CODING CHALLENGE.
+     * It does NOT modify any Elements.
+     * @param elementsIn array of elements to check for duplication/outdatedness within
+     */
+    private deconflictElements(elementsIn: ElementLike[]): ElementLike[] {
+        let noConflicts: ElementLike[] = [];
+        let conflicted: ElementLike[] = [];
+        return elementsIn;
+    }
+
     /**
      * Creates a new definition from {@link MinimumDef} components
-     * and adds it to the definition manifest of the connected storage
-     * connector.
+     * and adds it to the definition manifest of the connected DataStore.
      * @param defInfo 
      * @returns the newly created Definition
     */
-   createNewDef(defInfo: MinimumDef): Def {
+    createNewDef(defInfo: MinimumDef): Def {
         let newDef = new Def(defInfo);
-        this.connections.forEach(connection => {
+        this.dataStore.forEach(connection => {
             connection.setDefs([newDef])
         })
         return newDef
@@ -577,15 +602,14 @@ export class PDW {
 
     /**
      * Creates a new definition from {@link MinimumDef} components
-     * and adds it to the definition manifest of the connected storage
-     * connector.
+     * and adds it to the definition manifest of the connected DataStore
      * @param pointDefInfo 
      * @returns the newly created Point Definition
     */
-   createNewPointDef(pointDefInfo: MinimumPointDef): PointDef{
-    let newPointDef = new PointDef(pointDefInfo);
-    return newPointDef;
-}
+    createNewPointDef(pointDefInfo: MinimumPointDef): PointDef {
+        let newPointDef = new PointDef(pointDefInfo);
+        return newPointDef;
+    }
 
     /**
      * Singleton pattern.
@@ -606,24 +630,24 @@ export class PDW {
 /**
  * Base class 
  */
-export abstract class Element implements ElementLike{
+export abstract class Element implements ElementLike {
     _uid: string;
     _deleted: boolean;
     _created: Temporal.PlainDateTime | string;
     _updated: EpochStr;
-    constructor(existingData: any){
+    constructor(existingData: any) {
         this._uid = existingData._uid ?? makeUID();
         this._deleted = existingData._deleted ?? false;
         this._created = existingData._created ?? Temporal.Now.plainDateTimeISO();
         this._updated = existingData._updated ?? makeEpochStr();
     }
-    
-    markDeleted(){
+
+    markDeleted() {
         this._deleted = true;
         this._updated = makeEpochStr();
     }
 
-    markUndeleted(){
+    markUndeleted() {
         this._deleted = false;
         this._updated = makeEpochStr();
     }
@@ -633,7 +657,7 @@ export abstract class Element implements ElementLike{
      * @param elementData ElementLike data to compare against
      * @returns true if argument is updated more recently than this
      */
-    isOlderThan(elementData: ElementLike){
+    isOlderThan(elementData: ElementLike) {
         return this._updated < elementData._updated;
     }
 
@@ -643,9 +667,9 @@ export abstract class Element implements ElementLike{
      * @param comparison ElementLike data that might be a newer copy of this
      * @returns true if the argument is a newer version of the same Element
      */
-    shouldBeReplacedWith(comparison: ElementLike): boolean{
-        if(!this.sameIdAs(comparison)) return false;
-        if(this.isOlderThan(comparison)) return true;
+    shouldBeReplacedWith(comparison: ElementLike): boolean {
+        if (!this.sameIdAs(comparison)) return false;
+        if (this.isOlderThan(comparison)) return true;
         return false;
     }
 
@@ -655,10 +679,10 @@ export abstract class Element implements ElementLike{
      * @returns string representing the type of element
      */
     getType(): 'DefLike' | 'PointDefLike' | 'EntryLike' | 'EntryPointLike' | 'TagLike' {
-        if(this.hasOwnProperty("_tid")) return "TagLike"
-        if(this.hasOwnProperty("_eid") && this.hasOwnProperty('_pid')) return "EntryPointLike"
-        if(this.hasOwnProperty("_eid")) return "EntryLike"
-        if(this.hasOwnProperty("_pid")) return "PointDefLike"
+        if (this.hasOwnProperty("_tid")) return "TagLike"
+        if (this.hasOwnProperty("_eid") && this.hasOwnProperty('_pid')) return "EntryPointLike"
+        if (this.hasOwnProperty("_eid")) return "EntryLike"
+        if (this.hasOwnProperty("_pid")) return "PointDefLike"
         return "DefLike"
     }
 
@@ -667,28 +691,28 @@ export abstract class Element implements ElementLike{
      * whatever is passed in
      * @param comparison Element to compare against
      */
-    sameIdAs(comparison: ElementLike){
-        if(!this.sameTypeAs(comparison)) return false;
+    sameIdAs(comparison: ElementLike) {
+        if (!this.sameTypeAs(comparison)) return false;
         const type = this.getType();
         //@ts-expect-error
-        if(type==='DefLike') return this._did === comparison._did;
+        if (type === 'DefLike') return this._did === comparison._did;
         //@ts-expect-error
-        if(type==='EntryLike') return this._eid === comparison._eid;
+        if (type === 'EntryLike') return this._eid === comparison._eid;
         //@ts-expect-error
-        if(type==='TagLike') return this._tid === comparison._tid;
+        if (type === 'TagLike') return this._tid === comparison._tid;
         //@ts-expect-error
         return this._pid === comparison._pid && this._did === comparison._did;
     }
 
-    sameTypeAs(comparison: ElementLike){
+    sameTypeAs(comparison: ElementLike) {
         return this.getType() === this.getTypeOfElementLike(comparison);
     }
 
     private getTypeOfElementLike(data: ElementLike) {
-        if(data.hasOwnProperty("_tid")) return "TagLike"
-        if(data.hasOwnProperty("_eid") && data.hasOwnProperty('_pid')) return "EntryPointLike"
-        if(data.hasOwnProperty("_eid")) return "EntryLike"
-        if(data.hasOwnProperty("_pid")) return "PointDefLike"
+        if (data.hasOwnProperty("_tid")) return "TagLike"
+        if (data.hasOwnProperty("_eid") && data.hasOwnProperty('_pid')) return "EntryPointLike"
+        if (data.hasOwnProperty("_eid")) return "EntryLike"
+        if (data.hasOwnProperty("_pid")) return "PointDefLike"
         return "DefLike"
     }
 }
@@ -718,7 +742,7 @@ export class Def extends Element implements DefLike {
     }
 
     // createNewPointDef(pd: {_lbl: string, _type: PointType}){
-        
+
     // }
 
     setPointDefs() {
@@ -770,7 +794,7 @@ export class PointDef extends Element implements PointDefLike {
     _rollup: Rollup;
     _format: Format;
     _def?: Def;
-    constructor(pd: MinimumPointDef, def?: Def){
+    constructor(pd: MinimumPointDef, def?: Def) {
         super(pd)
         this._did = pd._did;
         this._lbl = pd._lbl;
@@ -784,7 +808,7 @@ export class PointDef extends Element implements PointDefLike {
         this._emoji = pd._emoji ?? '🆕';
         this._rollup = pd._rollup ?? Rollup.COUNT;
         this._format = pd._format ?? Format.TEXT;
-        if(def) this._def = def;
+        if (def) this._def = def;
     }
 
 }
@@ -794,29 +818,160 @@ export class Entry extends Element implements EntryLike {
     _note: Markdown;
     _did: string;
     _period: Period;
-    constructor(entryData: MinimumEntry){
+    constructor(entryData: MinimumEntry) {
         super(entryData);
         this._did = entryData._did;
-        this._period = entryData._period ;
+        this._period = entryData._period;
         this._eid = entryData._eid ?? makeUID();
         this._note = entryData._note ?? '';
     }
 
 }
 
-export class Period{
+/**
+ * Making this a class for symmetry, but not exactly sure if it 
+ * really should be one. Can't think of any methods that would 
+ * be attached. But I guess it's an easy way to build an EntryLike obj
+ */
+export class EntryPoint extends Element implements EntryPointLike {
+    _eid: string;
+    _pid: string;
+    _val: any;
+    constructor(entryPointData: MinimumEntryPoint) {
+        super(entryPointData);
+        this._eid = entryPointData._eid;
+        this._pid = entryPointData._pid;
+        this._val = entryPointData._val;
+    }
 
 }
 
-export class Query{
-    constructor(){
+export class TagDef extends Element implements TagDefLike {
+    _tid: string;
+    _lbl: string;
+    constructor(tagDefData: MinimumTagDef) {
+        super(tagDefData);
+        this._tid = tagDefData._tid ?? makeSmallID();
+        this._lbl = tagDefData._lbl;
+    }
+}
+
+export class Tag extends Element implements TagLike {
+    _tid: string;
+    _did: string;
+    _pid?: string | undefined;
+    constructor(tagData: MinimumTag) {
+        super(tagData);
+        this._tid = tagData._tid;
+        this._did = tagData._did;
+        this._pid = tagData._pid;
+    }
+}
+
+export class Period {
+
+}
+
+export class Query {
+    constructor() {
 
     }
     //#TODO - a lot
-    
-    run(): QueryLike{
+
+    run(): QueryLike {
         throw new Error('Query.run not yet implemented')
     }
+}
+
+export class DefaultDataStore implements DataStore {
+    serviceName: string;
+    pdw: PDW;
+    defs: Def[];
+    pointDefs: PointDef[];
+    entries: Entry[];
+    entryPoints: EntryPoint[];
+    tagDefs: TagDef[];
+    tags: Tag[];
+
+    constructor(pdwRef: PDW) {
+        this.serviceName = 'In memory dataset';
+        this.pdw = pdwRef;
+        this.defs = [];
+        this.pointDefs = [];
+        this.entries = [];
+        this.entryPoints = [];
+        this.tagDefs = [];
+        this.tags = [];
+    }
+
+    getDefs(didsAndOrLbls?: string[] | undefined, includeDeleted?: boolean | undefined): DefLike[] {
+        if (didsAndOrLbls === undefined) {
+            if (includeDeleted) return this.defs;
+            return this.defs.filter(def => def._deleted === false);
+        }
+        if (didsAndOrLbls) console.log('I see your ', didsAndOrLbls);
+        const labelMatches = this.defs.filter(def => didsAndOrLbls.some(p => p === def._lbl));
+        const didMatches = this.defs.filter(def => didsAndOrLbls.some(p => p === def._did));
+        //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
+        let noDupes = new Set([...labelMatches, ...didMatches]);
+        if (includeDeleted) return Array.from(noDupes);
+        return Array.from(noDupes).filter(def => def._deleted === false);
+    }
+
+    setDefs(defsIn: Def[]): Def[] {
+        let newDefs: Def[] = [];
+        //mark any old defs as deleted
+        defsIn.forEach(def => {
+            let existingDef = this.defs.find(existing => existing._did == def._did && existing._deleted === false);
+            if (existingDef !== undefined) {
+                //only replace if the setDefs def is newer, necessary for StorageConnector merges
+                if (existingDef.shouldBeReplacedWith(def)) {
+                    existingDef.markDeleted();
+                    newDefs.push(def)
+                }
+            } else {
+                newDefs.push(def);
+            }
+        })
+        //merge newDefs with defs in the DataStore
+        this.defs.push(...newDefs);
+        return defsIn;
+    }
+
+    getPointDefs(_didsAndOrLbls?: string[] | undefined): PointDefLike[] {
+        throw new Error("Method not implemented.");
+    }
+    setPointDefs(_pointDefs: PointDefLike | PointDefLike[]) {
+        throw new Error("Method not implemented.");
+    }
+    getEntries(_query: QueryLike): Entry {
+        throw new Error("Method not implemented.");
+    }
+    setEntries(_entries: Entry[]): Entry[] {
+        throw new Error("Method not implemented.");
+    }
+    getTags(_tidAndOrLbls?: string[] | undefined): TagLike[] {
+        throw new Error("Method not implemented.");
+    }
+    setTags(_tagData: Tag[]): TagLike[] {
+        throw new Error("Method not implemented.");
+    }
+    getTagDefs(_pidAndOrDidAndOrLbls?: string[] | undefined): TagDefLike[] {
+        throw new Error("Method not implemented.");
+    }
+    setTagDefs(_tagData: TagDef[]): TagDefLike[] {
+        throw new Error("Method not implemented.");
+    }
+    getOverview(): DataStoreOverview {
+        throw new Error("Method not implemented.");
+    }
+    getAllSince(): CompleteDataset {
+        throw new Error("Method not implemented.");
+    }
+    connect(..._params: any): boolean {
+        throw new Error("Method not implemented.");
+    }
+
 }
 
 //#endregion
@@ -840,8 +995,12 @@ export function makeSmallID(length = 4): SmallID {
     return Math.random().toString(36).slice(13 - length).padStart(length, "0")
 }
 
-export function parseTemporalFromUid(uid: UID): any { //Temporal.Instant{
-    const epochMillis = parseInt(uid.split(".")[0], 36)
+export function parseTemporalFromUid(uid: UID): Temporal.Instant {
+    return parseTemporalFromEpochStr(uid.split("-")[0]);
+}
+
+export function parseTemporalFromEpochStr(epochStr: EpochStr): Temporal.Instant {
+    const epochMillis = parseInt(epochStr, 36)
     const parsedTemporal = Temporal.Instant.fromEpochMilliseconds(epochMillis);
     // const zoneless = Temporal.Now.plainDateTimeISO();
     // const timezone = Temporal.Now.timeZone();
@@ -856,12 +1015,12 @@ export function parseTemporalFromUid(uid: UID): any { //Temporal.Instant{
  * @param comparisonElement The thing that might be newer
  * @returns true if baseElement is less recently updated than comparison
  */
-export function elementIsNewer(baseElement: ElementLike, comparisonElement: ElementLike): Boolean{
-    
+export function elementIsNewer(baseElement: ElementLike, comparisonElement: ElementLike): Boolean {
+
     console.log('base: ' + baseElement._updated)
     console.log('comp: ' + comparisonElement._updated)
     return baseElement._updated > comparisonElement._updated
-    
+
 }
 
 /**
@@ -870,11 +1029,11 @@ export function elementIsNewer(baseElement: ElementLike, comparisonElement: Elem
 * @returns string representing the type of element
 */
 export function getElementType(element: ElementLike): 'DefLike' | 'PointDefLike' | 'EntryLike' | 'EntryPointLike' | 'TagLike' {
-   if(element.hasOwnProperty("_tid")) return "TagLike"
-   if(element.hasOwnProperty("_eid") && element.hasOwnProperty('_pid')) return "EntryPointLike"
-   if(element.hasOwnProperty("_eid")) return "EntryLike"
-   if(element.hasOwnProperty("_pid")) return "PointDefLike"
-   return "DefLike"
+    if (element.hasOwnProperty("_tid")) return "TagLike"
+    if (element.hasOwnProperty("_eid") && element.hasOwnProperty('_pid')) return "EntryPointLike"
+    if (element.hasOwnProperty("_eid")) return "EntryLike"
+    if (element.hasOwnProperty("_pid")) return "PointDefLike"
+    return "DefLike"
 }
 
 //#endregion
@@ -886,7 +1045,6 @@ export const standardTabularPointDefHeaders = ['_uid', '_created', '_updated', '
 export const standardTabularBaseEntryHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_period', '_note'];
 export const standardTabularEntryPointHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_val'];
 export const standardTabularTagHeaders = ['_uid', '_created', '_updated', '_deleted', '_tid', '_lbl'];
-
 export const standardTabularFullEntryHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_note']; //think
 
 //#endregion

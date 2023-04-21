@@ -1,18 +1,21 @@
 import {PDW} from './pdw.js'
-import { DefaultConnector } from "./connectors/defaultConnector.js";
+import {Scope} from './pdw.js'
+// import { FileConnector } from "./connectors/fileConnector.js";
 // import { sampleDefinitions } from './sampleData.js';
 
 const pdw = PDW.getInstance();
-const fileConnector = new DefaultConnector();
-pdw.registerConnection(fileConnector);
+// const fileConnector = new FileConnector(pdw);
+// pdw.registerConnection(fileConnector);
 
-// pdw.createNewDef({_lbl: "test one", _desc: 'Initial desc', _emoji: '1️⃣'})
-// pdw.createNewDef({_lbl: "twooo", _scope: Scope.WEEK, _emoji: '2️⃣', _desc: 'now with a description'});
-// pdw.createNewDef({_lbl: "four", _emoji: '🕒'});
+pdw.createNewDef({_lbl: "test one", _desc: 'Initial desc', _emoji: '1️⃣'})
+pdw.createNewDef({_lbl: "twooo", _scope: Scope.WEEK, _emoji: '2️⃣', _desc: 'now with a description'});
+pdw.createNewDef({_lbl: "four", _emoji: '🕒'});
+
+console.log(pdw.getDefs());
 
 //Testing implicit merge
-loadFile('data-files/OutExcel.xlsx');
-loadFile('data-files/OutExcel2.xlsx');
+// loadFile('data-files/OutExcel.xlsx');
+// loadFile('data-files/OutExcel2.xlsx');
 
 // const localDefCopy = pdw.getDefs(['test one'], false);
 
@@ -25,13 +28,13 @@ loadFile('data-files/OutExcel2.xlsx');
 // console.log(DefaultConnector.getPointDefs())
 // pdw.setDefs(sampleDefinitions);
 
-let outFilename = 'data-files/OutExcel3.xlsx';
-(<DefaultConnector> pdw.connections).writeToFile(outFilename);
+// let outFilename = 'data-files/OutExcel3.xlsx';
+// (<DefaultConnector> pdw.connections).writeToFile(outFilename);
 // let outFilename = 'data-files/DevFile.json';
 // (<DefaultConnector> pdw.connection).writeToFile(outFilename);
 
 // console.log(makeUID());
 
-function loadFile(fileName: string){
-    (<DefaultConnector> pdw.connections).loadFromFile(fileName);
-}
+// function loadFile(fileName: string){
+//     (<DefaultConnector> pdw.connections).loadFromFile(fileName);
+// }

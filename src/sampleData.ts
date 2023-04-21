@@ -6,7 +6,7 @@ export const samplePointDefs: PointDefLike[] = [
         _did: 'doae',
         _uid: 'lep65ghw.rghw',
         _created: Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
-        _updated: Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
+        _updated:  'lep62vrw',
         _deleted: false,
         _pid: 'apox',
         _lbl: 'Event',
@@ -20,7 +20,7 @@ export const samplePointDefs: PointDefLike[] = [
         _did: 'seae',
         _uid: 'lep65gcy.rghw',
         _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-        _updated: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
+        _updated: 'lep62vrw',
         _deleted: false,
         _pid: 'oese',
         _lbl: 'Title',
@@ -34,7 +34,7 @@ export const samplePointDefs: PointDefLike[] = [
         _did: 'seae',
         _uid: 'lep65g3sq.fipe',
         _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-        _updated: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
+        _updated: 'lep62vrw',
         _deleted: false,
         _pid: 'momm',
         _lbl: 'First time?',
@@ -51,7 +51,7 @@ export const sampleDefinitions: DefLike[] = [
     {
         _uid: 'lep62vrw.hfvm',
         _created: Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
-        _updated: Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
+        _updated: 'lep62vrw',
         _deleted: false,
         _desc: 'A test definition, for plain events',
         _did: 'doae',
@@ -62,7 +62,7 @@ export const sampleDefinitions: DefLike[] = [
     {
         _uid: 'lep62vpsx.doqd',
         _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-        _updated: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
+        _updated: 'lep62vrw',
         _deleted: false,
         _desc: 'A 2nd definition, with two points',
         _did: 'seae',
@@ -76,7 +76,7 @@ export const sampleTags: TagDefLike[] = [
     {
         _uid: 'lep6353w.hnkp',
         _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-        _updated: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
+        _updated: 'lep62vrw',
         _deleted: false,
         _lbl: 'Media',
         _tid: 'pwpa'
@@ -86,7 +86,7 @@ export const sampleTags: TagDefLike[] = [
 export const sampleEntries: EntryLike[] = [
     {
         _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-        _updated: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
+        _updated: 'lep62vrw',
         _deleted: false,
         _uid: 'lep65g89q.awea',
         _eid: 'lep65g89q.awea',
@@ -99,7 +99,7 @@ export const sampleEntries: EntryLike[] = [
 export const sampleEntryPoints: EntryPointLike[] = [
     {
         _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-        _updated: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
+        _updated: 'lep62vrw',
         _deleted: false,
         _uid: 'lep65g89q.apis',
         _eid: 'lep65g89q.awea',
@@ -108,7 +108,7 @@ export const sampleEntryPoints: EntryPointLike[] = [
     },
     {
         _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
-        _updated: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
+        _updated: 'lep62vrw',
         _deleted: false,
         _uid: 'lep65g89q.wewq',
         _eid: 'lep65g89q.awea',

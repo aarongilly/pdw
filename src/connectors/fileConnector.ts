@@ -21,7 +21,7 @@ import { Temporal } from 'temporal-polyfill';
  * 
  * **For God's Sake don't let the co-development of this pollute the PDW library**.
  */
-export class DefaultConnector implements pdw.StorageConnector{
+export class FileConnector{
     connectedDbName: string;
     serviceName: string;
     connectionStatus: "error" | "not connected" | "connected"
@@ -87,14 +87,14 @@ export class DefaultConnector implements pdw.StorageConnector{
     }
 
     writeToFile(filepath: string){
-        const fileType = DefaultConnector.inferFileType(filepath)
+        const fileType = FileConnector.inferFileType(filepath)
         if(fileType === 'excel') return this.writeToExcel(filepath);
         if(fileType === 'json') return this.writeToJson(filepath);
         throw new Error('Unimplementd write type: ' + fileType)
     }
 
     loadFromFile(filepath: string){
-        const fileType = DefaultConnector.inferFileType(filepath)
+        const fileType = FileConnector.inferFileType(filepath)
         if(fileType === 'excel') return this.loadFromExcel(filepath);
         if(fileType === 'json') return this.loadFromJson(filepath);
         throw new Error('Unimplementd write type: ' + fileType)
@@ -232,7 +232,7 @@ function destringifyElement(obj: pdw.DefLike | pdw.PointDefLike | pdw.EntryLike 
         //TODO - check for and handle native Excel dates
         returnObj._created = Temporal.PlainDateTime.from(returnObj._created);
     }
-    if(returnObj._updated !== undefined) returnObj._updated = Temporal.PlainDateTime.from(returnObj._updated);
+    if(returnObj._updated !== undefined) returnObj._updated = pdw.makeEpochStr();
     if(returnObj._deleted !== undefined) returnObj._deleted = returnObj._deleted.toString().toUpperCase() === 'TRUE';
     if(returnObj.hasOwnProperty('_scope')){
         (<pdw.DefLike> returnObj)._scope = (<pdw.DefLike> returnObj)._scope.toString().toUpperCase() as pdw.Scope;
