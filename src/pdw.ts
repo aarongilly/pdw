@@ -47,13 +47,14 @@ export enum PointType {
      */
     NUM = "NUM",
     TEXT = 'TEXT',
-    SELECT = 'SELECT', //
+    MARKDOWN = 'MARKDOWN',
+    SELECT = 'SELECT', //_tid
     BOOL = 'BOOL', //true false
     DURATION = 'DURATION', //Temporal.duration
     TIME = 'TIME', //Temporal.plainTime
-    MULTISELECT = 'MULTISELECT', //#TODO --- think
-    FILE = 'FILE',
-    PHOTO = 'PHOTO',
+    MULTISELECT = 'MULTISELECT', //Comma-separated list of _tid 
+    FILE = 'FILE', //url?
+    PHOTO = 'PHOTO', //url?
 }
 
 export enum Scope {
@@ -163,12 +164,13 @@ export interface DataStore {
  * A map of arrays of all types of {@link Element}.
  */
 export interface CompleteDataset {
-    defs: DefLike[];
-    pointDefs: PointDefLike[];
-    entries: EntryLike[];
-    entryPoints: EntryPointLike[];
-    tagDefs: TagDefLike[];
-    tags: TagLike[];
+    overview?: DataStoreOverview;
+    defs?: DefLike[];
+    pointDefs?: PointDefLike[];
+    entries?: EntryLike[];
+    entryPoints?: EntryPointLike[];
+    tagDefs?: TagDefLike[];
+    tags?: TagLike[];
 }
 
 /**
@@ -513,19 +515,19 @@ export interface ReducedQuery {
 
 }
 
-interface CurrentAndDeleteeCounts {
+interface CurrentAndDeletedCounts {
     current: number,
     deleted: number
 }
 
 export interface DataStoreOverview {
     storeName: string;
-    defs: CurrentAndDeleteeCounts;
-    pointDefs: CurrentAndDeleteeCounts;
-    entries: CurrentAndDeleteeCounts;
-    entryPoints: CurrentAndDeleteeCounts
-    tagDefs: CurrentAndDeleteeCounts;
-    tags: CurrentAndDeleteeCounts;
+    defs: CurrentAndDeletedCounts;
+    pointDefs: CurrentAndDeletedCounts;
+    entries: CurrentAndDeletedCounts;
+    entryPoints: CurrentAndDeletedCounts
+    tagDefs: CurrentAndDeletedCounts;
+    tags: CurrentAndDeletedCounts;
     lastUpdated: EpochStr; //?? probably better to be human-readable?
 }
 //#endregion
@@ -533,13 +535,13 @@ export interface DataStoreOverview {
 //#region ### CLASSES ###
 
 export class PDW {
-    dataStore: DataStore[];
+    dataStores: DataStore[];
     private static instance: PDW;
     constructor(store?: DataStore) {
         if (store !== undefined) {
-            this.dataStore = [store];
+            this.dataStores = [store];
         } else {
-            this.dataStore = [new DefaultDataStore(this)]
+            this.dataStores = [new DefaultDataStore(this)]
         }
     }
     registerConnection(storeInstance: DataStore) {
@@ -549,42 +551,77 @@ export class PDW {
         // storeInstance.pdw = this;
     }
 
-    setDefs(defsIn: DefLike[]): Def[] {
+    //#HACK - hardcoded right now
+    allDataSince(): CompleteDataset{
+        return {
+            defs: this.dataStores[0].getDefs(),
+            // pointDefs: this.dataStores[0].getPointDefs()
+        }
+    }
+
+    setDefs(defsIn: MinimumDef[]): Def[] {
         let defs: Def[] = defsIn.map(defLike => new Def(defLike));
-        this.dataStore.forEach(connection => {
+        this.dataStores.forEach(connection => {
             connection.setDefs(defs)
         })
         return defs
     }
 
-    setPointDefs(pointDefs: PointDefLike[]) {
+    setPointDefs(pointDefs: MinimumPointDef[]) {
         console.log(pointDefs);
     }
 
     getDefs(didOrLbls?: string[] | string, includeDeleted = true): Def[] {
-        let allDefs: DefLike[] = [];
+        //enforce array-of-strings type
         if (didOrLbls !== undefined && !Array.isArray(didOrLbls)) didOrLbls = [didOrLbls]
+
+        //if there's only DataStore, bypass the combining stuff to save time
+        if(this.dataStores.length == 1){
+            let defLikes = this.dataStores[0].getDefs(didOrLbls, includeDeleted)
+            return defLikes.map(dl=>new Def(dl));
+        }
+
+        //multiple DataStores need to be all pulled, then deconflicted
+        let combinedDefs: Def[] = [];
         //compile defs from all attached DataStores
-        this.dataStore.forEach(dataStore => {
-            allDefs.push(...dataStore.getDefs(didOrLbls as string[], includeDeleted));
+        //#UNTESTED - test this!
+        this.dataStores.forEach(dataStore => {
+            let thisStoreDefLikes = dataStore.getDefs(didOrLbls as string[], includeDeleted);
+            let thisStoreDefs = thisStoreDefLikes.map(tsdl=>new Def(tsdl));
+            thisStoreDefs.forEach(def=>{
+                let existingCopy = combinedDefs.find(cd=>cd.sameIdAs(def));
+                if(existingCopy !== undefined){
+                    //duplicate found, determine which is newer & keep only it
+                    if(existingCopy.shouldBeReplacedWith(def)){
+                        //find & remove exising
+                        const ind = combinedDefs.findIndex(el=>el._uid === existingCopy!._uid)
+                        combinedDefs.splice(ind);
+                        //add replacement
+                        combinedDefs.push(def);
+                    }
+                }else{
+                    combinedDefs.push(def);
+                }
+            })
         })
-        //keep only the most recent defs
-        let mostRecent = this.deconflictElements(allDefs) as DefLike[];
-        return mostRecent.map(defLike => new Def(defLike));
+        return combinedDefs;
     }
 
-    /**
-     * Looks at an array of Elements and removes any duplicates and any
-     * older versions of an element (say, a Def from a DataStore that was 
-     * later updated in another DataStore). A CLASSIC CODING CHALLENGE.
-     * It does NOT modify any Elements.
-     * @param elementsIn array of elements to check for duplication/outdatedness within
-     */
-    private deconflictElements(elementsIn: ElementLike[]): ElementLike[] {
-        let noConflicts: ElementLike[] = [];
-        let conflicted: ElementLike[] = [];
-        return elementsIn;
-    }
+    // /**
+    //  * Looks at an array of Elements and removes any duplicates and any
+    //  * older versions of an element (say, a Def from a DataStore that was 
+    //  * later updated in another DataStore). A CLASSIC CODING CHALLENGE.
+    //  * It does NOT modify any Elements.
+    //  * @param elementsIn array of elements to check for duplication/outdatedness within
+    //  */
+    // private deconflictElements(elementsIn: Element[]): Element[] {
+    //     let noConflict: Element[] = [];
+    //     elementsIn.forEach(el=>{
+    //         if(!noConflict.some(nc=>nc.sameIdAs(el))) return noConflict.push(el);
+    //         return 
+    //     })
+    //     return elementsIn;
+    // }
 
     /**
      * Creates a new definition from {@link MinimumDef} components
@@ -594,7 +631,7 @@ export class PDW {
     */
     createNewDef(defInfo: MinimumDef): Def {
         let newDef = new Def(defInfo);
-        this.dataStore.forEach(connection => {
+        this.dataStores.forEach(connection => {
             connection.setDefs([newDef])
         })
         return newDef
@@ -747,40 +784,6 @@ export class Def extends Element implements DefLike {
 
     setPointDefs() {
 
-    }
-
-    /**
-     * Returns an array of the values of the def
-     * in accordance with the positions of the
-     * {@link standardTabularDefHeaders} positioning
-     */
-    getTabularDefBase() {
-        return [
-            this._uid, this._created.toString(), this._updated.toString(), this._deleted,
-            this._did, this._lbl, this._emoji, this._desc, this._scope.toString()
-        ]
-    }
-
-    /**
-     * Returns an array of arrays with the values of the
-     * def's points in accordance with the positions of the
-     * {@link standardTabularPointDefHeaders} positioning
-     */
-    getTabularPointDefs() {
-        return this._points?.map(point => [
-            point._uid,
-            point._created,
-            point._updated,
-            point._deleted,
-            point._did,
-            point._pid,
-            point._lbl,
-            point._emoji,
-            point._desc,
-            point._type,
-            point._rollup,
-            point._format
-        ])
     }
 }
 
@@ -1008,20 +1011,20 @@ export function parseTemporalFromEpochStr(epochStr: EpochStr): Temporal.Instant 
     return parsedTemporal
 }
 
-/**
- * To compare elements' {@link _updated} times, for use in determining
- * if the comparisonElement is newer than the baseElement.
- * @param baseElement The thing you have that might be outdated
- * @param comparisonElement The thing that might be newer
- * @returns true if baseElement is less recently updated than comparison
- */
-export function elementIsNewer(baseElement: ElementLike, comparisonElement: ElementLike): Boolean {
+// /**
+//  * To compare elements' {@link _updated} times, for use in determining
+//  * if the comparisonElement is newer than the baseElement.
+//  * @param baseElement The thing you have that might be outdated
+//  * @param comparisonElement The thing that might be newer
+//  * @returns true if baseElement is less recently updated than comparison
+//  */
+// export function elementIsNewer(baseElement: ElementLike, comparisonElement: ElementLike): Boolean {
 
-    console.log('base: ' + baseElement._updated)
-    console.log('comp: ' + comparisonElement._updated)
-    return baseElement._updated > comparisonElement._updated
+//     console.log('base: ' + baseElement._updated)
+//     console.log('comp: ' + comparisonElement._updated)
+//     return baseElement._updated > comparisonElement._updated
 
-}
+// }
 
 /**
 * Get the type of an element. Not sure if I'll use this outside
@@ -1035,16 +1038,5 @@ export function getElementType(element: ElementLike): 'DefLike' | 'PointDefLike'
     if (element.hasOwnProperty("_pid")) return "PointDefLike"
     return "DefLike"
 }
-
-//#endregion
-
-//#region ### CONSTANTS ###
-
-export const standardTabularDefHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_lbl', '_emoji', '_desc', '_scope'];
-export const standardTabularPointDefHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_lbl', '_emoji', '_desc', '_type', '_rollup', '_format'];
-export const standardTabularBaseEntryHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_period', '_note'];
-export const standardTabularEntryPointHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_val'];
-export const standardTabularTagHeaders = ['_uid', '_created', '_updated', '_deleted', '_tid', '_lbl'];
-export const standardTabularFullEntryHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_note']; //think
 
 //#endregion

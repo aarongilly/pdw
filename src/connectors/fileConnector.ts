@@ -1,243 +1,267 @@
 import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as pdw from '../pdw.js';
-import { Temporal } from 'temporal-polyfill';
+// import { Temporal } from 'temporal-polyfill';
 
-/**
- * The File Storage Connector is going to be developed in-tandem with this
- * iteration of the PDW. This connector will be unique, in that it will work
- * **in memory** and won't persist until explicitly saved via a mechanism
- * that doesn't exist yet. Also I (hope) to make this work across multiple 
- * data storage file types: 
- * - XLSX
- * - CSVs in a Folder
- * - JSON
- * - YAML
- * 
- * Synchronous reads & writes
- * to a file work work well and won't be nearly as portable.
- * 
- * We'll have to extract the loading & saving to their own, dedicated functions.
- * 
- * **For God's Sake don't let the co-development of this pollute the PDW library**.
- */
-export class FileConnector{
-    connectedDbName: string;
-    serviceName: string;
-    connectionStatus: "error" | "not connected" | "connected"
-    private defs: pdw.Def[];
-    private pointDefs: pdw.PointDef[];
-    /**
-     * A reference to the PDW instance this connection was
-     * created to connect to. This variable is set in the 
-     * {@link registerConnection} method
-     */
-    public pdw: pdw.PDW;
-    // private entries: pdw.Entry[];
-    // private tags: pdw.Tag[];
+//#region ### EXPORTED FUNCTIONS ###
+
+export function exportToFile(filepath: string, data: pdw.CompleteDataset) {
+    const fileType = inferFileType(filepath)
+    if (fileType === 'excel') return exportToExcel(filepath, data);
+    if (fileType === 'json') return exportToJson(filepath, data);
+    throw new Error('Unimplementd write type: ' + fileType)
+}
+
+export function importFromFile(filepath: string, pdwRef: pdw.PDW) {
+    const fileType = inferFileType(filepath)
+    if (fileType === 'excel') return importFromExcel(filepath, pdwRef);
+    if (fileType === 'json') return importFromJson(filepath, pdwRef);
+    throw new Error('Unimplementd write type: ' + fileType)
+}
+
+//#endregion
+
+//#region ### EXCEL -- TABULAR ### //#TODO - Excel 'Natural'
+
+const overViewShtName = 'Overview';
+const defShtName = 'Defs';
+const pointDefShtName = 'Point Defs';
+const entryShtName = "Entry Base";
+const entryPointShtName = "Entry Points";
+const tagDefShtName = "Tag Defs";
+const tagShtName = "Tags"
+
+function exportToExcel(filename: string, data: pdw.CompleteDataset) {
+    XLSX.set_fs(fs);
+    const wb = XLSX.utils.book_new();
+
+    //#TODO - overview sheet
     
-    constructor(pdw: pdw.PDW){
-        this.connectedDbName = 'temporary';
-        this.serviceName = 'In Memory';
-        this.connectionStatus = 'not connected';
-        this.pdw = pdw;
-        this.defs = [];
-        this.pointDefs = [];
-    }
+    let overviewSht = XLSX.utils.aoa_to_sheet([['to','do'],['over'],['view']]);
+    XLSX.utils.book_append_sheet(wb, overviewSht, overViewShtName);
 
-    //#BUG - PointDefs require DID AND a pid or lbl... think
-    getPointDefs(didsAndOrLbls?: string[] | undefined): pdw.PointDef[] {
-        if(didsAndOrLbls === undefined) return this.pointDefs;
-        if(didsAndOrLbls) console.log('I see your ', didsAndOrLbls);
-        const labelMatches = this.pointDefs.filter(def=>didsAndOrLbls.some(p=>p===def._lbl));
-        const didMatches = this.pointDefs.filter(def=>didsAndOrLbls.some(p=>p===def._did));
-        //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
-        let noDupes = new Set([...labelMatches, ...didMatches]);
-        return Array.from(noDupes);
-    }
-
-    setPointDefs(pointDefs: pdw.PointDefLike[]) {
-        pointDefs.forEach(pd=>{
-            this.pointDefs.push(new pdw.PointDef(pd));
-        })
-    }
-
-    setDefs(defs: pdw.MinimumDef[]) {
-        defs.forEach(def => {
-            this.defs.push(new pdw.Def(def));
-        })
-    }
-    
-    /**
-     * Get Defs searches the array of Definitions. 
-     * Specifying no param will return all definitions.
-     * I think this one is done & working.
-     * @param didsAndOrLbls array of _did or _lbl vales to get, leave empty to get all Defs
-     * @returns array of all matching definitions
-     */
-    getDefs(didsAndOrLbls?: string[] | undefined, includeDeleted = true) {
-        if(didsAndOrLbls === undefined) return this.defs;
-        if(didsAndOrLbls) console.log('I see your ', didsAndOrLbls);
-        const labelMatches = this.defs.filter(def=>didsAndOrLbls.some(p=>p===def._lbl));
-        const didMatches = this.defs.filter(def=>didsAndOrLbls.some(p=>p===def._did));
-        //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
-        let noDupes = Array.from(new Set([...labelMatches, ...didMatches]));
-        if(!includeDeleted) noDupes = noDupes.filter(def=> def._deleted === false);
-        return noDupes;
-    }
-
-    writeToFile(filepath: string){
-        const fileType = FileConnector.inferFileType(filepath)
-        if(fileType === 'excel') return this.writeToExcel(filepath);
-        if(fileType === 'json') return this.writeToJson(filepath);
-        throw new Error('Unimplementd write type: ' + fileType)
-    }
-
-    loadFromFile(filepath: string){
-        const fileType = FileConnector.inferFileType(filepath)
-        if(fileType === 'excel') return this.loadFromExcel(filepath);
-        if(fileType === 'json') return this.loadFromJson(filepath);
-        throw new Error('Unimplementd write type: ' + fileType)
-    }
-
-    private writeToExcel(filename: string){
-        XLSX.set_fs(fs);
-        const wb = XLSX.utils.book_new();
-
-        let defBaseArr = this.defs.map(def=>def.getTabularDefBase());
-        defBaseArr.unshift(pdw.standardTabularDefHeaders);
-
-        let pointDefArr = [pdw.standardTabularPointDefHeaders];
-        this.defs.forEach(def => {
-            const pointArr = def.getTabularPointDefs();
-            pointArr?.forEach(point => {
-                const stringifiedPoint = point.map(attr=> attr.toString());
-                pointDefArr.push(stringifiedPoint);
-            })
-        })
+    if (data.defs !== undefined) {
+        let defBaseArr = data.defs.map(def => makeExcelDefRow(def));
+        defBaseArr.unshift(tabularDefHeaders);
 
         let defSht = XLSX.utils.aoa_to_sheet(defBaseArr);
+        XLSX.utils.book_append_sheet(wb, defSht, defShtName);
+    }
+
+    if (data.pointDefs !== undefined) {
+        let pointDefArr = data.pointDefs.map(pd => makeExcelPointDefRow(pd));
+        pointDefArr.unshift(tabularPointDefHeaders);
+
         let pointDefSht = XLSX.utils.aoa_to_sheet(pointDefArr);
-        let entryBaseSht = XLSX.utils.aoa_to_sheet([pdw.standardTabularFullEntryHeaders]);
-        let entryPointSht = XLSX.utils.aoa_to_sheet([pdw.standardTabularEntryPointHeaders]);
-        let tagSht = XLSX.utils.aoa_to_sheet([pdw.standardTabularTagHeaders]);
-
-        XLSX.utils.book_append_sheet(wb, defSht, "Defs");
-        XLSX.utils.book_append_sheet(wb, pointDefSht, "Point Defs");
-        XLSX.utils.book_append_sheet(wb, entryBaseSht, "Entries Base");
-        XLSX.utils.book_append_sheet(wb, entryPointSht, "Entry Points");
-        XLSX.utils.book_append_sheet(wb, tagSht, "Tags");
-        XLSX.writeFile(wb, filename);
+        XLSX.utils.book_append_sheet(wb, pointDefSht, pointDefShtName);
     }
 
-    private writeToJson(filename: string){
-        let callback = ()=>{
-            console.log('Wrote successfully?');
-        }
-        //#TODO - test to ensure pointDefs come along, also Entries & tags eventually
-        const singleObject = {
-            overview: '#TODO',
-            defs: this.defs,
-            //pointDefs: this.pointDefs, //??
-            tags: [],
-            entries: [],
-            //entryPoints: this.entryPoints //??
-        }
-        let json = JSON.stringify(singleObject);
-        fs.writeFile(filename, json, 'utf8', callback);
-    }
+    let entryBaseSht = XLSX.utils.aoa_to_sheet([tabularEntryHeaders]);
+    XLSX.utils.book_append_sheet(wb, entryBaseSht, entryShtName);
 
-    loadFromExcel(filepath: string) {
-        console.log('loading...');
-        XLSX.set_fs(fs);
-        let loadedWb = XLSX.readFile(filepath);
-        const shts = loadedWb.SheetNames;
-        if (!shts.some(name => name === 'Defs')) {
-            console.warn('No Defs sheet found in ' + filepath);
-        } else {
-            const defSht = loadedWb.Sheets['Defs'];
-            const pointDefSht = loadedWb.Sheets['Point Defs'];
+    let entryPointSht = XLSX.utils.aoa_to_sheet([tabularEntryPointHeaders]);
+    XLSX.utils.book_append_sheet(wb, entryPointSht, entryPointShtName);
 
-            //will be all plain text
-            let defBaseRawArr = XLSX.utils.sheet_to_json(defSht) as pdw.DefLike[];
-            let defBaseParsedArr: pdw.DefLike[] = defBaseRawArr.map(raw => destringifyElement(raw));
-            this.mergeElements(defBaseParsedArr);
+    let tagDefSht = XLSX.utils.aoa_to_sheet([tabularTagDefHeaders]);
+    XLSX.utils.book_append_sheet(wb, tagDefSht, tagDefShtName);
 
-            let pointDefRawArr = XLSX.utils.sheet_to_json(pointDefSht) as pdw.PointDefLike[];
-            let pointDefParsedArr: pdw.PointDefLike[] = pointDefRawArr.map(raw => destringifyElement(raw));
-            this.mergeElements(pointDefParsedArr);
+    let tagSht = XLSX.utils.aoa_to_sheet([tabularTagHeaders]);
+    XLSX.utils.book_append_sheet(wb, tagSht, tagShtName);
 
-            console.log(this.defs);
-        }
-    }
-        
-        loadFromJson(filepath: string) {
-            const file = JSON.parse(fs.readFileSync(filepath).toString());
-            console.log(file);
-        }
-
-    private static inferFileType(path: string): "excel" | "json" | "csv" | "yaml" | "unknown" {
-        if(path.slice(-5)===".xlsx") return 'excel'
-        if(path.slice(-5)===".json") return 'json'
-        if(path.slice(-4)===".csv") return 'csv'
-        if(path.slice(-5)===".yaml") return 'yaml'
-        return "unknown"
-    }
-    private mergeElements(newElements: pdw.ElementLike[]){
-        newElements.forEach(newElement => {
-            this.mergeElement(newElement)
-        })
-    }
-
-    private mergeElement(newElementData: pdw.ElementLike){
-        const type = pdw.getElementType(newElementData);
-        if(type==='DefLike'){
-            let existingDef = this.defs.find(def=>def._did == (<pdw.DefLike> newElementData)._did && def._deleted === false)
-            if (existingDef === undefined) {
-                this.defs.push(new pdw.Def((<pdw.DefLike> newElementData)));
-                return
-            }
-            if (existingDef.shouldBeReplacedWith(newElementData)) {
-                existingDef.markDeleted();
-                this.defs.push(new pdw.Def((<pdw.DefLike> newElementData)));
-            }
-            return
-        }
-
-        if(type==='PointDefLike'){
-            let existingPointDef = this.pointDefs.find(pd=> pd._did == (<pdw.PointDefLike> newElementData)._did && pd._pid == (<pdw.PointDefLike> newElementData)._pid && pd._deleted === false)
-            if (existingPointDef === undefined) {
-                this.pointDefs.push(new pdw.PointDef((<pdw.PointDefLike> newElementData)));
-                return
-            }
-            if (existingPointDef.shouldBeReplacedWith(newElementData)) {
-                existingPointDef.markDeleted();
-                this.pointDefs.push(new pdw.PointDef((<pdw.PointDefLike> newElementData)));
-            }
-            return
-        }
-        throw new Error('I saw type ' + type)
-        return undefined
-    }
+    XLSX.writeFile(wb, filename);
 }
+
+function importFromExcel(filepath: string, pdwRef: pdw.PDW) {
+    console.log('loading...');
+    XLSX.set_fs(fs);
+    let loadedWb = XLSX.readFile(filepath);
+    const shts = loadedWb.SheetNames;
+    if (!shts.some(name => name === defShtName)) {
+        console.warn('No Defs sheet found in ' + filepath);
+    } else {
+        const defSht = loadedWb.Sheets[defShtName];
+        let defBaseRawArr = XLSX.utils.sheet_to_json(defSht) as pdw.DefLike[];
+        console.log(defBaseRawArr);
+        
+        // let defBaseParsedArr: pdw.DefLike[] = defBaseRawArr.map(raw => destringifyElement(raw));
+        // mergeElements(defBaseParsedArr);
+    }
+
+    if (!shts.some(name => name === pointDefShtName)) {
+        console.warn('No Point Defs sheet found in ' + filepath);
+    } else {
+        const pointDefSht = loadedWb.Sheets[pointDefShtName];
+        let pointDefRawArr = XLSX.utils.sheet_to_json(pointDefSht) as pdw.PointDefLike[];
+        console.log(pointDefRawArr);
+
+        // let pointDefParsedArr: pdw.PointDefLike[] = pointDefRawArr.map(raw => destringifyElement(raw));
+        // mergeElements(pointDefParsedArr);
+    }
+    if(false) console.log(pdwRef)
+}
+
+/**
+ * Returns an array of the values of the def
+ * in accordance with the positions of the
+ * {@link tabularDefHeaders} positioning. 
+ * Ying & Yang with {@link parseExcelDefRow}
+ */
+function makeExcelDefRow(def: pdw.DefLike) {
+    return [
+        def._uid,
+        def._created.toString(),
+        def._updated,
+        def._deleted ? "TRUE" : "FALSE",
+        def._did,
+        def._lbl,
+        def._emoji,
+        def._desc,
+        def._scope.toString()
+    ]
+}
+
+/**
+ * Parses a row from Excel into a DefLike structure.
+ * @param defRow row created by an Excel export 
+ * Ying & Yang with {@link makeExcelDefRow}
+ * @returns 
+ */
+function parseExcelDefRow(defRow: any[]): pdw.DefLike {
+    let returnObj: pdw.DefLike = {
+        _uid: defRow[0],
+        _created: defRow[1],
+        _updated: defRow[2],
+        _deleted: defRow[3].toUpperCase() == 'TRUE',
+        _did: defRow[4].toString(), //in case I got unlucky
+        _lbl: defRow[5],
+        _emoji: defRow[6],
+        _desc: defRow[7],
+        _scope: defRow[8]
+    }
+    return returnObj
+}
+
+/**
+ * Returns an array of arrays with the values of the
+ * def's points in accordance with the positions of the
+ * {@link tabularPointDefHeaders} positioning
+ */
+function makeExcelPointDefRow(pointDef: pdw.PointDefLike) {
+    return [
+        pointDef._uid,
+        pointDef._created,
+        pointDef._updated,
+        pointDef._deleted,
+        pointDef._did,
+        pointDef._pid,
+        pointDef._lbl,
+        pointDef._emoji,
+        pointDef._desc,
+        pointDef._type,
+        pointDef._rollup,
+        pointDef._format
+    ]
+}
+
+
+
+
+
+//#endregion
+
+//#region ### JSON ###
+
+function exportToJson(filename: string, data: pdw.CompleteDataset) {
+    let callback = () => {
+        console.log('Wrote successfully?');
+    }
+    let json = JSON.stringify(data);
+    fs.writeFile(filename, json, 'utf8', callback);
+}
+
+function importFromJson(filepath: string, pdwRef: pdw.PDW) {
+    const file = JSON.parse(fs.readFileSync(filepath).toString());
+    console.log(file, pdwRef); //#TODO
+}
+
+//#endregion
+
+//#region ### SHARED CONSTANTS ###
+export const tabularDefHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_lbl', '_emoji', '_desc', '_scope', '_active'];
+export const tabularPointDefHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_lbl', '_emoji', '_desc', '_active', '_type', '_rollup', '_format'];
+export const tabularEntryHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_eid', '_period', '_note'];
+export const tabularEntryPointHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_eid', '_val'];
+export const tabularTagDefHeaders = ['_uid', '_created', '_updated', '_deleted', '_tid', '_lbl', '_emoji', '_desc'];
+export const tabularTagHeaders = ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', 'tid'];
+
+//#region ### HELPERS ###
+function inferFileType(path: string): "excel" | "json" | "csv" | "yaml" | "unknown" {
+    if (path.slice(-5) === ".xlsx") return 'excel'
+    if (path.slice(-5) === ".json") return 'json'
+    if (path.slice(-4) === ".csv") return 'csv'
+    if (path.slice(-5) === ".yaml") return 'yaml'
+    return "unknown"
+}
+
+// function mergeElements(newElements: pdw.ElementLike[]) {
+//     newElements.forEach(newElement => {
+//         mergeElement(newElement)
+//     })
+// }
+
+// function mergeElement(newElementData: pdw.ElementLike) {
+//     const type = pdw.getElementType(newElementData);
+//     if (type === 'DefLike') {
+//         let existingDef = this.defs.find(def => def._did == (<pdw.DefLike>newElementData)._did && def._deleted === false)
+//         if (existingDef === undefined) {
+//             this.defs.push(new pdw.Def((<pdw.DefLike>newElementData)));
+//             return
+//         }
+//         if (existingDef.shouldBeReplacedWith(newElementData)) {
+//             existingDef.markDeleted();
+//             this.defs.push(new pdw.Def((<pdw.DefLike>newElementData)));
+//         }
+//         return
+//     }
+
+//     if (type === 'PointDefLike') {
+//         let existingPointDef = this.pointDefs.find(pd => pd._did == (<pdw.PointDefLike>newElementData)._did && pd._pid == (<pdw.PointDefLike>newElementData)._pid && pd._deleted === false)
+//         if (existingPointDef === undefined) {
+//             this.pointDefs.push(new pdw.PointDef((<pdw.PointDefLike>newElementData)));
+//             return
+//         }
+//         if (existingPointDef.shouldBeReplacedWith(newElementData)) {
+//             existingPointDef.markDeleted();
+//             this.pointDefs.push(new pdw.PointDef((<pdw.PointDefLike>newElementData)));
+//         }
+//         return
+//     }
+//     throw new Error('I saw type ' + type)
+//     return undefined
+// }
 
 /**
  * Converts a map of strings into a map of properly-typed values, 
  * based on the observed key.
  * @param obj object containing properties to convert
- */
-function destringifyElement(obj: pdw.DefLike | pdw.PointDefLike | pdw.EntryLike | pdw.TagDefLike): any {
-    let returnObj = {...obj}; //shallow copy deemed okay by Aaron circa 2023-03-12, get mad at him
-    if(returnObj._created !== undefined) {
-        //TODO - check for and handle native Excel dates
-        returnObj._created = Temporal.PlainDateTime.from(returnObj._created);
-    }
-    if(returnObj._updated !== undefined) returnObj._updated = pdw.makeEpochStr();
-    if(returnObj._deleted !== undefined) returnObj._deleted = returnObj._deleted.toString().toUpperCase() === 'TRUE';
-    if(returnObj.hasOwnProperty('_scope')){
-        (<pdw.DefLike> returnObj)._scope = (<pdw.DefLike> returnObj)._scope.toString().toUpperCase() as pdw.Scope;
-    }
-    
-    //...others?
-    return returnObj
-}
+*/
+// function destringifyElement(obj: pdw.DefLike | pdw.PointDefLike | pdw.EntryLike | pdw.TagDefLike): any {
+//     let returnObj = { ...obj }; //shallow copy deemed okay by Aaron circa 2023-03-12, get mad at him
+//     if (returnObj._created !== undefined) {
+//         //TODO - check for and handle native Excel dates
+//         returnObj._created = Temporal.PlainDateTime.from(returnObj._created);
+//     }
+//     if (returnObj._updated !== undefined) returnObj._updated = pdw.makeEpochStr();
+//     if (returnObj._deleted !== undefined) returnObj._deleted = returnObj._deleted.toString().toUpperCase() === 'TRUE';
+//     if (returnObj.hasOwnProperty('_scope')) {
+//         (<pdw.DefLike>returnObj)._scope = (<pdw.DefLike>returnObj)._scope.toString().toUpperCase() as pdw.Scope;
+//     }
+
+//     //...others?
+//     return returnObj
+// }
+
+
+
+
+//#endregion

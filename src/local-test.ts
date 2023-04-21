@@ -1,5 +1,6 @@
 import {PDW} from './pdw.js'
 import {Scope} from './pdw.js'
+import { exportToFile } from './connectors/fileConnector.js';
 // import { FileConnector } from "./connectors/fileConnector.js";
 // import { sampleDefinitions } from './sampleData.js';
 
@@ -28,8 +29,8 @@ console.log(pdw.getDefs());
 // console.log(DefaultConnector.getPointDefs())
 // pdw.setDefs(sampleDefinitions);
 
-// let outFilename = 'data-files/OutExcel3.xlsx';
-// (<DefaultConnector> pdw.connections).writeToFile(outFilename);
+let outFilename = 'data-files/OutExcel4.xlsx';
+exportToFile(outFilename, pdw.allDataSince());
 // let outFilename = 'data-files/DevFile.json';
 // (<DefaultConnector> pdw.connection).writeToFile(outFilename);
 
