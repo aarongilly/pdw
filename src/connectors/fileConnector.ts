@@ -395,7 +395,6 @@ export class JsonImportExport {
         if (file.tagDefs !== undefined) pdwRef.setTagDefs(file.tagDefs);
         if (file.tags !== undefined) pdwRef.setTags(file.tags);
     }
-
 }
 
 //#region ### SHARED  ###

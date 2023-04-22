@@ -20,7 +20,7 @@ const pdw = PDW.getInstance();
 // createTwoTestFiles();
 
 // importFromFile('data-files/OutJSON.json');
-importFromFile('data-files/OutExcel2.xlsx');
+importFromFile('data-files/OutExcel4.xlsx');
 
 console.log(pdw.allDataSince());
 
