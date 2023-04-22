@@ -8,43 +8,16 @@ import { sampleDefinitions, sampleEntries, samplePointDefs } from './sampleData.
 
 const pdw = PDW.getInstance();
 
+// console.log(Period.inferScope(Period.now(Scope.SECOND)));
+// console.log(Period.inferScope(Period.now(Scope.MINUTE)));
+// console.log(Period.inferScope(Period.now(Scope.HOUR)));
+// console.log(Period.inferScope(Period.now(Scope.DAY)));
+// console.log(Period.inferScope(Period.now(Scope.WEEK)));
+// console.log(Period.inferScope(Period.now(Scope.MONTH)));
+// console.log(Period.inferScope(Period.now(Scope.QUARTER)));
+// console.log(Period.inferScope(Period.now(Scope.YEAR)));
+
 createTwoTestFiles();
-
-// pdw.setDefs(sampleDefinitions);
-// pdw.setPointDefs(samplePointDefs);
-
-// pdw.createNewDef({_lbl: "test one", _desc: 'Initial desc', _emoji: '1️⃣'})
-// pdw.createNewDef({_lbl: "twooo", _scope: Scope.WEEK, _emoji: '2️⃣', _desc: 'now with a description'});
-// pdw.createNewDef({_lbl: "afree", _emoji: '3️⃣', _desc: 'Edited with description!'});
-// let four = pdw.createNewDef({_lbl: "FOUR", _desc: 'having fun', _emoji: '4️⃣'});
-// let five = pdw.createNewDef({_lbl: "Five", _desc: 'not in first file, added to second', _emoji: '5️⃣'});
-
-// pdw.setPointDefs([{_did: 'e0bq', _lbl: 'updated label', _type: PointType.BOOL, _emoji: '☝️'}])
-// let myPd = four.setPointDefs([{_lbl: 'test point', _type: PointType.TEXT}])
-
-// console.log(
-//     parseTemporalFromUid(myPd[0]._uid).toLocaleString()
-// );
-
-// importFromFile('data-files/OutExcel1.xlsx');
-// importFromFile('data-files/OutExcel2.xlsx');
-// importFromFile('data-files/DevFile.json');
-
-// let myDef = pdw.getDefs(['FOUR']);
-// console.log(myDef);
-// let myPoint = myDef[0].getPoints(true);
-// console.log(myPoint);
-
-//Testing implicit merge
-// loadFile('data-files/OutExcel.xlsx');
-// loadFile('data-files/OutExcel2.xlsx');
-
-// pdw.setEntries(sampleEntries);
-
-// let outFilename = 'data-files/OutExcel4.xlsx';
-// exportToFile(outFilename, pdw.allDataSince());
-// let outJsonName = 'data-files/DevFile.json';
-// exportToFile(outJsonName, pdw.allDataSince());
 
 function createTwoTestFiles(){
     pdw.createNewDef({

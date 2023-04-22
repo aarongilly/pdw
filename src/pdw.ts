@@ -64,8 +64,8 @@ export enum PointType {
 
 export enum Scope {
     SECOND = 'SECOND',
-    MINUTE = 'MINUTE', //#THINK
-    HOUR = 'HOUR', //#THINK
+    MINUTE = 'MINUTE',
+    HOUR = 'HOUR', 
     DAY = 'DAY',
     WEEK = 'WEEK',
     MONTH = 'MONTH',
@@ -81,21 +81,6 @@ export enum Rollup {
     COUNTOFEACH = 'COUNTOFEACH',
     AVERAGEABOUT4AM = 'AVERAGEABOUT4AM' //for type =  TYPE.TIME
 }
-
-// export enum Format {
-//     TEXT = 'TEXT',
-//     MARKDOWN = 'MARKDOWN',
-//     NUMWHOLE = 'NUMWHOLE',
-//     NUMDECIMAL = 'NUMDECIMAL',
-//     COMMASEPARATED = 'COMMASEPARATED',
-//     YESNO = 'YESNO',
-//     TRUEFALSE = 'TRUEFALSE',
-//     MONEY = 'MONEY',
-//     AMPM = 'AMPM',
-//     MILITARYTIME = 'MILITARYTIME',
-//     HOURSMINSSECS = 'HOURSMINSSECS',
-//     SECSTOTAL = 'SECSTOTAL'
-// }
 
 //#endregion
 
@@ -147,7 +132,6 @@ export interface DataStore {
 
     setEntryPoints(entryPointData: MinimumEntryPoint[]): EntryPointLike[];
 
-    //#THINK - this probably could allow accidental mixes & matches
     getTags(tids?: string[], dids?: SmallID[], pids?: SmallID[], includeDeleted?: boolean): TagLike[];
 
     setTags(tagData: Tag[]): TagLike[];
@@ -280,10 +264,6 @@ export interface PointDefLike extends ElementLike {
      * Default rollup type
      */
     _rollup: Rollup;
-    /**
-     * Default display format
-     */
-    // _format: Format
 }
 
 export interface EntryLike extends ElementLike {
@@ -462,11 +442,6 @@ export interface MinimumPointDef extends MinimumElement {
      * Defaults to {@link Rollup.COUNT}
      */
     _rollup?: Rollup;
-    /**
-     * Rollup Type
-     * Defaults to {@link Format.TEXT}
-     */
-    // _format?: Format;
 }
 
 /**
@@ -570,7 +545,7 @@ export interface QueryParams {
     pid?: string | string[];
     tag?: string | string[];
     includeDeleted?: boolean;
-    //#TODO probably more
+    //#TODO - more query params?
 }
 
 export interface ReducedQuery {
@@ -626,7 +601,7 @@ export class PDW {
         this.dataStores.push(storeInstance);
     }
 
-    //#HACK - hardcoded right now
+    //#HACK - allDataSince hardcoded
     allDataSince(): CompleteDataset {
         return {
             defs: this.dataStores[0].getDefs(undefined, true),
@@ -745,11 +720,11 @@ export class PDW {
     }
 
     getEntries(eids: UID[], includeDeleted = false): Entry[] {
-        //#HACK - hardcoded
         if (this.dataStores.length == 1) {
             let entries = this.dataStores[0].getEntries(eids, includeDeleted);
             return entries.map(entry => new Entry(entry));
         }
+
         throw new Error('Multiple datastores not yet implemented');
     }
 
@@ -811,6 +786,22 @@ export class PDW {
             connection.setEntryPoints([newEntryPoint])
         })
         return newEntryPoint;
+    }
+
+    createNewTagDef(tagDefInfo: MinimumTagDef): TagDef {
+        let newTagDef = new TagDef(tagDefInfo);
+        this.dataStores.forEach(connection => {
+            connection.setTagDefs([newTagDef])
+        })
+        return newTagDef;
+    }
+
+    createNewTag(tagInfo: MinimumTag): Tag {
+        let newTag = new Tag(tagInfo);
+        this.dataStores.forEach(connection => {
+            connection.setTags([newTag])
+        })
+        return newTag;
     }
 
     /**
@@ -976,8 +967,6 @@ export class Def extends Element implements DefLike {
     _desc: string;
     _emoji: string;
     _scope: Scope;
-    // _tags?: TagDefLike[] | undefined;
-    // _points?: PointDefLike[] | undefined;
     constructor(newDefData: MinimumDef) {
         if (newDefData._did !== undefined) {
             let existing = Element.findExistingData(newDefData);
@@ -1008,10 +997,6 @@ export class Def extends Element implements DefLike {
         }
     }
 
-    // createNewPointDef(pd: {_lbl: string, _type: PointType}){
-
-    // }
-
     setPointDefs(pointInfoIn: [{
         _lbl: string,
         _type: PointType
@@ -1035,7 +1020,7 @@ export class Def extends Element implements DefLike {
             return pds.map(pointDef => new PointDef(pointDef));
         }
 
-        throw new Error('Multiple Data Stores are #TODO') //#TODO
+        throw new Error('Multiple Data Stores are #TODO') //#TODO - for multiple data stores
     }
 
     // /**
@@ -1090,7 +1075,6 @@ export class PointDef extends Element implements PointDefLike {
     _emoji: string;
     _type: PointType;
     _rollup: Rollup;
-    // _format: Format;
     _def?: Def;
     constructor(newPointDefData: MinimumPointDef, def?: Def) {
         if (newPointDefData._did !== undefined && newPointDefData._pid !== undefined) {
@@ -1103,7 +1087,6 @@ export class PointDef extends Element implements PointDefLike {
                 if (newPointDefData._lbl === undefined) newPointDefData._lbl = existing._lbl;
                 if (newPointDefData._type === undefined) newPointDefData._type = existing._type;
                 if (newPointDefData._rollup === undefined) newPointDefData._rollup = existing._rollup;
-                // if(newPointDefData._format === undefined) newPointDefData._format = existing._format;
             }
         }
         super(newPointDefData)
@@ -1114,7 +1097,6 @@ export class PointDef extends Element implements PointDefLike {
         this._desc = newPointDefData._desc ?? 'Set a description';
         this._emoji = newPointDefData._emoji ?? '🆕';
         this._rollup = newPointDefData._rollup ?? Rollup.COUNT;
-        // this._format = newPointDefData._format ?? Format.TEXT;
         if (def) this._def = def;
     }
 
@@ -1132,7 +1114,6 @@ export class PointDef extends Element implements PointDefLike {
         if (data._emoji == undefined || typeof data._emoji !== 'string') return false
         if (data._type == undefined || !PointDef.isValidType(data._type)) return false
         if (data._rollup == undefined || !PointDef.isValidRollup(data._rollup)) return false
-        // if (data._format == undefined || !PointDef.isValidFormat(data._format)) return false
         if (data._uid == undefined || typeof data._uid !== 'string') return false
         if (data._created == undefined || typeof data._created.getISOFields !== 'function') return false //proxy check
         if (data._deleted == undefined || typeof data._deleted !== 'boolean') return false
@@ -1150,12 +1131,6 @@ export class PointDef extends Element implements PointDefLike {
         const values = Object.values(Rollup);
         return values.includes(typeStr as unknown as Rollup)
     }
-
-    // static isValidFormat(typeStr: string): boolean {
-    //     const values = Object.values(Format);
-    //     return values.includes(typeStr as unknown as Format)
-    // }
-
 }
 
 export class Entry extends Element implements EntryLike {
@@ -1199,6 +1174,10 @@ export class Entry extends Element implements EntryLike {
             });
             PDW.getInstance().setEntryPoints(entryPoints);
         }
+    }
+
+    getPeriod(): Period{
+        return new Period(this._period);
     }
 }
 
@@ -1270,10 +1249,12 @@ export class Period {
     }
 
     static inferScope(ISOString: string): Scope {
-        if (/\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+(?:[+-][0-2]\d:[0-5]\d|Z)/i.test(ISOString))
+        if (/\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d/i.test(ISOString))
             return Scope.SECOND;
-        //#TODO - minute
-        //#TODO - hour
+        if (/\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d/i.test(ISOString))
+            return Scope.MINUTE;
+        if (/\d{4}-[01]\d-[0-3]\dT[0-2]\d/i.test(ISOString))
+            return Scope.HOUR;
         if (/^([12]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$/.test(ISOString))
             return Scope.DAY;
         if (/^([0-9]{4})-?W(5[0-3]|[1-4][0-9]|0[1-9])$/i.test(ISOString))
@@ -1292,7 +1273,6 @@ export class Query {
     constructor() {
 
     }
-    //#TODO - a lot
 
     run(): QueryResponse {
         throw new Error('Query.run not yet implemented')
