@@ -408,6 +408,12 @@ export interface MinimumDef extends MinimumElement {
      */
     _scope?: Scope;
     /**
+     * other key/value pairs will attempt to set
+     * up a {@link PointDef} with the embedded info 
+     * the value
+     */
+    [x: string]: any;
+    /**
      * Tags
      * Defaults to empty array
      */
@@ -420,12 +426,12 @@ export interface MinimumDef extends MinimumElement {
 }
 
 /**
- * required: _lbl, _did, _type
+ * required: _did
  * optoinal: all others
  */
 export interface MinimumPointDef extends MinimumElement {
     /**
-     * To create a brand new PointDef, you must provide a label, did, & type
+     * Label for the points, defaults to "Label Unset"
      */
     _lbl?: string;
     /**
@@ -433,7 +439,7 @@ export interface MinimumPointDef extends MinimumElement {
      */
     _did: SmallID;
     /**
-     * To create a brand new PointDef, you must provide a label, did & type
+     * Point type, defaults to {@link PointType.TEXT}
      */
     _type?: PointType;
     /**
@@ -663,7 +669,7 @@ export class PDW {
         return entryPoints
     }
 
-    getDefs(didOrLbls?: string[] | string, includeDeleted = true): Def[] {
+    getDefs(didOrLbls?: string[] | string, includeDeleted = false): Def[] {
         //enforce array-of-strings type
         if (didOrLbls !== undefined && !Array.isArray(didOrLbls)) didOrLbls = [didOrLbls]
 
@@ -700,7 +706,7 @@ export class PDW {
         return combinedDefs;
     }
 
-    getPointDefs(didPidOrLbls?: string[] | string, includeDeleted = true): Def[] {
+    getPointDefs(didPidOrLbls?: string[] | string, includeDeleted = false): Def[] {
         //enforce array-of-strings type
         if (didPidOrLbls !== undefined && !Array.isArray(didPidOrLbls)) didPidOrLbls = [didPidOrLbls]
 
@@ -796,19 +802,6 @@ export class PDW {
         this.dataStores.forEach(connection => {
             connection.setEntries([newEntry])
         })
-        //spawn new EntryPoints for any non-underscore-prefixed keys
-        let pids = Object.keys(entryInfo).filter(key => key.substring(0, 1) !== '_');
-        if (pids.length > 0) {
-            let entryPoints: MinimumEntryPoint[] = pids.map(pid => {
-                return {
-                    _pid: pid,
-                    _val: entryInfo[pid],
-                    _eid: newEntry._eid,
-                    _did: newEntry._did
-                }
-            });
-            PDW.getInstance().setEntryPoints(entryPoints);
-        }
         return newEntry;
     }
 
@@ -1003,6 +996,16 @@ export class Def extends Element implements DefLike {
         this._desc = newDefData._desc ?? 'Set a description';
         this._emoji = newDefData._emoji ?? '🆕';
         this._scope = newDefData._scope ?? Scope.SECOND;
+        //spawn new PointDefs for any non-underscore-prefixed keys
+        let pids = Object.keys(newDefData).filter(key => key.substring(0, 1) !== '_');
+        if (pids.length > 0) {
+            let pointDefs: MinimumPointDef[] = pids.map(pid => {
+                newDefData[pid]._pid = pid;
+                newDefData[pid]._did = this._did;
+                return newDefData[pid]
+            });
+            PDW.getInstance().setPointDefs(pointDefs);
+        }
     }
 
     // createNewPointDef(pd: {_lbl: string, _type: PointType}){
@@ -1183,6 +1186,19 @@ export class Entry extends Element implements EntryLike {
         }
         this._eid = entryData._eid ?? makeUID();
         this._note = entryData._note ?? '';
+        //spawn new EntryPoints for any non-underscore-prefixed keys
+        let pids = Object.keys(entryData).filter(key => key.substring(0, 1) !== '_');
+        if (pids.length > 0) {
+            let entryPoints: MinimumEntryPoint[] = pids.map(pid => {
+                return {
+                    _pid: pid,
+                    _val: entryData[pid],
+                    _eid: this._eid,
+                    _did: this._did
+                }
+            });
+            PDW.getInstance().setEntryPoints(entryPoints);
+        }
     }
 }
 
@@ -1314,7 +1330,6 @@ export class DefaultDataStore implements DataStore {
             if (includeDeleted) return this.defs;
             return this.defs.filter(def => def._deleted === false);
         }
-        if (didsAndOrLbls) console.log('I see your ', didsAndOrLbls);
         const labelMatches = this.defs.filter(def => didsAndOrLbls.some(p => p === def._lbl));
         const didMatches = this.defs.filter(def => didsAndOrLbls.some(p => p === def._did));
         //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
@@ -1348,7 +1363,6 @@ export class DefaultDataStore implements DataStore {
             if (includeDeleted) return this.pointDefs;
             return this.pointDefs.filter(def => def._deleted === false);
         }
-        if (didsAndOrLbls) console.log('I see your ', didsAndOrLbls);
         const labelMatches = this.pointDefs.filter(def => didsAndOrLbls.some(p => p === def._lbl));
         const didMatches = this.pointDefs.filter(def => didsAndOrLbls.some(p => p === def._did));
         const pidMatches = this.pointDefs.filter(def => didsAndOrLbls.some(p => p === def._pid));

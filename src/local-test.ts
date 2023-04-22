@@ -101,22 +101,27 @@ function createTwoTestFiles(){
     })
     let outFileOneame = 'data-files/OutExcel1.xlsx';
     exportToFile(outFileOneame, pdw.allDataSince());
-    //update def
+    //update def (and pointdef)
     pdw.setDefs([{
-        _did: '0m7w',
-        _lbl: 'One Relabeled'
+        _did: 'ay7l',
+        _lbl: 'Two Relabeled',
+        '0pc6': {
+            _lbl: 'Test Relabel'
+        }
     }]);
     //update a pointdef
     pdw.setPointDefs([{
         _did: 'ay7l',
         _pid: '0tb7',
-        _lbl: 'Changed Label',
+        _emoji: '👎',
     }])
+    //update an entry (and entrypoint)
     pdw.setEntries([{
         _eid: 'lgricx7k-08al',
-        _note: 'Updated noted'
+        _note: 'Updated noted',
+        '0tb7': true
     }])
-    //update an entrypoint
+    //update an entrypoint explicitly
     pdw.setEntryPoints([{
         _eid: 'lgricx7k-08al',
         _pid: '0pc6',
