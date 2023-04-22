@@ -1092,15 +1092,15 @@ export class Def extends Element implements DefLike {
     * @returns true if data have all required properties of {@link DefLike}
     */
     static isDefLike(data: any): boolean {
-        if (data._did == undefined || typeof data._did !== 'string') return false
-        if (data._lbl == undefined || typeof data._lbl !== 'string') return false
-        if (data._desc == undefined || typeof data._desc !== 'string') return false
-        if (data._emoji == undefined || typeof data._emoji !== 'string') return false
+        if (typeof data._did !== 'string') return false
+        if (typeof data._lbl !== 'string') return false
+        if (typeof data._desc !== 'string') return false
+        if (typeof data._emoji !== 'string') return false
         if (data._scope == undefined || !this.isValidScope(data._scope)) return false
-        if (data._uid == undefined || typeof data._uid !== 'string') return false
-        if (data._created == undefined || typeof data._created.getISOFields !== 'function') return false //proxy check
-        if (data._deleted == undefined || typeof data._deleted !== 'boolean') return false
-        if (data._updated == undefined || typeof data._updated !== 'string') return false
+        if (typeof data._uid !== 'string') return false
+        if (typeof data._created !== 'string') return false
+        if (typeof data._deleted !== 'boolean') return false
+        if (typeof data._updated !== 'string') return false
         return true;
     }
 
@@ -1151,17 +1151,17 @@ export class PointDef extends Element implements PointDefLike {
     * @returns true if data have all required properties of {@link DefLike}
     */
     static isPointDefLike(data: any): boolean {
-        if (data._did == undefined || typeof data._did !== 'string') return false
-        if (data._pid == undefined || typeof data._pid !== 'string') return false
-        if (data._lbl == undefined || typeof data._lbl !== 'string') return false
-        if (data._desc == undefined || typeof data._desc !== 'string') return false
-        if (data._emoji == undefined || typeof data._emoji !== 'string') return false
+        if (typeof data._did !== 'string') return false
+        if (typeof data._pid !== 'string') return false
+        if (typeof data._lbl !== 'string') return false
+        if (typeof data._desc !== 'string') return false
+        if (typeof data._emoji !== 'string') return false
         if (data._type == undefined || !PointDef.isValidType(data._type)) return false
         if (data._rollup == undefined || !PointDef.isValidRollup(data._rollup)) return false
-        if (data._uid == undefined || typeof data._uid !== 'string') return false
-        if (data._created == undefined || typeof data._created.getISOFields !== 'function') return false //proxy check
-        if (data._deleted == undefined || typeof data._deleted !== 'boolean') return false
-        if (data._updated == undefined || typeof data._updated !== 'string') return false
+        if (typeof data._uid !== 'string') return false
+        if (typeof data._created !== 'string') return false
+        if (typeof data._deleted !== 'boolean') return false
+        if (typeof data._updated !== 'string') return false
         return true;
     }
 
@@ -1223,6 +1223,24 @@ export class Entry extends Element implements EntryLike {
     getPeriod(): Period {
         return new Period(this._period);
     }
+
+    /**
+    * Predicate to check if an object has all {@link EntryLike} properties
+    * AND they are the right type.
+    * @param data data to check
+    * @returns true if data have all required properties of {@link DefLike}
+    */
+    static isEntryLike(data: any): boolean {
+        if (typeof data._did !== 'string') return false
+        if (typeof data._eid !== 'string') return false
+        if (typeof data._note !== 'string') return false
+        if (typeof data._period !== 'string') return false
+        if (typeof data._uid !== 'string') return false
+        if (typeof data._created !== 'string') return false
+        if (typeof data._deleted !== 'boolean') return false
+        if (typeof data._updated !== 'string') return false
+        return true;
+    }
 }
 
 /**
@@ -1249,7 +1267,18 @@ export class EntryPoint extends Element implements EntryPointLike {
         this._val = entryPointData._val;
         this._did = entryPointData._did!; //I *think* this will always be not undefined
     }
-
+    
+    static isEntryPointLike(data: any): boolean {
+        if (typeof data._uid !== 'string') return false
+        if (typeof data._created !== 'string') return false
+        if (typeof data._updated !== 'string') return false
+        if (typeof data._deleted !== 'boolean') return false
+        if (typeof data._did !== 'string') return false
+        if (typeof data._pid !== 'string') return false
+        if (typeof data._eid !== 'string') return false
+        if (data._val === undefined) return false
+        return true;
+    }
 }
 
 export class TagDef extends Element implements TagDefLike {
@@ -1265,6 +1294,16 @@ export class TagDef extends Element implements TagDefLike {
         super(tagDefData);
         this._tid = tagDefData._tid ?? makeSmallID();
         this._lbl = tagDefData._lbl;
+    }
+    
+    static isTagDefLike(data: any): boolean {
+        if (typeof data._uid !== 'string') return false
+        if (typeof data._created !== 'string') return false
+        if (typeof data._updated !== 'string') return false
+        if (typeof data._deleted !== 'boolean') return false
+        if (typeof data._tid !== 'string') return false
+        if (typeof data._lbl !== 'string') return false
+        return true;
     }
 }
 
@@ -1283,6 +1322,16 @@ export class Tag extends Element implements TagLike {
         this._tid = tagData._tid;
         this._did = tagData._did;
         this._pid = tagData._pid;
+    }
+
+    static isTagLike(data: any): boolean {
+        if (typeof data._uid !== 'string') return false
+        if (typeof data._created !== 'string') return false
+        if (typeof data._updated !== 'string') return false
+        if (typeof data._deleted !== 'boolean') return false
+        if (typeof data._did !== 'string') return false
+        if (typeof data._tid !== 'string') return false
+        return true;
     }
 }
 

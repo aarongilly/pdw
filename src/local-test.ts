@@ -17,7 +17,12 @@ const pdw = PDW.getInstance();
 // console.log(Period.inferScope(Period.now(Scope.QUARTER)));
 // console.log(Period.inferScope(Period.now(Scope.YEAR)));
 
-createTwoTestFiles();
+// createTwoTestFiles();
+
+// importFromFile('data-files/OutJSON.json');
+importFromFile('data-files/OutExcel2.xlsx');
+
+console.log(pdw.allDataSince());
 
 function createTwoTestFiles(){
     //Testing createNewDef && Def.setPointDefs
@@ -101,8 +106,10 @@ function createTwoTestFiles(){
         _tid: '0vvi',
         _pid: '8esq'
     })
+    //Write to file before any updates
     let outFileOneame = 'data-files/OutExcel1.xlsx';
     exportToFile(outFileOneame, pdw.allDataSince());
+
     //update def (and pointdef)
     pdw.setDefs([{
         _did: 'ay7l',
@@ -140,6 +147,8 @@ function createTwoTestFiles(){
         _tid: 'vvct',
         _deleted: true
     }])
+
+    //Write to updated files
     let data = pdw.allDataSince();
     let outFileTwoName = 'data-files/OutExcel2.xlsx';
     exportToFile(outFileTwoName, data);
