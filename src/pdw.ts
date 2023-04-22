@@ -65,7 +65,7 @@ export enum PointType {
 export enum Scope {
     SECOND = 'SECOND',
     MINUTE = 'MINUTE',
-    HOUR = 'HOUR', 
+    HOUR = 'HOUR',
     DAY = 'DAY',
     WEEK = 'WEEK',
     MONTH = 'MONTH',
@@ -607,7 +607,9 @@ export class PDW {
             defs: this.dataStores[0].getDefs(undefined, true),
             pointDefs: this.dataStores[0].getPointDefs(undefined, true),
             entries: this.dataStores[0].getEntries(undefined, true),
-            entryPoints: this.dataStores[0].getEntryPoints(undefined, undefined, true)
+            entryPoints: this.dataStores[0].getEntryPoints(undefined, undefined, true),
+            tagDefs: this.dataStores[0].getTagDefs(undefined, true),
+            tags: this.dataStores[0].getTags(undefined, undefined, undefined, true),
         }
     }
 
@@ -642,6 +644,22 @@ export class PDW {
             connection.setEntryPoints(entryPoints)
         })
         return entryPoints
+    }
+
+    setTagDefs(tagDefsIn: MinimumTagDef[]): TagDef[] {
+        let tagDefs: TagDef[] = tagDefsIn.map(tagDef => new TagDef(tagDef));
+        this.dataStores.forEach(connection => {
+            connection.setTagDefs(tagDefs)
+        })
+        return tagDefs
+    }
+
+    setTags(tagsIn: MinimumTag[]): Tag[] {
+        let tags: Tag[] = tagsIn.map(tag => new Tag(tag));
+        this.dataStores.forEach(connection => {
+            connection.setTags(tags)
+        })
+        return tags
     }
 
     getDefs(didOrLbls?: string[] | string, includeDeleted = false): Def[] {
@@ -723,6 +741,24 @@ export class PDW {
         if (this.dataStores.length == 1) {
             let entries = this.dataStores[0].getEntries(eids, includeDeleted);
             return entries.map(entry => new Entry(entry));
+        }
+
+        throw new Error('Multiple datastores not yet implemented');
+    }
+
+    getEntryPoints(){
+        throw new Error('You did not build this, do you need it?')
+    }
+
+
+    getTagDefs(tidOrLbls?: string[] | string, includeDeleted = false): TagDef[] {
+        //enforce array-of-strings type
+        if (tidOrLbls !== undefined && !Array.isArray(tidOrLbls)) tidOrLbls = [tidOrLbls]
+
+        //if there's only DataStore, bypass the combining stuff to save time
+        if (this.dataStores.length == 1) {
+            let tagDefLikes = this.dataStores[0].getTagDefs(tidOrLbls, includeDeleted)
+            return tagDefLikes.map(tdl => new TagDef(tdl));
         }
 
         throw new Error('Multiple datastores not yet implemented');
@@ -999,13 +1035,21 @@ export class Def extends Element implements DefLike {
 
     setPointDefs(pointInfoIn: [{
         _lbl: string,
-        _type: PointType
+        _type: PointType,
+        _emoji?: string,
+        _desc?: Markdown,
+        _rollup?: Rollup
+        _pid?: SmallID
     }]): PointDef[] {
         let pointDefs = pointInfoIn.map(point => {
             return PDW.getInstance().createNewPointDef({
                 _lbl: point._lbl,
                 _did: this._did,
-                _type: point._type
+                _type: point._type,
+                _emoji: point._emoji,
+                _desc: point._desc,
+                _rollup: point._rollup,
+                _pid: point._pid
             })
         })
         return pointDefs
@@ -1176,7 +1220,7 @@ export class Entry extends Element implements EntryLike {
         }
     }
 
-    getPeriod(): Period{
+    getPeriod(): Period {
         return new Period(this._period);
     }
 }
@@ -1212,6 +1256,12 @@ export class TagDef extends Element implements TagDefLike {
     _tid: string;
     _lbl: string;
     constructor(tagDefData: MinimumTagDef) {
+        if (tagDefData._tid !== undefined) {
+            let existing = Element.findExistingData(tagDefData);
+            if (existing !== undefined) {
+                if (tagDefData._created === undefined) tagDefData._created = existing._created;
+            }
+        }
         super(tagDefData);
         this._tid = tagDefData._tid ?? makeSmallID();
         this._lbl = tagDefData._lbl;
@@ -1223,6 +1273,12 @@ export class Tag extends Element implements TagLike {
     _did: string;
     _pid?: string | undefined;
     constructor(tagData: MinimumTag) {
+        if (tagData._tid !== undefined) {
+            let existing = Element.findExistingData(tagData);
+            if (existing !== undefined) {
+                if (tagData._created === undefined) tagData._created = existing._created;
+            }
+        }
         super(tagData);
         this._tid = tagData._tid;
         this._did = tagData._did;
@@ -1327,7 +1383,7 @@ export class DefaultDataStore implements DataStore {
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
                 if (existingDef.shouldBeReplacedWith(def)) {
                     existingDef.markDeleted();
-                    newDefs.push(def)
+                    if(!def._deleted) newDefs.push(def) //don't duplicate in case of calling setDefs purely to delete
                 }
             } else {
                 newDefs.push(def);
@@ -1361,7 +1417,7 @@ export class DefaultDataStore implements DataStore {
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
                 if (existingDef.shouldBeReplacedWith(pd)) {
                     existingDef.markDeleted();
-                    newDefs.push(pd)
+                    if(!pd._deleted) newDefs.push(pd)
                 }
             } else {
                 newDefs.push(pd);
@@ -1400,7 +1456,7 @@ export class DefaultDataStore implements DataStore {
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
                 if (existingEntry.shouldBeReplacedWith(entry)) {
                     existingEntry.markDeleted();
-                    entries.push(entry)
+                    if(!entry._deleted) entries.push(entry)
                 }
             } else {
                 entries.push(entry);
@@ -1440,7 +1496,7 @@ export class DefaultDataStore implements DataStore {
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
                 if (existingEntry.shouldBeReplacedWith(entryPoint)) {
                     existingEntry.markDeleted();
-                    entryPoints.push(entryPoint)
+                    if(!entryPoint._deleted) entryPoints.push(entryPoint)
                 }
             } else {
                 entryPoints.push(entryPoint);
@@ -1452,11 +1508,35 @@ export class DefaultDataStore implements DataStore {
 
 
     getTags(tids?: UID[], dids?: SmallID[], pids?: SmallID[], includeDeleted = false): TagLike[] {
-        throw new Error("Method not implemented.");
+        if (tids === undefined && dids === undefined && pids === undefined) {
+            if (includeDeleted) return this.tags;
+            return this.tags.filter(entry => entry._deleted === false);
+        }
+        const didMatches = dids === undefined ? [] : this.tags.filter(def => dids.some(p => p === def._did));
+        const tidMatches = tids === undefined ? [] : this.tags.filter(def => tids.some(p => p === def._tid));
+        const pidMatches = pids === undefined ? [] : this.tags.filter(def => pids.some(p => p === def._pid));
+        let noDupes = new Set([...didMatches, ...pidMatches, ...tidMatches]);
+        if (includeDeleted) return Array.from(noDupes);
+        return Array.from(noDupes).filter(entry => entry._deleted === false);
     }
 
-    setTags(_tagData: Tag[]): TagLike[] {
-        throw new Error("Method not implemented.");
+    setTags(tagData: Tag[]): TagLike[] {
+        let tags: Tag[] = [];
+        //mark any old defs as deleted
+        tagData.forEach(tag => {
+            let existingTag = this.tags.find(existing => existing.sameIdAs(tag) && existing._deleted === false);
+            if (existingTag !== undefined) {
+                //only replace if the setDefs def is newer, necessary for StorageConnector merges
+                if (existingTag.shouldBeReplacedWith(tag)) {
+                    existingTag.markDeleted();
+                    if(!tag._deleted) tags.push(tag)
+                }
+            } else {
+                tags.push(tag);
+            }
+        })
+        this.tags.push(...tags);
+        return tags;
     }
 
     getTagDefs(tidAndOrLbls?: string[], includeDeleted = false): TagDefLike[] {
@@ -1471,8 +1551,24 @@ export class DefaultDataStore implements DataStore {
         return Array.from(noDupes).filter(entry => entry._deleted === false);
     }
 
-    setTagDefs(_tagData: TagDef[]): TagDefLike[] {
-        throw new Error("Method not implemented.");
+    setTagDefs(tagDefsIn: TagDef[]): TagDefLike[] {
+        let tagDefs: TagDef[] = [];
+        //mark any old defs as deleted
+        tagDefsIn.forEach(tagDef => {
+            let existingTagDef = this.tagDefs.find(existing => existing.sameIdAs(tagDef) && existing._deleted === false);
+            if (existingTagDef !== undefined) {
+                //only replace if the setDefs def is newer, necessary for StorageConnector merges
+                if (existingTagDef.shouldBeReplacedWith(tagDef)) {
+                    existingTagDef.markDeleted();
+                    if(!tagDef._deleted) tagDefs.push(tagDef) //don't duplicate if you're just deleting
+                }
+            } else {
+                tagDefs.push(tagDef);
+            }
+        })
+        //merge newDefs with defs in the DataStore
+        this.tagDefs.push(...tagDefs);
+        return tagDefs;
     }
 
     getOverview(): DataStoreOverview {

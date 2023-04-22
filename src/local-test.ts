@@ -1,5 +1,5 @@
 //// @ts-nocheck
-import {PDW, Period, PointType, parseTemporalFromEpochStr, parseTemporalFromUid} from './pdw.js'
+import {PDW, Period, PointType, Rollup, parseTemporalFromEpochStr, parseTemporalFromUid} from './pdw.js'
 import {Scope} from './pdw.js'
 import { exportToFile } from './connectors/fileConnector.js';
 import { importFromFile } from './connectors/fileConnector.js';
@@ -20,13 +20,21 @@ const pdw = PDW.getInstance();
 createTwoTestFiles();
 
 function createTwoTestFiles(){
+    //Testing createNewDef && Def.setPointDefs
     pdw.createNewDef({
         _did: '0m7w',
         _lbl: 'defOne',
         _emoji: '1️⃣',
         _scope: Scope.SECOND,
         _desc: 'This is now inerited'
-    })
+    }).setPointDefs([{
+        _lbl: 'Select Test',
+        _type: PointType.SELECT,
+        _emoji: '⛏️',
+        _desc: 'For testing selects',
+        _pid: '8esq',
+        _rollup: Rollup.COUNTOFEACH
+    }])
     pdw.createNewDef({
         _did: 'ay7l',
         _lbl: 'TWO',
@@ -51,7 +59,8 @@ function createTwoTestFiles(){
         _pid: '0pc6',
         _type: PointType.NUM,
         _lbl: 'Numeric Thing',
-        _emoji: '#️⃣'
+        _emoji: '#️⃣',
+        _rollup: Rollup.AVERAGE
     })
     pdw.createNewPointDef({
         _did: 'ay7l',
@@ -71,6 +80,26 @@ function createTwoTestFiles(){
     })
     pdw.createNewEntry({
         _did: '0m7w',
+    })
+    pdw.createNewTagDef({
+        _lbl: 'My Tag!',
+    })
+    pdw.createNewTagDef({
+        _lbl: 'Orig Tag Label',
+        _tid: 'vvct'
+    })
+    pdw.createNewTagDef({
+        _lbl: 'Select Option Test',
+        _tid: '0vvi'
+    })
+    pdw.createNewTag({
+        _did: 'ay7l',
+        _tid: 'vvct'
+    })
+    pdw.createNewTag({
+        _did: '0m7w',
+        _tid: '0vvi',
+        _pid: '8esq'
     })
     let outFileOneame = 'data-files/OutExcel1.xlsx';
     exportToFile(outFileOneame, pdw.allDataSince());
@@ -99,6 +128,17 @@ function createTwoTestFiles(){
         _eid: 'lgricx7k-08al',
         _pid: '0pc6',
         _val: 6
+    }])
+    //update a tagDef
+    pdw.setTagDefs([{
+        _tid: 'vvct',
+        _lbl: 'New Label'
+    }])
+    //update a tag
+    pdw.setTags([{
+        _did: 'ay7l',
+        _tid: 'vvct',
+        _deleted: true
     }])
     let data = pdw.allDataSince();
     let outFileTwoName = 'data-files/OutExcel2.xlsx';

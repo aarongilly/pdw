@@ -76,11 +76,21 @@ export class ExcelTabularImportExport {
             XLSX.utils.book_append_sheet(wb, entryPointSht, ExcelTabularImportExport.entryPointShtName);
         }
 
-        let tagDefSht = XLSX.utils.aoa_to_sheet([tabularHeaders.tagDef]);
-        XLSX.utils.book_append_sheet(wb, tagDefSht, ExcelTabularImportExport.tagDefShtName);
+        if(data.tagDefs !== undefined){
+            let tagDefArr = data.tagDefs.map(tagDef => ExcelTabularImportExport.makeExcelTagDefRow(tagDef))
+            tagDefArr.unshift(tabularHeaders.tagDef);
 
-        let tagSht = XLSX.utils.aoa_to_sheet([tabularHeaders.tag]);
-        XLSX.utils.book_append_sheet(wb, tagSht, ExcelTabularImportExport.tagShtName);
+            let tagDefSht = XLSX.utils.aoa_to_sheet(tagDefArr);
+            XLSX.utils.book_append_sheet(wb, tagDefSht, ExcelTabularImportExport.tagDefShtName);
+        }
+
+        if(data.tags !== undefined){
+            let tagArr = data.tags.map(tag => ExcelTabularImportExport.makeExcelTagRow(tag))
+            tagArr.unshift(tabularHeaders.tag);
+
+            let tagSht = XLSX.utils.aoa_to_sheet(tagArr);
+            XLSX.utils.book_append_sheet(wb, tagSht, ExcelTabularImportExport.tagShtName);
+        }
 
         XLSX.writeFile(wb, filename);
     }
@@ -173,7 +183,6 @@ export class ExcelTabularImportExport {
             pointDef._desc,
             pointDef._type,
             pointDef._rollup,
-            // pointDef._format
         ]
     }
 
@@ -201,6 +210,29 @@ export class ExcelTabularImportExport {
             entryPointData._pid,
             entryPointData._eid,
             entryPointData._val.toString() //I think I want this
+        ]
+    }
+
+    static makeExcelTagDefRow(tagDefData: pdw.TagDefLike){
+        return [
+            tagDefData._uid,
+            tagDefData._created,
+            tagDefData._updated,
+            tagDefData._deleted,
+            tagDefData._tid,
+            tagDefData._lbl
+        ]
+    }
+
+    static makeExcelTagRow(tagData: pdw.TagLike){
+        return [
+            tagData._uid,
+            tagData._created,
+            tagData._updated,
+            tagData._deleted,
+            tagData._did,
+            tagData._pid,
+            tagData._tid,
         ]
     }
 
@@ -259,7 +291,7 @@ export const tabularHeaders = {
     pointDef: ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_lbl', '_emoji', '_desc', '_type', '_rollup'],
     entry: ['_uid', '_created', '_updated', '_deleted', '_did', '_eid', '_period', '_note'],
     entryPoint: ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_eid', '_val'],
-    tagDef: ['_uid', '_created', '_updated', '_deleted', '_tid', '_lbl', '_emoji', '_desc'],
+    tagDef: ['_uid', '_created', '_updated', '_deleted', '_tid', '_lbl'],
     tag: ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', 'tid']
 }
 
