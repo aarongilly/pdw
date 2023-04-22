@@ -53,6 +53,7 @@ function createTwoTestFiles(){
         _lbl: 'defOne',
         _emoji: '1️⃣',
         _scope: Scope.SECOND,
+        _desc: 'This is now inerited'
     })
     pdw.createNewDef({
         _did: 'ay7l',
@@ -88,13 +89,30 @@ function createTwoTestFiles(){
         _emoji: '👍'
     })
     pdw.createNewEntry({
+        _eid: 'lgricx7k-08al',
         _did: 'ay7l',
         '0tb7': false,
         '0pc6': 5
     })
     pdw.createNewEntry({
-        _did: '0m7w'
+        _did: '0m7w',
     })
     let outFileOneame = 'data-files/OutExcel1.xlsx';
     exportToFile(outFileOneame, pdw.allDataSince());
+    //update def
+    pdw.setDefs([{
+        _did: '0m7w',
+        _lbl: 'One Relabeled'
+    }]);
+    //update an entrypoint
+    // pdw.setEntryPoints([{
+    //     _eid: 'lgricx7k-08al',
+    //     _pid: '0pc6',
+    //     _val: 6
+    // }])
+    let data = pdw.allDataSince();
+    let outFileTwoName = 'data-files/OutExcel2.xlsx';
+    exportToFile(outFileTwoName, data);
+    let outJsonName = 'data-files/OutJSON.json';
+    exportToFile(outJsonName, data);
 }

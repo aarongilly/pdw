@@ -139,7 +139,7 @@ export interface DataStore {
      */
     setPointDefs(pointDefs: PointDef[]): any
 
-    getEntries(query: QueryParams): EntryLike[];
+    getEntries(eids?: string[], includeDeleted?: boolean): EntryLike[];
 
     setEntries(entries: Entry[]): Entry[];
 
@@ -156,6 +156,8 @@ export interface DataStore {
     setTagDefs(tagData: TagDef[]): TagDefLike[];
 
     getOverview(): DataStoreOverview;
+
+    query(params: QueryParams): QueryResponse;
 
     getAllSince(): CompleteDataset;
 
@@ -498,8 +500,9 @@ export interface MinimumEntry extends MinimumElement {
 export interface MinimumEntryPoint extends MinimumElement {
     /**
      * What kind of entry it is
+     * Can be inferred from 
      */
-    _did: SmallID;
+    _did?: SmallID;
     /**
      * Which Point is it
      */
@@ -575,11 +578,11 @@ export interface ReducedQuery {
     pid: string[];
 }
 
-export interface QueryResponse{
+export interface QueryResponse {
     success: boolean;
     count: number;
     messages?: string;
-    params: {paramsIn: object, asParsed: object};
+    params: { paramsIn: object, asParsed: object };
     entries: Entry[]
 }
 
@@ -622,9 +625,9 @@ export class PDW {
     //#HACK - hardcoded right now
     allDataSince(): CompleteDataset {
         return {
-            defs: this.dataStores[0].getDefs(undefined,true),
-            pointDefs: this.dataStores[0].getPointDefs(undefined,true),
-            entries: this.dataStores[0].getEntries({includeDeleted: true}),
+            defs: this.dataStores[0].getDefs(undefined, true),
+            pointDefs: this.dataStores[0].getPointDefs(undefined, true),
+            entries: this.dataStores[0].getEntries(undefined, true),
             entryPoints: this.dataStores[0].getEntryPoints(undefined, true)
         }
     }
@@ -638,7 +641,6 @@ export class PDW {
     }
 
 
-
     setPointDefs(pointDefsIn: MinimumPointDef[]): PointDef[] {
         let pointDefs: PointDef[] = pointDefsIn.map(minimumPD => new PointDef(minimumPD));
         this.dataStores.forEach(connection => {
@@ -647,7 +649,7 @@ export class PDW {
         return pointDefs
     }
 
-    setEntries(entryData: MinimumEntry[]): Entry[]{
+    setEntries(entryData: MinimumEntry[]): Entry[] {
         let entries: Entry[] = entryData.map(minimumEntry => new Entry(minimumEntry));
         this.dataStores.forEach(connection => {
             connection.setEntries(entries)
@@ -655,7 +657,8 @@ export class PDW {
         return entries
     }
 
-    setEntryPoints(entryPointData: MinimumEntryPoint[]): EntryPoint[]{
+    setEntryPoints(entryPointData: MinimumEntryPoint[]): EntryPoint[] {
+        //#TODO - overwrite with needs to be considdered and used in all 4 of these set___ funcs
         let entryPoints: EntryPoint[] = entryPointData.map(minimumEntryPoint => new EntryPoint(minimumEntryPoint));
         this.dataStores.forEach(connection => {
             connection.setEntryPoints(entryPoints)
@@ -738,10 +741,10 @@ export class PDW {
         // return combinedDefs;
     }
 
-    getEntries(query: QueryParams): Entry[]{
+    getEntries(eids: UID[], includeDeleted = false): Entry[] {
         //#HACK - hardcoded
         if (this.dataStores.length == 1) {
-            let entries = this.dataStores[0].getEntries(query)
+            let entries = this.dataStores[0].getEntries(eids, includeDeleted);
             return entries.map(entry => new Entry(entry));
         }
         throw new Error('Multiple datastores not yet implemented');
@@ -791,27 +794,28 @@ export class PDW {
         return newPointDef;
     }
 
-    createNewEntry(entryInfo: MinimumEntry): Entry{
+    createNewEntry(entryInfo: MinimumEntry): Entry {
         let newEntry = new Entry(entryInfo);
         this.dataStores.forEach(connection => {
             connection.setEntries([newEntry])
         })
         //spawn new EntryPoints for any non-underscore-prefixed keys
-        let pids = Object.keys(entryInfo).filter(key=>key.substring(0,1) !== '_');
-        if(pids.length > 0){
-            let entryPoints: MinimumEntryPoint[] = pids.map(pid=> {
+        let pids = Object.keys(entryInfo).filter(key => key.substring(0, 1) !== '_');
+        if (pids.length > 0) {
+            let entryPoints: MinimumEntryPoint[] = pids.map(pid => {
                 return {
-                    _pid: pid, 
-                    _val: entryInfo[pid], 
-                    _eid: newEntry._eid, 
-                    _did: newEntry._did}
+                    _pid: pid,
+                    _val: entryInfo[pid],
+                    _eid: newEntry._eid,
+                    _did: newEntry._did
+                }
             });
             PDW.getInstance().setEntryPoints(entryPoints);
         }
         return newEntry;
     }
 
-    createNewEntryPoint(entryPointInfo: MinimumEntryPoint): EntryPoint{
+    createNewEntryPoint(entryPointInfo: MinimumEntryPoint): EntryPoint {
         let newEntryPoint = new EntryPoint(entryPointInfo);
         this.dataStores.forEach(connection => {
             connection.setEntryPoints([newEntryPoint])
@@ -882,12 +886,8 @@ export abstract class Element implements ElementLike {
      * of the 
      * @returns string representing the type of element
      */
-    getType(): 'DefLike' | 'PointDefLike' | 'EntryLike' | 'EntryPointLike' | 'TagLike' {
-        if (this.hasOwnProperty("_tid")) return "TagLike"
-        if (this.hasOwnProperty("_eid") && this.hasOwnProperty('_pid')) return "EntryPointLike"
-        if (this.hasOwnProperty("_eid")) return "EntryLike"
-        if (this.hasOwnProperty("_pid")) return "PointDefLike"
-        return "DefLike"
+    getType(): 'DefLike' | 'PointDefLike' | 'EntryLike' | 'EntryPointLike' | 'TagDefLike' | 'TagLike' | null {
+        return Element.getTypeOfElementLike(this)!
     }
 
     /**
@@ -915,15 +915,50 @@ export abstract class Element implements ElementLike {
     }
 
     sameTypeAs(comparison: ElementLike) {
-        return this.getType() === this.getTypeOfElementLike(comparison);
+        return this.getType() === Element.getTypeOfElementLike(comparison);
     }
 
-    private getTypeOfElementLike(data: ElementLike) {
-        if (data.hasOwnProperty("_tid")) return "TagLike"
+    private static getTypeOfElementLike(data: ElementLike) {
+        if (data.hasOwnProperty("_tid") && data.hasOwnProperty('_did')) return "TagLike"
+        if (data.hasOwnProperty("_tid")) return "TagDefLike"
         if (data.hasOwnProperty("_eid") && data.hasOwnProperty('_pid')) return "EntryPointLike"
         if (data.hasOwnProperty("_eid")) return "EntryLike"
         if (data.hasOwnProperty("_pid")) return "PointDefLike"
-        return "DefLike"
+        if (data.hasOwnProperty("_did")) return "DefLike"
+        return null
+    }
+
+    /**
+     * Analyzes an object and tries to find one UNDELETED Element that
+     * has the same Xid(s). 
+     * @param dataIn an object that may be part of an existing Element
+     * @returns the raw DefLike, PointDefLike, EntryLike, EntryPointLike, TagLike, or TagDefLike - or undefined if none found
+     */
+    public static findExistingData(dataIn: any): any{
+        const type = Element.getTypeOfElementLike(dataIn);
+        if(type===null) return undefined;
+
+        let pdwRef = PDW.getInstance();
+        let existing: any;
+        if(type==='DefLike'){
+            pdwRef.dataStores.forEach(store=>{
+                let storeResult = maybeGetOnlyResult(store.getDefs([dataIn._did], false));
+                if(storeResult !== undefined && existing === undefined) existing = storeResult as DefLike
+            })
+        }
+        if(type==='PointDefLike'){
+            pdwRef.dataStores.forEach(store=>{
+                let storeResult = maybeGetOnlyResult(store.getPointDefs([dataIn._pid], false));
+                if(storeResult !== undefined && existing === undefined) existing = storeResult as PointDefLike
+            })
+        }
+        if(type==='EntryLike'){
+            pdwRef.dataStores.forEach(store=>{
+                let storeResult = maybeGetOnlyResult(store.getEntries([dataIn._eid], false));
+                if(storeResult !== undefined && existing === undefined) existing = storeResult as PointDefLike
+            })
+        }
+        return existing;
     }
 }
 
@@ -935,13 +970,24 @@ export class Def extends Element implements DefLike {
     _scope: Scope;
     // _tags?: TagDefLike[] | undefined;
     // _points?: PointDefLike[] | undefined;
-    constructor(defIn: MinimumDef) {
-        super(defIn)
-        this._lbl = defIn._lbl;
-        this._did = defIn._did ?? makeSmallID();
-        this._desc = defIn._desc ?? 'Set a description';
-        this._emoji = defIn._emoji ?? '🆕';
-        this._scope = defIn._scope ?? Scope.SECOND;
+    constructor(newDefData: MinimumDef) {
+        if (newDefData._did !== undefined) {
+            let existing = Element.findExistingData(newDefData);
+            if (existing !== undefined){
+                if(newDefData._created === undefined) newDefData._created = existing._created;
+                if(newDefData._desc === undefined) newDefData._desc = existing._desc;
+                if(newDefData._emoji === undefined) newDefData._emoji = existing._emoji;
+                if(newDefData._did === undefined) newDefData._did = existing._did;
+                if(newDefData._lbl === undefined) newDefData._lbl = existing._lbl;
+                if(newDefData._scope === undefined) newDefData._scope = existing._scope;
+            }
+        }
+        super(newDefData)
+        this._lbl = newDefData._lbl;
+        this._did = newDefData._did ?? makeSmallID();
+        this._desc = newDefData._desc ?? 'Set a description';
+        this._emoji = newDefData._emoji ?? '🆕';
+        this._scope = newDefData._scope ?? Scope.SECOND;
     }
 
     // createNewPointDef(pd: {_lbl: string, _type: PointType}){
@@ -962,7 +1008,7 @@ export class Def extends Element implements DefLike {
         return pointDefs
     }
 
-    getPoints(includeDeleted = false): PointDef[]{
+    getPoints(includeDeleted = false): PointDef[] {
         const pdwRef = PDW.getInstance();
 
         //if there's only DataStore, bypass the combining stuff to save time
@@ -973,6 +1019,24 @@ export class Def extends Element implements DefLike {
 
         throw new Error('Multiple Data Stores are #TODO') //#TODO
     }
+
+    // /**
+    //  * When replacing one Def with a new one, you want to pull all the values
+    //  * for any existing properties that are NOT explicityl contained in the new Def
+    //  * @param existingDef 
+    //  */
+    // overwriteWith(newDefData: MinimumDef): Def{
+    //     if(newDefData._created === undefined) newDefData._created = this._created;
+    //     if(newDefData._desc === undefined) newDefData._desc = this._desc;
+    //     if(newDefData._emoji === undefined) newDefData._emoji = this._emoji;
+    //     if(newDefData._did === undefined) newDefData._did = this._did;
+    //     if(newDefData._lbl === undefined) newDefData._lbl = this._lbl;
+    //     if(newDefData._scope === undefined) newDefData._scope = this._scope;
+    //     this._deleted = true;
+    //     //newDefData._uid will be different
+    //     //newDefData._updated will be set anew
+    //     return new Def(newDefData);
+    // }
 
     /**
     * Predicate to check if an object has all {@link DefLike} properties
@@ -997,7 +1061,7 @@ export class Def extends Element implements DefLike {
         const values = Object.values(Scope);
         return values.includes(typeStr as unknown as Scope)
     }
-    
+
 }
 
 export class PointDef extends Element implements PointDefLike {
@@ -1070,15 +1134,13 @@ export class Entry extends Element implements EntryLike {
     _period: PeriodStr;
     constructor(entryData: MinimumEntry) {
         super(entryData);
-        const defSet = PDW.getInstance().getDefs([entryData._did]);
-        if(defSet.length > 1) throw new Error('More than 1 active Def found with _did ' + entryData._did);
-        if(defSet.length == 0) throw new Error('No undeleted defs exist for ' + entryData._did);
-        const relatedDef = defSet[0]
+        const relatedDef = maybeGetOnlyResult(PDW.getInstance().getDefs([entryData._did]));
+        if(relatedDef === undefined) throw new Error('No def found for ' + entryData._did);
         this._did = entryData._did;
-        if(entryData._period !== undefined){
+        if (entryData._period !== undefined) {
             this._period = entryData._period;
-        }else{
-            this._period = Period.now(relatedDef._scope);
+        } else {
+            this._period = Period.now((<Def>relatedDef)._scope);
         }
         this._eid = entryData._eid ?? makeUID();
         this._note = entryData._note ?? '';
@@ -1101,7 +1163,7 @@ export class EntryPoint extends Element implements EntryPointLike {
         this._eid = entryPointData._eid;
         this._pid = entryPointData._pid;
         this._val = entryPointData._val;
-        this._did = entryPointData._did;
+        this._did = entryPointData._did!;
     }
 
 }
@@ -1129,24 +1191,24 @@ export class Tag extends Element implements TagLike {
 }
 
 export class Period {
-    constructor(periodStr: PeriodStr){
+    constructor(periodStr: PeriodStr) {
 
     }
-    static now(scope: Scope): PeriodStr{
+    static now(scope: Scope): PeriodStr {
         let seedStr = '';
         let nowTemp = Temporal.Now.zonedDateTimeISO();
-        if(scope === Scope.YEAR) seedStr =  nowTemp.year.toString();
-        if(scope === Scope.QUARTER) seedStr =  nowTemp.year.toString() + '-Q' + Math.ceil(nowTemp.month / 3);
-        if(scope === Scope.MONTH) seedStr =  nowTemp.toPlainYearMonth().toString()
-        if(scope === Scope.WEEK) seedStr =  nowTemp.year.toString() + '-W' + nowTemp.weekOfYear.toString();
-        if(scope === Scope.DAY) seedStr =  nowTemp.toPlainDate().toString()
-        if(scope === Scope.HOUR) seedStr =  nowTemp.toString().substring(0,13)
-        if(scope === Scope.MINUTE) seedStr =  nowTemp.toString().substring(0,16)
-        if(scope === Scope.SECOND) seedStr =  nowTemp.toString().substring(0,19)
+        if (scope === Scope.YEAR) seedStr = nowTemp.year.toString();
+        if (scope === Scope.QUARTER) seedStr = nowTemp.year.toString() + '-Q' + Math.ceil(nowTemp.month / 3);
+        if (scope === Scope.MONTH) seedStr = nowTemp.toPlainYearMonth().toString()
+        if (scope === Scope.WEEK) seedStr = nowTemp.year.toString() + '-W' + nowTemp.weekOfYear.toString();
+        if (scope === Scope.DAY) seedStr = nowTemp.toPlainDate().toString()
+        if (scope === Scope.HOUR) seedStr = nowTemp.toString().substring(0, 13)
+        if (scope === Scope.MINUTE) seedStr = nowTemp.toString().substring(0, 16)
+        if (scope === Scope.SECOND) seedStr = nowTemp.toString().substring(0, 19)
         return seedStr
     }
 
-    static  inferScope(ISOString: string): Scope {
+    static inferScope(ISOString: string): Scope {
         if (/\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+(?:[+-][0-2]\d:[0-5]\d|Z)/i.test(ISOString))
             return Scope.SECOND;
         //#TODO - minute
@@ -1197,6 +1259,11 @@ export class DefaultDataStore implements DataStore {
         this.tags = [];
     }
 
+    query(params: QueryParams): QueryResponse {
+
+        throw new Error("Method not implemented.");
+    }
+
     getDefs(didsAndOrLbls?: string[] | undefined, includeDeleted = false): DefLike[] {
         if (didsAndOrLbls === undefined) {
             if (includeDeleted) return this.defs;
@@ -1220,6 +1287,7 @@ export class DefaultDataStore implements DataStore {
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
                 if (existingDef.shouldBeReplacedWith(def)) {
                     existingDef.markDeleted();
+                    // def.copyUnsetPropsFrom(existingDef) //#BUG - damn
                     newDefs.push(def)
                 }
             } else {
@@ -1239,11 +1307,11 @@ export class DefaultDataStore implements DataStore {
         if (didsAndOrLbls) console.log('I see your ', didsAndOrLbls);
         const labelMatches = this.pointDefs.filter(def => didsAndOrLbls.some(p => p === def._lbl));
         const didMatches = this.pointDefs.filter(def => didsAndOrLbls.some(p => p === def._did));
+        const pidMatches = this.pointDefs.filter(def => didsAndOrLbls.some(p => p === def._pid));
         //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
-        let noDupes = new Set([...labelMatches, ...didMatches]);
+        let noDupes = new Set([...labelMatches, ...didMatches, ...pidMatches]);
         if (includeDeleted) return Array.from(noDupes);
         return Array.from(noDupes).filter(pd => pd._deleted === false);
-
     }
 
     setPointDefs(pointDefsIn: PointDef[]) {
@@ -1266,9 +1334,22 @@ export class DefaultDataStore implements DataStore {
         return pointDefsIn;
     }
 
-    getEntries(_query: QueryParams): EntryLike[] {
-        //#HACK - hardcoded
-        return this.entries;
+    /**
+     * For pulling entries that you know the eid of
+     * @param eids 
+     * @param includeDeleted 
+     * @returns an array of all entries matching the criteria
+     */
+    getEntries(eids?: string[], includeDeleted = false): EntryLike[] {
+        if (eids === undefined) {
+            if (includeDeleted) return this.entries;
+            return this.entries.filter(entry => entry._deleted === false);
+        }
+        const entries = this.entries.filter(entry => eids.some(p => p === entry._eid));
+        //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
+        let noDupes = new Set([...entries]);
+        if (includeDeleted) return Array.from(noDupes);
+        return Array.from(noDupes).filter(entry => entry._deleted === false);
 
     }
 
@@ -1399,6 +1480,15 @@ export function getElementType(element: ElementLike): 'DefLike' | 'PointDefLike'
     if (element.hasOwnProperty("_eid")) return "EntryLike"
     if (element.hasOwnProperty("_pid")) return "PointDefLike"
     return "DefLike"
+}
+
+function maybeGetOnlyResult(arrayOfOneElement: any[]): undefined | Def | Entry | PointDef | EntryPoint | Tag | TagDef {
+    if(arrayOfOneElement.length === 0) return undefined
+    if(arrayOfOneElement.length > 1) {
+        console.error('Found too many errors:', arrayOfOneElement)
+        throw new Error('Found too many results')
+    }
+    return arrayOfOneElement[0]
 }
 
 //#endregion
