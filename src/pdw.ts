@@ -33,6 +33,11 @@ export type DurationStr = string;
 export type PeriodStr = string;
 
 /**
+ * String representation of a full ISO 8601 timestamp, ending with the 'Z'
+ */
+export type UTCTimestamp = string
+
+/**
  * A String that is likely to be markdown-enabled in use
  */
 export type Markdown = string
@@ -59,6 +64,8 @@ export enum PointType {
 
 export enum Scope {
     SECOND = 'SECOND',
+    MINUTE = 'MINUTE', //#THINK
+    HOUR = 'HOUR', //#THINK
     DAY = 'DAY',
     WEEK = 'WEEK',
     MONTH = 'MONTH',
@@ -132,17 +139,21 @@ export interface DataStore {
      */
     setPointDefs(pointDefs: PointDef[]): any
 
-    getEntries(query: QueryLike): Entry
+    getEntries(query: QueryParams): EntryLike[];
 
     setEntries(entries: Entry[]): Entry[];
 
-    getTags(tidAndOrLbls?: string[]): TagLike[]
+    getEntryPoints(xid?: string[], includeDeleted?: boolean): EntryPointLike[];
 
-    setTags(tagData: Tag[]): TagLike[]
+    setEntryPoints(entryPointData: MinimumEntryPoint[]): EntryPointLike[];
 
-    getTagDefs(pidAndOrDidAndOrLbls?: string[]): TagDefLike[]
+    getTags(tidAndOrLbls?: string[]): TagLike[];
 
-    setTagDefs(tagData: TagDef[]): TagDefLike[]
+    setTags(tagData: Tag[]): TagLike[];
+
+    getTagDefs(pidAndOrDidAndOrLbls?: string[]): TagDefLike[];
+
+    setTagDefs(tagData: TagDef[]): TagDefLike[];
 
     getOverview(): DataStoreOverview;
 
@@ -194,7 +205,7 @@ export interface ElementLike {
     /**
      * When the element was created
      */
-    _created: Temporal.PlainDateTime;
+    _created: UTCTimestamp;
     /**
      * When the element was updated, usually lines up with "_created"
      * unless the instance of the element was created via updating a 
@@ -286,7 +297,7 @@ export interface EntryLike extends ElementLike {
     /**
      * When the entry is for
      */
-    _period: PeriodStr | Period,
+    _period: PeriodStr,
     /**
      * Associated definition ID
      */
@@ -298,6 +309,10 @@ export interface EntryPointLike extends ElementLike {
      * The Entry the Point is Associated With
      */
     _eid: UID,
+    /**
+     * Definition ID of the Entry
+     */
+    _did: SmallID,
     /**
      * Associated Point Definition ID
      */
@@ -352,7 +367,7 @@ export interface MinimumElement {
     /**
      * The human-readable time of creation. Will generate for you.
      */
-    _created?: Temporal.PlainDateTime | PeriodStr;
+    _created?: UTCTimestamp;
     /**
      * EpochStr for when this was updated. Will geenrate for you.
      */
@@ -452,8 +467,10 @@ export interface MinimumPointDef extends MinimumElement {
 export interface MinimumEntry extends MinimumElement {
     /**
      * When the Entry took place
+     * if blank, will default to 'now'
+     * in accordnce with the definition's scope
      */
-    _period: PeriodStr;
+    _period?: PeriodStr;
     /**
      * What kind of entry it is
      */
@@ -467,8 +484,12 @@ export interface MinimumEntry extends MinimumElement {
      */
     _note?: Markdown;
     /**
-     * #TODO - finish this when building out the Entry Class
+     * other key/value pairs will attempt to find
+     * the PointDef who's _pid == the key and spin
+     * up a new {@link EntryPoint} who's _val is 
+     * the value
      */
+    [x: string]: any;
 }
 
 /**
@@ -532,12 +553,34 @@ export interface MinimumTag extends MinimumElement {
     _pid?: SmallID;
 }
 
-export interface QueryLike {
-
+export interface QueryParams {
+    from?: PeriodStr;
+    to?: PeriodStr;
+    updatedFrom?: PeriodStr;
+    updatedTo?: PeriodStr;
+    did?: string | string[];
+    eid?: string | string[];
+    pid?: string | string[];
+    tag?: string | string[];
+    includeDeleted?: boolean;
+    //#TODO probably more
 }
 
 export interface ReducedQuery {
+    from: Temporal.PlainDateTime;
+    to: Temporal.PlainDateTime;
+    includeDeleted: boolean;
+    did: string[];
+    eid: string[];
+    pid: string[];
+}
 
+export interface QueryResponse{
+    success: boolean;
+    count: number;
+    messages?: string;
+    params: {paramsIn: object, asParsed: object};
+    entries: Entry[]
 }
 
 interface CurrentAndDeletedCounts {
@@ -580,7 +623,9 @@ export class PDW {
     allDataSince(): CompleteDataset {
         return {
             defs: this.dataStores[0].getDefs(undefined,true),
-            pointDefs: this.dataStores[0].getPointDefs(undefined,true)
+            pointDefs: this.dataStores[0].getPointDefs(undefined,true),
+            entries: this.dataStores[0].getEntries({includeDeleted: true}),
+            entryPoints: this.dataStores[0].getEntryPoints(undefined, true)
         }
     }
 
@@ -592,12 +637,30 @@ export class PDW {
         return defs
     }
 
+
+
     setPointDefs(pointDefsIn: MinimumPointDef[]): PointDef[] {
         let pointDefs: PointDef[] = pointDefsIn.map(minimumPD => new PointDef(minimumPD));
         this.dataStores.forEach(connection => {
             connection.setPointDefs(pointDefs)
         })
         return pointDefs
+    }
+
+    setEntries(entryData: MinimumEntry[]): Entry[]{
+        let entries: Entry[] = entryData.map(minimumEntry => new Entry(minimumEntry));
+        this.dataStores.forEach(connection => {
+            connection.setEntries(entries)
+        })
+        return entries
+    }
+
+    setEntryPoints(entryPointData: MinimumEntryPoint[]): EntryPoint[]{
+        let entryPoints: EntryPoint[] = entryPointData.map(minimumEntryPoint => new EntryPoint(minimumEntryPoint));
+        this.dataStores.forEach(connection => {
+            connection.setEntryPoints(entryPoints)
+        })
+        return entryPoints
     }
 
     getDefs(didOrLbls?: string[] | string, includeDeleted = true): Def[] {
@@ -635,6 +698,53 @@ export class PDW {
             })
         })
         return combinedDefs;
+    }
+
+    getPointDefs(didPidOrLbls?: string[] | string, includeDeleted = true): Def[] {
+        //enforce array-of-strings type
+        if (didPidOrLbls !== undefined && !Array.isArray(didPidOrLbls)) didPidOrLbls = [didPidOrLbls]
+
+        //if there's only DataStore, bypass the combining stuff to save time
+        if (this.dataStores.length == 1) {
+            let defLikes = this.dataStores[0].getPointDefs(didPidOrLbls, includeDeleted)
+            return defLikes.map(dl => new Def(dl));
+        }
+
+        throw new Error('Multiple stores not implemented yet');
+        // //multiple DataStores need to be all pulled, then deconflicted
+        // let combinedDefs: Def[] = [];
+        // //compile defs from all attached DataStores
+        // //#UNTESTED - test this!
+        // this.dataStores.forEach(dataStore => {
+        //     let thisStoreDefLikes = dataStore.getDefs(didPidOrLbls as string[], includeDeleted);
+        //     let thisStoreDefs = thisStoreDefLikes.map(tsdl => new Def(tsdl));
+        //     thisStoreDefs.forEach(def => {
+        //         let existingCopy = combinedDefs.find(cd => cd.sameIdAs(def));
+        //         if (existingCopy !== undefined) {
+        //             //duplicate found, determine which is newer & keep only it
+        //             if (existingCopy.shouldBeReplacedWith(def)) {
+        //                 //find & remove exising
+        //                 const ind = combinedDefs.findIndex(el => el._uid === existingCopy!._uid)
+        //                 combinedDefs.splice(ind);
+        //                 //add replacement
+        //                 combinedDefs.push(def);
+        //             }
+        //             //else{ignore it. don't do anything}
+        //         } else {
+        //             combinedDefs.push(def);
+        //         }
+        //     })
+        // })
+        // return combinedDefs;
+    }
+
+    getEntries(query: QueryParams): Entry[]{
+        //#HACK - hardcoded
+        if (this.dataStores.length == 1) {
+            let entries = this.dataStores[0].getEntries(query)
+            return entries.map(entry => new Entry(entry));
+        }
+        throw new Error('Multiple datastores not yet implemented');
     }
 
     // /**
@@ -681,6 +791,34 @@ export class PDW {
         return newPointDef;
     }
 
+    createNewEntry(entryInfo: MinimumEntry): Entry{
+        let newEntry = new Entry(entryInfo);
+        this.dataStores.forEach(connection => {
+            connection.setEntries([newEntry])
+        })
+        //spawn new EntryPoints for any non-underscore-prefixed keys
+        let pids = Object.keys(entryInfo).filter(key=>key.substring(0,1) !== '_');
+        if(pids.length > 0){
+            let entryPoints: MinimumEntryPoint[] = pids.map(pid=> {
+                return {
+                    _pid: pid, 
+                    _val: entryInfo[pid], 
+                    _eid: newEntry._eid, 
+                    _did: newEntry._did}
+            });
+            PDW.getInstance().setEntryPoints(entryPoints);
+        }
+        return newEntry;
+    }
+
+    createNewEntryPoint(entryPointInfo: MinimumEntryPoint): EntryPoint{
+        let newEntryPoint = new EntryPoint(entryPointInfo);
+        this.dataStores.forEach(connection => {
+            connection.setEntryPoints([newEntryPoint])
+        })
+        return newEntryPoint;
+    }
+
     /**
      * Singleton pattern.
      * @returns the PDW
@@ -699,13 +837,12 @@ export class PDW {
 export abstract class Element implements ElementLike {
     _uid: string;
     _deleted: boolean;
-    _created: Temporal.PlainDateTime;
+    _created: UTCTimestamp;
     _updated: EpochStr;
     constructor(existingData: any) {
         this._uid = existingData._uid ?? makeUID();
         this._deleted = existingData._deleted ?? false;
-        this._created = existingData._created ?? Temporal.Now.plainDateTimeISO();//new Temporal.TimeZone('UTC'));
-        if (typeof this._created == 'string') this._created = Temporal.PlainDateTime.from(this._created);
+        this._created = existingData._created ?? new Date().toISOString();
         this._updated = existingData._updated ?? makeEpochStr();
     }
 
@@ -827,6 +964,7 @@ export class Def extends Element implements DefLike {
 
     getPoints(includeDeleted = false): PointDef[]{
         const pdwRef = PDW.getInstance();
+
         //if there's only DataStore, bypass the combining stuff to save time
         if (pdwRef.dataStores.length == 1) {
             let pds = pdwRef.dataStores[0].getPointDefs([this._did], includeDeleted)
@@ -929,11 +1067,19 @@ export class Entry extends Element implements EntryLike {
     _eid: string;
     _note: Markdown;
     _did: string;
-    _period: Period;
+    _period: PeriodStr;
     constructor(entryData: MinimumEntry) {
         super(entryData);
+        const defSet = PDW.getInstance().getDefs([entryData._did]);
+        if(defSet.length > 1) throw new Error('More than 1 active Def found with _did ' + entryData._did);
+        if(defSet.length == 0) throw new Error('No undeleted defs exist for ' + entryData._did);
+        const relatedDef = defSet[0]
         this._did = entryData._did;
-        this._period = entryData._period;
+        if(entryData._period !== undefined){
+            this._period = entryData._period;
+        }else{
+            this._period = Period.now(relatedDef._scope);
+        }
         this._eid = entryData._eid ?? makeUID();
         this._note = entryData._note ?? '';
     }
@@ -946,14 +1092,16 @@ export class Entry extends Element implements EntryLike {
  * be attached. But I guess it's an easy way to build an EntryLike obj
  */
 export class EntryPoint extends Element implements EntryPointLike {
-    _eid: string;
-    _pid: string;
+    _eid: UID;
+    _pid: SmallID;
     _val: any;
+    _did: SmallID
     constructor(entryPointData: MinimumEntryPoint) {
         super(entryPointData);
         this._eid = entryPointData._eid;
         this._pid = entryPointData._pid;
         this._val = entryPointData._val;
+        this._did = entryPointData._did;
     }
 
 }
@@ -981,7 +1129,40 @@ export class Tag extends Element implements TagLike {
 }
 
 export class Period {
+    constructor(periodStr: PeriodStr){
 
+    }
+    static now(scope: Scope): PeriodStr{
+        let seedStr = '';
+        let nowTemp = Temporal.Now.zonedDateTimeISO();
+        if(scope === Scope.YEAR) seedStr =  nowTemp.year.toString();
+        if(scope === Scope.QUARTER) seedStr =  nowTemp.year.toString() + '-Q' + Math.ceil(nowTemp.month / 3);
+        if(scope === Scope.MONTH) seedStr =  nowTemp.toPlainYearMonth().toString()
+        if(scope === Scope.WEEK) seedStr =  nowTemp.year.toString() + '-W' + nowTemp.weekOfYear.toString();
+        if(scope === Scope.DAY) seedStr =  nowTemp.toPlainDate().toString()
+        if(scope === Scope.HOUR) seedStr =  nowTemp.toString().substring(0,13)
+        if(scope === Scope.MINUTE) seedStr =  nowTemp.toString().substring(0,16)
+        if(scope === Scope.SECOND) seedStr =  nowTemp.toString().substring(0,19)
+        return seedStr
+    }
+
+    static  inferScope(ISOString: string): Scope {
+        if (/\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+(?:[+-][0-2]\d:[0-5]\d|Z)/i.test(ISOString))
+            return Scope.SECOND;
+        //#TODO - minute
+        //#TODO - hour
+        if (/^([12]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$/.test(ISOString))
+            return Scope.DAY;
+        if (/^([0-9]{4})-?W(5[0-3]|[1-4][0-9]|0[1-9])$/i.test(ISOString))
+            return Scope.WEEK;
+        if (/^([0-9]{4})-(1[0-2]|0[1-9])$/.test(ISOString))
+            return Scope.MONTH;
+        if (/^[0-9]{4}-Q[1-4]$/i.test(ISOString))
+            return Scope.QUARTER;
+        if (/^([0-9]{4})$/.test(ISOString))
+            return Scope.YEAR;
+        throw new Error('Attempted to infer scope failed for: ' + ISOString);
+    }
 }
 
 export class Query {
@@ -990,7 +1171,7 @@ export class Query {
     }
     //#TODO - a lot
 
-    run(): QueryLike {
+    run(): QueryResponse {
         throw new Error('Query.run not yet implemented')
     }
 }
@@ -1064,6 +1245,7 @@ export class DefaultDataStore implements DataStore {
         return Array.from(noDupes).filter(pd => pd._deleted === false);
 
     }
+
     setPointDefs(pointDefsIn: PointDef[]) {
         let newDefs: PointDef[] = [];
         //mark any old defs as deleted
@@ -1083,30 +1265,82 @@ export class DefaultDataStore implements DataStore {
         this.pointDefs.push(...newDefs);
         return pointDefsIn;
     }
-    getEntries(_query: QueryLike): Entry {
-        throw new Error("Method not implemented.");
+
+    getEntries(_query: QueryParams): EntryLike[] {
+        //#HACK - hardcoded
+        return this.entries;
+
     }
-    setEntries(_entries: Entry[]): Entry[] {
-        throw new Error("Method not implemented.");
+
+    setEntries(entriesIn: Entry[]): Entry[] {
+        let entries: Entry[] = [];
+        //mark any old defs as deleted
+        entriesIn.forEach(entry => {
+            let existingEntry = this.entries.find(existing => existing.sameIdAs(entry) && existing._deleted === false);
+            if (existingEntry !== undefined) {
+                //only replace if the setDefs def is newer, necessary for StorageConnector merges
+                if (existingEntry.shouldBeReplacedWith(entry)) {
+                    existingEntry.markDeleted();
+                    entries.push(entry)
+                }
+            } else {
+                entries.push(entry);
+            }
+        })
+        //merge newDefs with defs in the DataStore
+        this.entries.push(...entries);
+        return entries;
     }
+
+    getEntryPoints(xid?: string[], includeDeleted = false): EntryPointLike[] {
+        //#HACK - hardcoded
+        return this.entryPoints
+    }
+
+    setEntryPoints(entryPointData: EntryPoint[]): EntryPoint[] {
+        let entryPoints: EntryPoint[] = [];
+        //mark any old defs as deleted
+        entryPointData.forEach(entryPoint => {
+            let existingEntry = this.entryPoints.find(existing => existing.sameIdAs(entryPoint) && existing._deleted === false);
+            if (existingEntry !== undefined) {
+                //only replace if the setDefs def is newer, necessary for StorageConnector merges
+                if (existingEntry.shouldBeReplacedWith(entryPoint)) {
+                    existingEntry.markDeleted();
+                    entryPoints.push(entryPoint)
+                }
+            } else {
+                entryPoints.push(entryPoint);
+            }
+        })
+        this.entryPoints.push(...entryPoints);
+        return entryPoints;
+    }
+
+
     getTags(_tidAndOrLbls?: string[] | undefined): TagLike[] {
         throw new Error("Method not implemented.");
     }
+
     setTags(_tagData: Tag[]): TagLike[] {
         throw new Error("Method not implemented.");
     }
+
     getTagDefs(_pidAndOrDidAndOrLbls?: string[] | undefined): TagDefLike[] {
         throw new Error("Method not implemented.");
     }
+
     setTagDefs(_tagData: TagDef[]): TagDefLike[] {
         throw new Error("Method not implemented.");
     }
+
     getOverview(): DataStoreOverview {
         throw new Error("Method not implemented.");
     }
+
     getAllSince(): CompleteDataset {
         throw new Error("Method not implemented.");
     }
+
     connect(..._params: any): boolean {
         throw new Error("Method not implemented.");
     }

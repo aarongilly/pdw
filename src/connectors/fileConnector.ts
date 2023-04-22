@@ -60,11 +60,21 @@ export class ExcelTabularImportExport {
             XLSX.utils.book_append_sheet(wb, pointDefSht, ExcelTabularImportExport.pointDefShtName);
         }
 
-        let entryBaseSht = XLSX.utils.aoa_to_sheet([tabularHeaders.entry]);
-        XLSX.utils.book_append_sheet(wb, entryBaseSht, ExcelTabularImportExport.entryShtName);
+        if (data.entries !== undefined){
+            let entryArr = data.entries.map(entry => ExcelTabularImportExport.makeExcelEntryRow(entry));
+            entryArr.unshift(tabularHeaders.entry);
 
-        let entryPointSht = XLSX.utils.aoa_to_sheet([tabularHeaders.entryPoint]);
-        XLSX.utils.book_append_sheet(wb, entryPointSht, ExcelTabularImportExport.entryPointShtName);
+            let entryBaseSht = XLSX.utils.aoa_to_sheet(entryArr);
+            XLSX.utils.book_append_sheet(wb, entryBaseSht, ExcelTabularImportExport.entryShtName);
+        }
+
+        if(data.entryPoints !== undefined){
+            let entryPointArr = data.entryPoints.map(entryPoint => ExcelTabularImportExport.makeExcelEntryPointRow(entryPoint));
+            entryPointArr.unshift(tabularHeaders.entryPoint);
+            
+            let entryPointSht = XLSX.utils.aoa_to_sheet(entryPointArr);
+            XLSX.utils.book_append_sheet(wb, entryPointSht, ExcelTabularImportExport.entryPointShtName);
+        }
 
         let tagDefSht = XLSX.utils.aoa_to_sheet([tabularHeaders.tagDef]);
         XLSX.utils.book_append_sheet(wb, tagDefSht, ExcelTabularImportExport.tagDefShtName);
@@ -151,10 +161,9 @@ export class ExcelTabularImportExport {
      * {@link tabularPointDefHeaders} positioning
      */
     static makeExcelPointDefRow(pointDef: pdw.PointDefLike) {
-
         return [
             pointDef._uid,
-            pointDef._created.toString(),
+            pointDef._created,
             pointDef._updated,
             pointDef._deleted,
             pointDef._did,
@@ -165,6 +174,33 @@ export class ExcelTabularImportExport {
             pointDef._type,
             pointDef._rollup,
             pointDef._format
+        ]
+    }
+
+
+    static makeExcelEntryRow(entryData: pdw.EntryLike){
+        return [
+            entryData._uid,
+            entryData._created,
+            entryData._updated,
+            entryData._deleted,
+            entryData._did,
+            entryData._eid,
+            entryData._period,
+            entryData._note
+        ]
+    }
+
+    static makeExcelEntryPointRow(entryPointData: pdw.EntryPointLike){
+        return [
+            entryPointData._uid,
+            entryPointData._created,
+            entryPointData._updated,
+            entryPointData._deleted,
+            entryPointData._did,
+            entryPointData._pid,
+            entryPointData._eid,
+            entryPointData._val.toString() //I think I want this
         ]
     }
 

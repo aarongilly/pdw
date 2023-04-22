@@ -4,7 +4,7 @@ export const samplePointDefs = [
     {
         _did: 'doae',
         _uid: 'lep65ghw.rghw',
-        _created: undefined, //Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
+        _created: undefined,
         _updated:  'lep62vrw',
         _deleted: false,
         _pid: 'apox',
@@ -18,7 +18,7 @@ export const samplePointDefs = [
     {
         _did: 'seae',
         _uid: 'lep65gcy.rghw',
-        _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
+        _created: '2023-03-12T22:10:00Z',
         _updated: 'lep62vrw',
         _deleted: false,
         _pid: 'oese',
@@ -32,7 +32,7 @@ export const samplePointDefs = [
     {
         _did: 'seae',
         _uid: 'lep65g3sq.fipe',
-        _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
+        _created: '2023-03-12T22:10:00Z',
         _updated: 'lep62vrw',
         _deleted: false,
         _pid: 'momm',
@@ -49,7 +49,7 @@ export const samplePointDefs = [
 export const sampleDefinitions = [
     {
         _uid: 'lep62vrw.hfvm',
-        _created: Temporal.PlainDateTime.from('2023-02-28T22:10:00'),
+        _created: '2023-02-28T22:10:00Z',
         _updated: 'lep62vrw',
         _deleted: false,
         _desc: 'A test definition, for plain events',
@@ -60,7 +60,7 @@ export const sampleDefinitions = [
     },
     {
         _uid: 'lep62vpsx.doqd',
-        _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
+        _created: '2023-03-12T22:10:00Z',
         _updated: 'lep62vrw',
         _deleted: false,
         _desc: 'A 2nd definition, with two points',
@@ -74,7 +74,7 @@ export const sampleDefinitions = [
 export const sampleTags = [
     {
         _uid: 'lep6353w.hnkp',
-        _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
+        _created: '2023-03-12T22:10:00Z',
         _updated: 'lep62vrw',
         _deleted: false,
         _lbl: 'Media',
@@ -84,20 +84,20 @@ export const sampleTags = [
 
 export const sampleEntries = [
     {
-        _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
+        _created: '2023-03-12T22:10:00Z',
         _updated: 'lep62vrw',
         _deleted: false,
         _uid: 'lep65g89q.awea',
         _eid: 'lep65g89q.awea',
         _did: 'seae',
         _note: 'A test note on a sample entry',
-        _period: '2023-03-12T22:10:00'
+        _period: '2023-03-12T22:10:00Z'
     }
 ]
 
 export const sampleEntryPoints = [
     {
-        _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
+        _created: '2023-03-12T22:10:00Z',
         _updated: 'lep62vrw',
         _deleted: false,
         _uid: 'lep65g89q.apis',
@@ -106,7 +106,7 @@ export const sampleEntryPoints = [
         _val: 'Inception'
     },
     {
-        _created: Temporal.PlainDateTime.from('2023-03-12T22:10:00'),
+        _created: '2023-03-12T22:10:00Z',
         _updated: 'lep62vrw',
         _deleted: false,
         _uid: 'lep65g89q.wewq',
