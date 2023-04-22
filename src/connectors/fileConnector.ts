@@ -173,7 +173,7 @@ export class ExcelTabularImportExport {
             pointDef._desc,
             pointDef._type,
             pointDef._rollup,
-            pointDef._format
+            // pointDef._format
         ]
     }
 
@@ -256,7 +256,7 @@ export class JsonImportExport {
 //#region ### SHARED  ###
 export const tabularHeaders = {
     def: ['_uid', '_created', '_updated', '_deleted', '_did', '_lbl', '_emoji', '_desc', '_scope'],
-    pointDef: ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_lbl', '_emoji', '_desc', '_type', '_rollup', '_format'],
+    pointDef: ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_lbl', '_emoji', '_desc', '_type', '_rollup'],
     entry: ['_uid', '_created', '_updated', '_deleted', '_did', '_eid', '_period', '_note'],
     entryPoint: ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_eid', '_val'],
     tagDef: ['_uid', '_created', '_updated', '_deleted', '_tid', '_lbl', '_emoji', '_desc'],

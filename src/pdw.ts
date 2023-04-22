@@ -82,20 +82,20 @@ export enum Rollup {
     AVERAGEABOUT4AM = 'AVERAGEABOUT4AM' //for type =  TYPE.TIME
 }
 
-export enum Format {
-    TEXT = 'TEXT',
-    MARKDOWN = 'MARKDOWN',
-    NUMWHOLE = 'NUMWHOLE',
-    NUMDECIMAL = 'NUMDECIMAL',
-    COMMASEPARATED = 'COMMASEPARATED',
-    YESNO = 'YESNO',
-    TRUEFALSE = 'TRUEFALSE',
-    MONEY = 'MONEY',
-    AMPM = 'AMPM',
-    MILITARYTIME = 'MILITARYTIME',
-    HOURSMINSSECS = 'HOURSMINSSECS',
-    SECSTOTAL = 'SECSTOTAL'
-}
+// export enum Format {
+//     TEXT = 'TEXT',
+//     MARKDOWN = 'MARKDOWN',
+//     NUMWHOLE = 'NUMWHOLE',
+//     NUMDECIMAL = 'NUMDECIMAL',
+//     COMMASEPARATED = 'COMMASEPARATED',
+//     YESNO = 'YESNO',
+//     TRUEFALSE = 'TRUEFALSE',
+//     MONEY = 'MONEY',
+//     AMPM = 'AMPM',
+//     MILITARYTIME = 'MILITARYTIME',
+//     HOURSMINSSECS = 'HOURSMINSSECS',
+//     SECSTOTAL = 'SECSTOTAL'
+// }
 
 //#endregion
 
@@ -143,15 +143,16 @@ export interface DataStore {
 
     setEntries(entries: Entry[]): Entry[];
 
-    getEntryPoints(xid?: string[], includeDeleted?: boolean): EntryPointLike[];
+    getEntryPoints(eids?: UID[], pids?: SmallID[], includeDeleted?: boolean): EntryPointLike[];
 
     setEntryPoints(entryPointData: MinimumEntryPoint[]): EntryPointLike[];
 
-    getTags(tidAndOrLbls?: string[]): TagLike[];
+    //#THINK - this probably could allow accidental mixes & matches
+    getTags(tids?: string[], dids?: SmallID[], pids?: SmallID[], includeDeleted?: boolean): TagLike[];
 
     setTags(tagData: Tag[]): TagLike[];
 
-    getTagDefs(pidAndOrDidAndOrLbls?: string[]): TagDefLike[];
+    getTagDefs(pidAndOrDidAndOrLbls?: string[], includeDeleted?: boolean): TagDefLike[];
 
     setTagDefs(tagData: TagDef[]): TagDefLike[];
 
@@ -282,7 +283,7 @@ export interface PointDefLike extends ElementLike {
     /**
      * Default display format
      */
-    _format: Format
+    // _format: Format
 }
 
 export interface EntryLike extends ElementLike {
@@ -426,7 +427,7 @@ export interface MinimumPointDef extends MinimumElement {
     /**
      * To create a brand new PointDef, you must provide a label, did, & type
      */
-    _lbl: string;
+    _lbl?: string;
     /**
      * To create a brand new PointDef, you must provide a label, did, & type
      */
@@ -434,7 +435,7 @@ export interface MinimumPointDef extends MinimumElement {
     /**
      * To create a brand new PointDef, you must provide a label, did & type
      */
-    _type: PointType;
+    _type?: PointType;
     /**
      * Point ID
      * Defaults to a new smallID
@@ -459,12 +460,12 @@ export interface MinimumPointDef extends MinimumElement {
      * Rollup Type
      * Defaults to {@link Format.TEXT}
      */
-    _format?: Format;
+    // _format?: Format;
 }
 
 /**
- * required: _period, _did
- * optioonal: all others
+ * required: _did OR/AND _eid
+ * optional: all others
  */
 export interface MinimumEntry extends MinimumElement {
     /**
@@ -476,7 +477,7 @@ export interface MinimumEntry extends MinimumElement {
     /**
      * What kind of entry it is
      */
-    _did: SmallID;
+    _did?: SmallID;
     /**
      * Entry ID
      */
@@ -495,12 +496,12 @@ export interface MinimumEntry extends MinimumElement {
 }
 
 /**
- * required: _did, _pid, _eid, _val
+ * required: _pid, _val, and _eid
  */
 export interface MinimumEntryPoint extends MinimumElement {
     /**
      * What kind of entry it is
-     * Can be inferred from 
+     * Can be inferred
      */
     _did?: SmallID;
     /**
@@ -515,9 +516,6 @@ export interface MinimumEntryPoint extends MinimumElement {
      * What is the entry value?
      */
     _val: string | number | boolean | object;
-    /**
-     * #TODO - finish this when building out the EntryPoint Class
-     */
 }
 
 /**
@@ -628,7 +626,7 @@ export class PDW {
             defs: this.dataStores[0].getDefs(undefined, true),
             pointDefs: this.dataStores[0].getPointDefs(undefined, true),
             entries: this.dataStores[0].getEntries(undefined, true),
-            entryPoints: this.dataStores[0].getEntryPoints(undefined, true)
+            entryPoints: this.dataStores[0].getEntryPoints(undefined, undefined, true)
         }
     }
 
@@ -658,7 +656,6 @@ export class PDW {
     }
 
     setEntryPoints(entryPointData: MinimumEntryPoint[]): EntryPoint[] {
-        //#TODO - overwrite with needs to be considdered and used in all 4 of these set___ funcs
         let entryPoints: EntryPoint[] = entryPointData.map(minimumEntryPoint => new EntryPoint(minimumEntryPoint));
         this.dataStores.forEach(connection => {
             connection.setEntryPoints(entryPoints)
@@ -905,7 +902,7 @@ export abstract class Element implements ElementLike {
         //@ts-expect-error
         if (type === 'EntryLike') return this._eid === comparison._eid;
         //@ts-expect-error
-        if (type === 'EntryPointLike') return this._eid === comparison._eid && this_pid === comparison._pid;
+        if (type === 'EntryPointLike') return this._eid === comparison._eid && this._pid === comparison._pid;
         //@ts-expect-error
         if (type === 'TagDefLike') return this._tid === comparison._tid;
         //@ts-expect-error
@@ -934,28 +931,46 @@ export abstract class Element implements ElementLike {
      * @param dataIn an object that may be part of an existing Element
      * @returns the raw DefLike, PointDefLike, EntryLike, EntryPointLike, TagLike, or TagDefLike - or undefined if none found
      */
-    public static findExistingData(dataIn: any): any{
+    public static findExistingData(dataIn: any): any {
         const type = Element.getTypeOfElementLike(dataIn);
-        if(type===null) return undefined;
+        if (type === null) return undefined;
 
         let pdwRef = PDW.getInstance();
         let existing: any;
-        if(type==='DefLike'){
-            pdwRef.dataStores.forEach(store=>{
+        if (type === 'DefLike') {
+            pdwRef.dataStores.forEach(store => {
                 let storeResult = maybeGetOnlyResult(store.getDefs([dataIn._did], false));
-                if(storeResult !== undefined && existing === undefined) existing = storeResult as DefLike
+                if (storeResult !== undefined && existing === undefined) existing = storeResult as DefLike
             })
         }
-        if(type==='PointDefLike'){
-            pdwRef.dataStores.forEach(store=>{
+        if (type === 'PointDefLike') {
+            pdwRef.dataStores.forEach(store => {
                 let storeResult = maybeGetOnlyResult(store.getPointDefs([dataIn._pid], false));
-                if(storeResult !== undefined && existing === undefined) existing = storeResult as PointDefLike
+                if (storeResult !== undefined && existing === undefined) existing = storeResult as PointDefLike
             })
         }
-        if(type==='EntryLike'){
-            pdwRef.dataStores.forEach(store=>{
+        if (type === 'EntryLike') {
+            pdwRef.dataStores.forEach(store => {
                 let storeResult = maybeGetOnlyResult(store.getEntries([dataIn._eid], false));
-                if(storeResult !== undefined && existing === undefined) existing = storeResult as PointDefLike
+                if (storeResult !== undefined && existing === undefined) existing = storeResult as EntryLike
+            })
+        }
+        if (type === 'EntryPointLike') {
+            pdwRef.dataStores.forEach(store => {
+                let storeResult = maybeGetOnlyResult(store.getEntryPoints([dataIn._eid], [dataIn._pid], false));
+                if (storeResult !== undefined && existing === undefined) existing = storeResult as EntryPointLike
+            })
+        }
+        if (type === 'TagDefLike') {
+            pdwRef.dataStores.forEach(store => {
+                let storeResult = maybeGetOnlyResult(store.getTagDefs([dataIn._tid], false));
+                if (storeResult !== undefined && existing === undefined) existing = storeResult as TagDefLike
+            })
+        }
+        if (type === 'TagLike') {
+            pdwRef.dataStores.forEach(store => {
+                let storeResult = maybeGetOnlyResult(store.getTags([dataIn._tid], [dataIn._did], undefined, false));
+                if (storeResult !== undefined && existing === undefined) existing = storeResult as TagDefLike
             })
         }
         return existing;
@@ -973,13 +988,13 @@ export class Def extends Element implements DefLike {
     constructor(newDefData: MinimumDef) {
         if (newDefData._did !== undefined) {
             let existing = Element.findExistingData(newDefData);
-            if (existing !== undefined){
-                if(newDefData._created === undefined) newDefData._created = existing._created;
-                if(newDefData._desc === undefined) newDefData._desc = existing._desc;
-                if(newDefData._emoji === undefined) newDefData._emoji = existing._emoji;
-                if(newDefData._did === undefined) newDefData._did = existing._did;
-                if(newDefData._lbl === undefined) newDefData._lbl = existing._lbl;
-                if(newDefData._scope === undefined) newDefData._scope = existing._scope;
+            if (existing !== undefined) {
+                if (newDefData._created === undefined) newDefData._created = existing._created;
+                if (newDefData._desc === undefined) newDefData._desc = existing._desc;
+                if (newDefData._emoji === undefined) newDefData._emoji = existing._emoji;
+                if (newDefData._did === undefined) newDefData._did = existing._did;
+                if (newDefData._lbl === undefined) newDefData._lbl = existing._lbl;
+                if (newDefData._scope === undefined) newDefData._scope = existing._scope;
             }
         }
         super(newDefData)
@@ -1072,18 +1087,31 @@ export class PointDef extends Element implements PointDefLike {
     _emoji: string;
     _type: PointType;
     _rollup: Rollup;
-    _format: Format;
+    // _format: Format;
     _def?: Def;
-    constructor(pd: MinimumPointDef, def?: Def) {
-        super(pd)
-        this._did = pd._did;
-        this._lbl = pd._lbl;
-        this._type = pd._type;
-        this._pid = pd._pid ?? makeSmallID();
-        this._desc = pd._desc ?? 'Set a description';
-        this._emoji = pd._emoji ?? '🆕';
-        this._rollup = pd._rollup ?? Rollup.COUNT;
-        this._format = pd._format ?? Format.TEXT;
+    constructor(newPointDefData: MinimumPointDef, def?: Def) {
+        if (newPointDefData._did !== undefined && newPointDefData._pid !== undefined) {
+            let existing = Element.findExistingData(newPointDefData);
+            if (existing !== undefined) {
+                if (newPointDefData._created === undefined) newPointDefData._created = existing._created;
+                if (newPointDefData._desc === undefined) newPointDefData._desc = existing._desc;
+                if (newPointDefData._emoji === undefined) newPointDefData._emoji = existing._emoji;
+                if (newPointDefData._did === undefined) newPointDefData._did = existing._did;
+                if (newPointDefData._lbl === undefined) newPointDefData._lbl = existing._lbl;
+                if (newPointDefData._type === undefined) newPointDefData._type = existing._type;
+                if (newPointDefData._rollup === undefined) newPointDefData._rollup = existing._rollup;
+                // if(newPointDefData._format === undefined) newPointDefData._format = existing._format;
+            }
+        }
+        super(newPointDefData)
+        this._did = newPointDefData._did;
+        this._lbl = newPointDefData._lbl ?? 'Label unset';
+        this._type = newPointDefData._type ?? PointType.TEXT;
+        this._pid = newPointDefData._pid ?? makeSmallID();
+        this._desc = newPointDefData._desc ?? 'Set a description';
+        this._emoji = newPointDefData._emoji ?? '🆕';
+        this._rollup = newPointDefData._rollup ?? Rollup.COUNT;
+        // this._format = newPointDefData._format ?? Format.TEXT;
         if (def) this._def = def;
     }
 
@@ -1101,7 +1129,7 @@ export class PointDef extends Element implements PointDefLike {
         if (data._emoji == undefined || typeof data._emoji !== 'string') return false
         if (data._type == undefined || !PointDef.isValidType(data._type)) return false
         if (data._rollup == undefined || !PointDef.isValidRollup(data._rollup)) return false
-        if (data._format == undefined || !PointDef.isValidFormat(data._format)) return false
+        // if (data._format == undefined || !PointDef.isValidFormat(data._format)) return false
         if (data._uid == undefined || typeof data._uid !== 'string') return false
         if (data._created == undefined || typeof data._created.getISOFields !== 'function') return false //proxy check
         if (data._deleted == undefined || typeof data._deleted !== 'boolean') return false
@@ -1120,10 +1148,10 @@ export class PointDef extends Element implements PointDefLike {
         return values.includes(typeStr as unknown as Rollup)
     }
 
-    static isValidFormat(typeStr: string): boolean {
-        const values = Object.values(Format);
-        return values.includes(typeStr as unknown as Format)
-    }
+    // static isValidFormat(typeStr: string): boolean {
+    //     const values = Object.values(Format);
+    //     return values.includes(typeStr as unknown as Format)
+    // }
 
 }
 
@@ -1133,10 +1161,21 @@ export class Entry extends Element implements EntryLike {
     _did: string;
     _period: PeriodStr;
     constructor(entryData: MinimumEntry) {
+        if (entryData._eid === undefined && entryData._did === undefined)
+            throw new Error('Not enough info to determine Entry type')
+        if (entryData._eid !== undefined) {
+            let existing = Element.findExistingData(entryData);
+            if (existing !== undefined) {
+                if (entryData._created === undefined) entryData._created = existing._created;
+                if (entryData._did === undefined) entryData._did = existing._did;
+                if (entryData._period === undefined) entryData._period = existing._period;
+                if (entryData._note === undefined) entryData._note = existing._note;
+            }
+        }
         super(entryData);
-        const relatedDef = maybeGetOnlyResult(PDW.getInstance().getDefs([entryData._did]));
-        if(relatedDef === undefined) throw new Error('No def found for ' + entryData._did);
-        this._did = entryData._did;
+        const relatedDef = maybeGetOnlyResult(PDW.getInstance().getDefs([entryData._did!]));
+        if (relatedDef === undefined) throw new Error('No def found for ' + entryData._did);
+        this._did = entryData._did!;
         if (entryData._period !== undefined) {
             this._period = entryData._period;
         } else {
@@ -1145,7 +1184,6 @@ export class Entry extends Element implements EntryLike {
         this._eid = entryData._eid ?? makeUID();
         this._note = entryData._note ?? '';
     }
-
 }
 
 /**
@@ -1159,11 +1197,18 @@ export class EntryPoint extends Element implements EntryPointLike {
     _val: any;
     _did: SmallID
     constructor(entryPointData: MinimumEntryPoint) {
+        if (entryPointData._eid !== undefined) {
+            let existing = Element.findExistingData(entryPointData);
+            if (existing !== undefined) {
+                if (entryPointData._created === undefined) entryPointData._created = existing._created;
+                if (entryPointData._did === undefined) entryPointData._did = existing._did;
+            }
+        }
         super(entryPointData);
         this._eid = entryPointData._eid;
         this._pid = entryPointData._pid;
         this._val = entryPointData._val;
-        this._did = entryPointData._did!;
+        this._did = entryPointData._did!; //I *think* this will always be not undefined
     }
 
 }
@@ -1287,7 +1332,6 @@ export class DefaultDataStore implements DataStore {
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
                 if (existingDef.shouldBeReplacedWith(def)) {
                     existingDef.markDeleted();
-                    // def.copyUnsetPropsFrom(existingDef) //#BUG - damn
                     newDefs.push(def)
                 }
             } else {
@@ -1373,9 +1417,24 @@ export class DefaultDataStore implements DataStore {
         return entries;
     }
 
-    getEntryPoints(xid?: string[], includeDeleted = false): EntryPointLike[] {
-        //#HACK - hardcoded
-        return this.entryPoints
+    getEntryPoints(eids?: UID[], pids?: SmallID[], includeDeleted = false): EntryPointLike[] {
+        if (eids === undefined && pids === undefined) {
+            if (includeDeleted) return this.entryPoints;
+            return this.entryPoints.filter(entryPoint => entryPoint._deleted === false);
+        }
+        const eidMatches = eids === undefined ? [] : this.entryPoints.filter(entry => eids.some(p => p === entry._eid));
+        const pidMatches = pids === undefined ? [] : this.entryPoints.filter(entry => pids.some(p => p === entry._pid));
+        //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
+        let noDupes = Array.from(new Set([...eidMatches, ...pidMatches]));
+        if (eids !== undefined && pids !== undefined) {
+            noDupes = noDupes.filter(entryPoint => {
+                const eidSame = eids.some(p => p === entryPoint._eid);
+                const pidSame = pids.some(p => p === entryPoint._pid)
+                return eidSame && pidSame
+            })
+        }
+        if (includeDeleted) return Array.from(noDupes);
+        return Array.from(noDupes).filter(entry => entry._deleted === false);
     }
 
     setEntryPoints(entryPointData: EntryPoint[]): EntryPoint[] {
@@ -1398,7 +1457,7 @@ export class DefaultDataStore implements DataStore {
     }
 
 
-    getTags(_tidAndOrLbls?: string[] | undefined): TagLike[] {
+    getTags(tids?: UID[], dids?: SmallID[], pids?: SmallID[], includeDeleted = false): TagLike[] {
         throw new Error("Method not implemented.");
     }
 
@@ -1406,8 +1465,16 @@ export class DefaultDataStore implements DataStore {
         throw new Error("Method not implemented.");
     }
 
-    getTagDefs(_pidAndOrDidAndOrLbls?: string[] | undefined): TagDefLike[] {
-        throw new Error("Method not implemented.");
+    getTagDefs(tidAndOrLbls?: string[], includeDeleted = false): TagDefLike[] {
+        if (tidAndOrLbls === undefined) {
+            if (includeDeleted) return this.tagDefs;
+            return this.tagDefs.filter(entry => entry._deleted === false);
+        }
+        const didMatches = this.tagDefs.filter(def => tidAndOrLbls.some(p => p === def._tid));
+        const lblMatches = this.tagDefs.filter(def => tidAndOrLbls.some(p => p === def._lbl));
+        let noDupes = new Set([...lblMatches, ...didMatches]);
+        if (includeDeleted) return Array.from(noDupes);
+        return Array.from(noDupes).filter(entry => entry._deleted === false);
     }
 
     setTagDefs(_tagData: TagDef[]): TagDefLike[] {
@@ -1483,8 +1550,8 @@ export function getElementType(element: ElementLike): 'DefLike' | 'PointDefLike'
 }
 
 function maybeGetOnlyResult(arrayOfOneElement: any[]): undefined | Def | Entry | PointDef | EntryPoint | Tag | TagDef {
-    if(arrayOfOneElement.length === 0) return undefined
-    if(arrayOfOneElement.length > 1) {
+    if (arrayOfOneElement.length === 0) return undefined
+    if (arrayOfOneElement.length > 1) {
         console.error('Found too many errors:', arrayOfOneElement)
         throw new Error('Found too many results')
     }

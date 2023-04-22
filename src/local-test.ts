@@ -10,7 +10,6 @@ const pdw = PDW.getInstance();
 
 createTwoTestFiles();
 
-
 // pdw.setDefs(sampleDefinitions);
 // pdw.setPointDefs(samplePointDefs);
 
@@ -86,11 +85,14 @@ function createTwoTestFiles(){
         _pid: '0tb7',
         _type: PointType.BOOL,
         _lbl: 'Boolean Thing',
-        _emoji: '👍'
+        _emoji: '👍',
+        _desc: 'Orig desc'
     })
     pdw.createNewEntry({
         _eid: 'lgricx7k-08al',
         _did: 'ay7l',
+        _note: 'Orig note',
+        _period: '2023-04-22T06',
         '0tb7': false,
         '0pc6': 5
     })
@@ -104,12 +106,22 @@ function createTwoTestFiles(){
         _did: '0m7w',
         _lbl: 'One Relabeled'
     }]);
+    //update a pointdef
+    pdw.setPointDefs([{
+        _did: 'ay7l',
+        _pid: '0tb7',
+        _lbl: 'Changed Label',
+    }])
+    pdw.setEntries([{
+        _eid: 'lgricx7k-08al',
+        _note: 'Updated noted'
+    }])
     //update an entrypoint
-    // pdw.setEntryPoints([{
-    //     _eid: 'lgricx7k-08al',
-    //     _pid: '0pc6',
-    //     _val: 6
-    // }])
+    pdw.setEntryPoints([{
+        _eid: 'lgricx7k-08al',
+        _pid: '0pc6',
+        _val: 6
+    }])
     let data = pdw.allDataSince();
     let outFileTwoName = 'data-files/OutExcel2.xlsx';
     exportToFile(outFileTwoName, data);
