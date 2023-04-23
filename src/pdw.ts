@@ -33,11 +33,6 @@ export type DurationStr = string;
 export type PeriodStr = string;
 
 /**
- * String representation of a full ISO 8601 timestamp, ending with the 'Z'
- */
-export type UTCTimestamp = string
-
-/**
  * A String that is likely to be markdown-enabled in use
  */
 export type Markdown = string
@@ -254,7 +249,7 @@ export interface ElementLike {
     /**
      * When the element was created
      */
-    _created: UTCTimestamp;
+    _created: EpochStr;
     /**
      * When the element was updated, usually lines up with "_created"
      * unless the instance of the element was created via updating a 
@@ -414,13 +409,13 @@ export interface MinimumElement {
      */
     _deleted?: boolean;
     /**
-     * The human-readable time of creation. Will generate for you.
+     * EpochStr for when this was updated. Will geenrate for you.q  
      */
-    _created?: UTCTimestamp;
+    _created?: EpochStr;
     /**
      * EpochStr for when this was updated. Will geenrate for you.
      */
-    _updated?: UTCTimestamp;
+    _updated?: EpochStr;
 }
 
 /**
@@ -616,16 +611,11 @@ export interface QueryParams {
     tag?: string | string[];
     includeDeleted?: boolean;
     limit?: number;
-    //#TODO - more query params?
-}
+    today?: any;
+    thisWeek: any;
+    thisMonth: any;
 
-export interface ReducedQuery {
-    from: Temporal.PlainDateTime;
-    to: Temporal.PlainDateTime;
-    includeDeleted: boolean;
-    did: string[];
-    eid: string[];
-    pid: string[];
+    //#TODO - more query params?
 }
 
 export interface QueryResponse {
@@ -983,13 +973,13 @@ export class PDW {
 export abstract class Element implements ElementLike {
     _uid: string;
     _deleted: boolean;
-    _created: UTCTimestamp;
-    _updated: UTCTimestamp;
+    _created: EpochStr;
+    _updated: EpochStr;
     constructor(existingData: any) {
         this._uid = existingData._uid ?? makeUID();
         this._deleted = existingData._deleted ?? false;
-        this._created = existingData._created ?? new Date().toISOString();
-        this._updated = existingData._updated ??  makeEpochStr();
+        this._created = existingData._created ?? makeEpochStr();
+        this._updated = existingData._updated ?? makeEpochStr();
     }
 
     markDeleted() {
@@ -1211,24 +1201,6 @@ export class Def extends Element implements DefLike {
 
         throw new Error('Multiple Data Stores are #TODO') //#TODO - for multiple data stores
     }
-
-    // /**
-    //  * When replacing one Def with a new one, you want to pull all the values
-    //  * for any existing properties that are NOT explicityl contained in the new Def
-    //  * @param existingDef 
-    //  */
-    // overwriteWith(newDefData: MinimumDef): Def{
-    //     if(newDefData._created === undefined) newDefData._created = this._created;
-    //     if(newDefData._desc === undefined) newDefData._desc = this._desc;
-    //     if(newDefData._emoji === undefined) newDefData._emoji = this._emoji;
-    //     if(newDefData._did === undefined) newDefData._did = this._did;
-    //     if(newDefData._lbl === undefined) newDefData._lbl = this._lbl;
-    //     if(newDefData._scope === undefined) newDefData._scope = this._scope;
-    //     this._deleted = true;
-    //     //newDefData._uid will be different
-    //     //newDefData._updated will be set anew
-    //     return new Def(newDefData);
-    // }
 
     /**
     * Predicate to check if an object has all {@link DefLike} properties
@@ -1882,16 +1854,6 @@ export function makeUID(): UID {
 
 export function makeEpochStr(): EpochStr {
     return Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString(36)
-}
-
-export function makeUTCTimestamp(): UTCTimestamp {
-    const utcStr = Temporal.Now.instant().toString();
-    console.log(utcStr);
-
-    const zdt = Temporal.Now.zonedDateTimeISO()
-    console.log(zdt.toString());
-
-    return utcStr;
 }
 
 export function makeSmallID(length = 4): SmallID {

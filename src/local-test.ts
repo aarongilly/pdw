@@ -1,5 +1,5 @@
 //// @ts-nocheck
-import {EntryPoint, PDW, Period, PointType, Rollup, makeEpochStr, makeUTCTimestamp, parseTemporalFromEpochStr, parseTemporalFromUid} from './pdw.js'
+import {EntryPoint, PDW, Period, PointType, Rollup, makeEpochStr, parseTemporalFromEpochStr, parseTemporalFromUid} from './pdw.js'
 import {Scope} from './pdw.js'
 import { exportToFile } from './connectors/fileConnector.js';
 import { importFromFile } from './connectors/fileConnector.js';
@@ -26,12 +26,12 @@ const pdw = PDW.getInstance();
 // console.log(myTemp.toLocaleString());
 // console.log(myTemp.toString())
 
-createTwoTestFiles();
+// createTwoTestFiles();
 
 // importFromFile('data-files/OutJSON.json');
 // importFromFile('data-files/OutExcel4.xlsx');
 // importFromFile('data-files/OutYaml.yaml');
-// console.log('hi')
+console.log('hi')
 // console.log(pdw.allDataSince());
 
 function createTwoTestFiles(){
