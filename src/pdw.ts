@@ -48,17 +48,41 @@ export type Markdown = string
 
 export enum PointType {
     /**
-     * number
+     * a number
      */
     NUM = "NUM",
+    /**
+     * A string, assumed to be short-ish
+     */
     TEXT = 'TEXT',
+    /**
+     * A string, assumed to be long-ish, to run through 'marked' if possible
+     */
     MARKDOWN = 'MARKDOWN',
     SELECT = 'SELECT', //_tid
+    /**
+     * true or false
+     */
     BOOL = 'BOOL', //true false
+    /**
+     * A Temporal Duration string
+     */
     DURATION = 'DURATION', //Temporal.duration
+    /**
+     * A Temporal PlainTime string (no timezone)
+     */
     TIME = 'TIME', //Temporal.plainTime
+    /**
+     * An array of _tid
+     */
     MULTISELECT = 'MULTISELECT', //Comma-separated list of _tid 
+    /**
+     * A url to a file?
+     */
     FILE = 'FILE', //url?
+    /**
+     * A url to a photo?
+     */
     PHOTO = 'PHOTO', //url?
 }
 
@@ -144,9 +168,9 @@ export interface DataStore {
 
     query(params: QueryParams): QueryResponse;
 
-    getAllSince(): CompleteDataset;
+    getAll(): CompleteDataset;
 
-    connect(...params: any): boolean;
+    connect?(...params: any): boolean;
 
     /**
      * The name of the connector, essentially. Examples: "Excel", "Firestore"
@@ -158,6 +182,44 @@ export interface DataStore {
      * which the storage connector is connected.
      */
     pdw: PDW;
+}
+
+/**
+ * A static DataStore. Loads content to the DefaultDataStore (arrays in memory)
+ * and doesn't register itself with the PDW. No changes are persisted to the 
+ * place where the data was imported from until it's exported back to that place.
+ */
+export interface AsyncDataStore {
+    importFrom(params: any): CompleteDataset,
+    exportTo(allData: CompleteDataset, params: any): any
+}
+
+export interface Filters {
+    /**
+     * Include things marked as deleted?
+     * no - default
+     * yes - include all
+     * only - only include deleted things
+     */
+    includeDeleted?: 'yes' | 'no' | 'only',
+    /**
+     * For entries and entryPoints only
+     */
+    from?: PeriodStr,
+    to?: PeriodStr,
+    createdFrom?: Temporal.ZonedDateTime,
+    createdTo?: Temporal.ZonedDateTime,
+    updatedFrom?: Temporal.ZonedDateTime,
+    updatedTo?: Temporal.ZonedDateTime,
+    uid?: UID[],
+    did?: SmallID[],
+    pid?: SmallID[],
+    eid?: UID[],
+    tid?: SmallID[],
+    defLbl?: string[],
+    pointLbl?: string[],
+    tagLbl?: string[],
+    limit?: number,
 }
 
 /**
@@ -285,6 +347,10 @@ export interface EntryLike extends ElementLike {
      * Associated definition ID
      */
     _did: SmallID,
+    /**
+     * For tracking where the tracking is coming from
+     */
+    _source: string,
 }
 
 export interface EntryPointLike extends ElementLike {
@@ -354,7 +420,7 @@ export interface MinimumElement {
     /**
      * EpochStr for when this was updated. Will geenrate for you.
      */
-    _updated?: EpochStr;
+    _updated?: UTCTimestamp;
 }
 
 /**
@@ -468,6 +534,10 @@ export interface MinimumEntry extends MinimumElement {
      */
     _note?: Markdown;
     /**
+     * Where did the data come from?
+     */
+    _source?: string;
+    /**
      * other key/value pairs will attempt to find
      * the PointDef who's _pid == the key and spin
      * up a new {@link EntryPoint} who's _val is 
@@ -545,6 +615,7 @@ export interface QueryParams {
     pid?: string | string[];
     tag?: string | string[];
     includeDeleted?: boolean;
+    limit?: number;
     //#TODO - more query params?
 }
 
@@ -566,19 +637,25 @@ export interface QueryResponse {
 }
 
 interface CurrentAndDeletedCounts {
-    current: number,
-    deleted: number
+    /**
+     * undefined means zero
+     */
+    current: number | undefined,
+    /**
+     * undefined means zero
+     */
+    deleted: number | undefined
 }
 
 export interface DataStoreOverview {
-    storeName: string;
+    storeName?: string;
     defs: CurrentAndDeletedCounts;
     pointDefs: CurrentAndDeletedCounts;
     entries: CurrentAndDeletedCounts;
     entryPoints: CurrentAndDeletedCounts
     tagDefs: CurrentAndDeletedCounts;
     tags: CurrentAndDeletedCounts;
-    lastUpdated: EpochStr; //?? probably better to be human-readable?
+    lastUpdated: EpochStr;
 }
 //#endregion
 
@@ -602,8 +679,8 @@ export class PDW {
     }
 
     //#HACK - allDataSince hardcoded
-    allDataSince(): CompleteDataset {
-        return {
+    getAll(): CompleteDataset {
+        let data = {
             defs: this.dataStores[0].getDefs(undefined, true),
             pointDefs: this.dataStores[0].getPointDefs(undefined, true),
             entries: this.dataStores[0].getEntries(undefined, true),
@@ -611,6 +688,7 @@ export class PDW {
             tagDefs: this.dataStores[0].getTagDefs(undefined, true),
             tags: this.dataStores[0].getTags(undefined, undefined, undefined, true),
         }
+        return PDW.addOverviewToCompleteDataset(data);
     }
 
     setDefs(defsIn: MinimumDef[]): Def[] {
@@ -746,7 +824,7 @@ export class PDW {
         throw new Error('Multiple datastores not yet implemented');
     }
 
-    getEntryPoints(){
+    getEntryPoints() {
         throw new Error('You did not build this, do you need it?')
     }
 
@@ -850,6 +928,53 @@ export class PDW {
         }
         return PDW.instance;
     }
+
+    static getDatasetLastUpdate(dataset: CompleteDataset): string {
+        let recents: ElementLike[] = [];
+        if(dataset.defs !== undefined && dataset.defs.length > 0) recents.push(Element.getMostRecent(dataset.defs)!) 
+        if(dataset.pointDefs !== undefined && dataset.pointDefs.length > 0) recents.push(Element.getMostRecent(dataset.pointDefs)!) 
+        if(dataset.entries !== undefined && dataset.entries.length > 0) recents.push(Element.getMostRecent(dataset.entries)!) 
+        if(dataset.entryPoints !== undefined && dataset.entryPoints.length > 0) recents.push(Element.getMostRecent(dataset.entryPoints)!) 
+        if(dataset.tagDefs !== undefined && dataset.tagDefs.length > 0) recents.push(Element.getMostRecent(dataset.tagDefs)!) 
+        if(dataset.tags !== undefined && dataset.tags.length > 0) recents.push(Element.getMostRecent(dataset.tags)!) 
+        return Element.getMostRecent(recents)!._updated
+    }
+
+    static addOverviewToCompleteDataset(data: CompleteDataset, storeName?: string): CompleteDataset{
+        if(data.overview !== undefined){
+            console.warn('Tried to add an overview to a dataset that already had one:', data);
+            return data
+        }
+        data.overview = {
+            defs: {
+                current: data.defs?.filter(element=>element._deleted===false).length,
+                deleted: data.defs?.filter(element=>element._deleted).length
+            },
+            pointDefs: {
+                current: data.pointDefs?.filter(element=>element._deleted===false).length,
+                deleted: data.pointDefs?.filter(element=>element._deleted).length
+            },
+            entries: {
+                current: data.entries?.filter(element=>element._deleted===false).length,
+                deleted: data.entries?.filter(element=>element._deleted).length
+            },
+            entryPoints: {
+                current: data.entryPoints?.filter(element=>element._deleted===false).length,
+                deleted: data.entryPoints?.filter(element=>element._deleted).length
+            },
+            tagDefs: {
+                current: data.tagDefs?.filter(element=>element._deleted===false).length,
+                deleted: data.tagDefs?.filter(element=>element._deleted).length
+            },
+            tags: {
+                current: data.tags?.filter(element=>element._deleted===false).length,
+                deleted: data.tags?.filter(element=>element._deleted).length
+            },
+            lastUpdated: PDW.getDatasetLastUpdate(data)
+        }
+        if(storeName) data.overview!.storeName = storeName
+        return data
+    }
 }
 
 /**
@@ -859,17 +984,17 @@ export abstract class Element implements ElementLike {
     _uid: string;
     _deleted: boolean;
     _created: UTCTimestamp;
-    _updated: EpochStr;
+    _updated: UTCTimestamp;
     constructor(existingData: any) {
         this._uid = existingData._uid ?? makeUID();
         this._deleted = existingData._deleted ?? false;
         this._created = existingData._created ?? new Date().toISOString();
-        this._updated = existingData._updated ?? makeEpochStr();
+        this._updated = existingData._updated ??  makeEpochStr();
     }
 
     markDeleted() {
         this._deleted = true;
-        this._updated = makeEpochStr();
+        this._updated =  makeEpochStr();
     }
 
     markUndeleted() {
@@ -949,10 +1074,11 @@ export abstract class Element implements ElementLike {
      * Analyzes an object and tries to find one UNDELETED Element that
      * has the same Xid(s). 
      * @param dataIn an object that may be part of an existing Element
+     * @param ofType optional, allows you to override what the dataIn would suggest it should be
      * @returns the raw DefLike, PointDefLike, EntryLike, EntryPointLike, TagLike, or TagDefLike - or undefined if none found
      */
-    public static findExistingData(dataIn: any): any {
-        const type = Element.getTypeOfElementLike(dataIn);
+    static findExistingData(dataIn: any, ofType?: 'Def' | 'PointDef' | 'Entry' | 'EntryPoint' | 'TagDef' | 'Tag'): any {
+        const type = ofType === undefined ? Element.getTypeOfElementLike(dataIn) : ofType + 'Like';
         if (type === null) return undefined;
 
         let pdwRef = PDW.getInstance();
@@ -965,7 +1091,8 @@ export abstract class Element implements ElementLike {
         }
         if (type === 'PointDefLike') {
             pdwRef.dataStores.forEach(store => {
-                let storeResult = maybeGetOnlyResult(store.getPointDefs([dataIn._pid], false));
+                const pidOrLbl = dataIn._pid ?? dataIn._lbl
+                let storeResult = maybeGetOnlyResult(store.getPointDefs([pidOrLbl], false));
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as PointDefLike
             })
         }
@@ -977,7 +1104,8 @@ export abstract class Element implements ElementLike {
         }
         if (type === 'EntryPointLike') {
             pdwRef.dataStores.forEach(store => {
-                let storeResult = maybeGetOnlyResult(store.getEntryPoints([dataIn._eid], [dataIn._pid], false));
+                const pidOrLbl = dataIn._pid ?? dataIn._lbl
+                let storeResult = maybeGetOnlyResult(store.getEntryPoints([dataIn._eid], [pidOrLbl], false));
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as EntryPointLike
             })
         }
@@ -994,6 +1122,23 @@ export abstract class Element implements ElementLike {
             })
         }
         return existing;
+    }
+
+    public static getMostRecent(elementArr: ElementLike[]): ElementLike | undefined{
+        if(elementArr.length == 0){
+            console.warn('You tried to get the most recent of a list of zero elements');
+            return undefined
+        }
+        let mostRecent: ElementLike = {
+            _uid: '',
+            _deleted: true,
+            _created: '',
+            _updated: '0' // earlier than anything before 12/31/1969, 6:00:00 PM CST
+        }
+        elementArr.forEach(element=>{
+            if(element._updated > mostRecent._updated) mostRecent = element
+        })
+        return mostRecent
     }
 }
 
@@ -1182,6 +1327,7 @@ export class Entry extends Element implements EntryLike {
     _note: Markdown;
     _did: string;
     _period: PeriodStr;
+    _source: string;
     constructor(entryData: MinimumEntry) {
         if (entryData._eid === undefined && entryData._did === undefined)
             throw new Error('Not enough info to determine Entry type')
@@ -1192,6 +1338,7 @@ export class Entry extends Element implements EntryLike {
                 if (entryData._did === undefined) entryData._did = existing._did;
                 if (entryData._period === undefined) entryData._period = existing._period;
                 if (entryData._note === undefined) entryData._note = existing._note;
+                if (entryData._source === undefined) entryData._source = existing._source;
             }
         }
         super(entryData);
@@ -1205,12 +1352,16 @@ export class Entry extends Element implements EntryLike {
         }
         this._eid = entryData._eid ?? makeUID();
         this._note = entryData._note ?? '';
+        this._source = entryData._source ?? '';
         //spawn new EntryPoints for any non-underscore-prefixed keys
+        //#TODO - support values by _lbl in addition to current (vals by _pid) 
         let pids = Object.keys(entryData).filter(key => key.substring(0, 1) !== '_');
         if (pids.length > 0) {
             let entryPoints: MinimumEntryPoint[] = pids.map(pid => {
+                //needing to find associated PointDef to support using the _lbl as the key
+                let assPointDef = EntryPoint.findExistingData({ _lbl: pid, _pid: pid })
                 return {
-                    _pid: pid,
+                    _pid: assPointDef._pid,
                     _val: entryData[pid],
                     _eid: this._eid,
                     _did: this._did
@@ -1239,6 +1390,7 @@ export class Entry extends Element implements EntryLike {
         if (typeof data._created !== 'string') return false
         if (typeof data._deleted !== 'boolean') return false
         if (typeof data._updated !== 'string') return false
+        if (typeof data._source !== 'string') return false
         return true;
     }
 }
@@ -1253,7 +1405,7 @@ export class EntryPoint extends Element implements EntryPointLike {
     _pid: SmallID;
     _val: any;
     _did: SmallID
-    constructor(entryPointData: MinimumEntryPoint) {
+    constructor(entryPointData: MinimumEntryPoint) { //#TODO - support supplying assPointDef as argument for speed
         if (entryPointData._eid !== undefined) {
             let existing = Element.findExistingData(entryPointData);
             if (existing !== undefined) {
@@ -1261,13 +1413,94 @@ export class EntryPoint extends Element implements EntryPointLike {
                 if (entryPointData._did === undefined) entryPointData._did = existing._did;
             }
         }
+        const associatedDef = PointDef.findExistingData(entryPointData, 'PointDef');
+        if (associatedDef === undefined) throw new Error('No definition associated with supplied EntryPoint data')
+
+        //for now, just letting that function throw warnings to the console
+        let correctType: any = EntryPoint.ensureValType(entryPointData._val, associatedDef._type);
+        if (correctType === undefined) correctType = entryPointData._val; //for now passing thru bad data
+
         super(entryPointData);
         this._eid = entryPointData._eid;
         this._pid = entryPointData._pid;
-        this._val = entryPointData._val;
-        this._did = entryPointData._did!; //I *think* this will always be not undefined
+        this._val = correctType;
+        this._did = associatedDef._did!; //I *think* this will always be not undefined
     }
-    
+
+    /**
+     * Attempts to intercept poorly-typed values and convert them if possible.
+     * If conversion isn't possible, returns undefined and logs to console.warn
+     * @param _val value to check
+     * @param _type type to attempt to convert to
+     * @returns correctly-typed _val, or undefined if _val cannot be converted
+     */
+    static ensureValType(_val: string | number | boolean | object, _type: PointType) {
+        if (_type === PointType.BOOL) {
+            if (typeof _val === 'boolean') return _val;
+            if (typeof _val === 'string') return _val.toUpperCase() === 'TRUE';
+            if (typeof _val === "number") return _val !== 0;
+            console.warn(`Cannot convert this to boolean:`, _val)
+            return undefined;
+        }
+        if (_type === PointType.DURATION) {
+            if (typeof _val === 'string') return _val;
+            //if (typeof _val === "number") return _val !== 0; //number of seconds? millseconds?
+            console.warn(`Cannot convert this to duration:`, _val)
+            return undefined;
+        }
+        if (_type === PointType.FILE) {
+            if (typeof _val === 'string') return _val;
+            console.warn(`Cannot convert this to file:`, _val)
+            return undefined;
+        }
+        if (_type === PointType.MARKDOWN) {
+            if (typeof _val === 'boolean') return _val.toString();
+            if (typeof _val === 'string') return _val;
+            if (typeof _val === "number") return _val.toString();
+            console.warn(`Cannot convert this to markdown:`, _val)
+            return undefined;
+        }
+        if (_type === PointType.MULTISELECT) {
+            if(Array.isArray(_val)) return _val.join(', ');
+            if(typeof _val === 'string') return _val;
+            console.warn(`Cannot convert this to multiselect:`, _val)
+            return undefined;
+        }
+        if (_type === PointType.NUM) {
+            if (typeof _val === 'boolean') return _val ? 1 : 0;
+            if (typeof _val === 'string') return Number.parseInt(_val);
+            if (typeof _val === "number") return _val;
+            console.warn(`Cannot convert this to number:`, _val)
+            return undefined;
+        }
+        if (_type === PointType.PHOTO) {
+            if (typeof _val === 'string') return _val;
+            console.warn(`Cannot convert this to PHOTO:`, _val)
+            return undefined;
+        }
+        if (_type === PointType.SELECT) {
+            if(typeof _val === 'string') return _val;
+            console.warn(`Cannot convert this to select:`, _val)
+            return undefined;
+        }
+        if (_type === PointType.TEXT) {
+            if (typeof _val === 'boolean') return _val.toString();
+            if (typeof _val === 'string') return _val.trim();
+            if (typeof _val === "number") return _val.toString();
+            return _val.toString();
+        }
+        if (_type === PointType.TIME) {
+            if (typeof _val === 'string') return _val.trim();
+            if (typeof _val === "number" && _val >= 0 && _val <= 1) {
+                //attempt to support "proportion of day to time" like Excel would
+                return new Temporal.PlainTime(0,0).add({seconds: 86400 * _val}).toString();
+            }
+            console.warn(`Cannot convert this to time:`, _val)
+            return undefined;
+        }
+        throw new Error("Method not implemented.");
+    }
+
     static isEntryPointLike(data: any): boolean {
         if (typeof data._uid !== 'string') return false
         if (typeof data._created !== 'string') return false
@@ -1295,7 +1528,7 @@ export class TagDef extends Element implements TagDefLike {
         this._tid = tagDefData._tid ?? makeSmallID();
         this._lbl = tagDefData._lbl;
     }
-    
+
     static isTagDefLike(data: any): boolean {
         if (typeof data._uid !== 'string') return false
         if (typeof data._created !== 'string') return false
@@ -1432,7 +1665,7 @@ export class DefaultDataStore implements DataStore {
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
                 if (existingDef.shouldBeReplacedWith(def)) {
                     existingDef.markDeleted();
-                    if(!def._deleted) newDefs.push(def) //don't duplicate in case of calling setDefs purely to delete
+                    if (!def._deleted) newDefs.push(def) //don't duplicate in case of calling setDefs purely to delete
                 }
             } else {
                 newDefs.push(def);
@@ -1466,7 +1699,7 @@ export class DefaultDataStore implements DataStore {
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
                 if (existingDef.shouldBeReplacedWith(pd)) {
                     existingDef.markDeleted();
-                    if(!pd._deleted) newDefs.push(pd)
+                    if (!pd._deleted) newDefs.push(pd)
                 }
             } else {
                 newDefs.push(pd);
@@ -1505,7 +1738,7 @@ export class DefaultDataStore implements DataStore {
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
                 if (existingEntry.shouldBeReplacedWith(entry)) {
                     existingEntry.markDeleted();
-                    if(!entry._deleted) entries.push(entry)
+                    if (!entry._deleted) entries.push(entry)
                 }
             } else {
                 entries.push(entry);
@@ -1545,7 +1778,7 @@ export class DefaultDataStore implements DataStore {
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
                 if (existingEntry.shouldBeReplacedWith(entryPoint)) {
                     existingEntry.markDeleted();
-                    if(!entryPoint._deleted) entryPoints.push(entryPoint)
+                    if (!entryPoint._deleted) entryPoints.push(entryPoint)
                 }
             } else {
                 entryPoints.push(entryPoint);
@@ -1578,7 +1811,7 @@ export class DefaultDataStore implements DataStore {
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
                 if (existingTag.shouldBeReplacedWith(tag)) {
                     existingTag.markDeleted();
-                    if(!tag._deleted) tags.push(tag)
+                    if (!tag._deleted) tags.push(tag)
                 }
             } else {
                 tags.push(tag);
@@ -1609,7 +1842,7 @@ export class DefaultDataStore implements DataStore {
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
                 if (existingTagDef.shouldBeReplacedWith(tagDef)) {
                     existingTagDef.markDeleted();
-                    if(!tagDef._deleted) tagDefs.push(tagDef) //don't duplicate if you're just deleting
+                    if (!tagDef._deleted) tagDefs.push(tagDef) //don't duplicate if you're just deleting
                 }
             } else {
                 tagDefs.push(tagDef);
@@ -1624,7 +1857,7 @@ export class DefaultDataStore implements DataStore {
         throw new Error("Method not implemented.");
     }
 
-    getAllSince(): CompleteDataset {
+    getAll(): CompleteDataset {
         throw new Error("Method not implemented.");
     }
 
@@ -1648,30 +1881,30 @@ export function makeUID(): UID {
 }
 
 export function makeEpochStr(): EpochStr {
-    return new Date().getTime().toString(36)
+    return Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString(36)
+}
+
+export function makeUTCTimestamp(): UTCTimestamp {
+    const utcStr = Temporal.Now.instant().toString();
+    console.log(utcStr);
+
+    const zdt = Temporal.Now.zonedDateTimeISO()
+    console.log(zdt.toString());
+
+    return utcStr;
 }
 
 export function makeSmallID(length = 4): SmallID {
     return Math.random().toString(36).slice(13 - length).padStart(length, "0")
 }
 
-export function parseTemporalFromUid(uid: UID): Temporal.Instant {
+export function parseTemporalFromUid(uid: UID): Temporal.ZonedDateTime {
     return parseTemporalFromEpochStr(uid.split("-")[0]);
 }
 
-export function parseTemporalFromEpochStr(epochStr: EpochStr): Temporal.Instant {
+export function parseTemporalFromEpochStr(epochStr: EpochStr): Temporal.ZonedDateTime {
     const epochMillis = parseInt(epochStr, 36)
-    const parsedTemporal = Temporal.Instant.fromEpochMilliseconds(epochMillis);
-    // const zoneless = Temporal.Now.plainDateTimeISO();
-    // console.log(parsedTemporal.toString({ timeZone: Temporal.TimeZone.from(timezone)}));
-    // const timezone = Temporal.Now.timeZone();
-    //#BUG - this is still having some time zone weirdness.
-    //bug demo
-    let tempStr = makeEpochStr();
-    const bugEpochMillis = parseInt(tempStr, 36)
-    const bugParsedTemporal = Temporal.Instant.fromEpochMilliseconds(bugEpochMillis);
-    console.log('bug demo: ' + bugParsedTemporal.toLocaleString()); //will be in the future
-
+    const parsedTemporal = Temporal.Instant.fromEpochMilliseconds(epochMillis).toZonedDateTimeISO(Temporal.Now.timeZone());
     return parsedTemporal
 }
 

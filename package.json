@@ -23,6 +23,7 @@
     "node-fetch": "^3.3.0",
     "sqlite3": "^5.1.4",
     "temporal-polyfill": "^0.0.8",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.19.2/xlsx-0.19.2.tgz"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.19.2/xlsx-0.19.2.tgz",
+    "yaml": "^2.2.1"
   }
 }

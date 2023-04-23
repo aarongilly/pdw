@@ -1,9 +1,10 @@
 //// @ts-nocheck
-import {PDW, Period, PointType, Rollup, parseTemporalFromEpochStr, parseTemporalFromUid} from './pdw.js'
+import {EntryPoint, PDW, Period, PointType, Rollup, makeEpochStr, makeUTCTimestamp, parseTemporalFromEpochStr, parseTemporalFromUid} from './pdw.js'
 import {Scope} from './pdw.js'
 import { exportToFile } from './connectors/fileConnector.js';
 import { importFromFile } from './connectors/fileConnector.js';
 import { sampleDefinitions, sampleEntries, samplePointDefs } from './sampleData.js';
+import { Temporal } from 'temporal-polyfill';
 // import { FileConnector } from "./connectors/fileConnector.js";
 
 const pdw = PDW.getInstance();
@@ -17,12 +18,21 @@ const pdw = PDW.getInstance();
 // console.log(Period.inferScope(Period.now(Scope.QUARTER)));
 // console.log(Period.inferScope(Period.now(Scope.YEAR)));
 
-// createTwoTestFiles();
+
+// Think I solved it!
+// const myTemp = parseTemporalFromEpochStr(makeEpochStr());
+// console.log(myTemp.toPlainDateTime().toString());
+// console.log(myTemp.toPlainDateTime().toJSON());
+// console.log(myTemp.toLocaleString());
+// console.log(myTemp.toString())
+
+createTwoTestFiles();
 
 // importFromFile('data-files/OutJSON.json');
-importFromFile('data-files/OutExcel4.xlsx');
-
-console.log(pdw.allDataSince());
+// importFromFile('data-files/OutExcel4.xlsx');
+// importFromFile('data-files/OutYaml.yaml');
+// console.log('hi')
+// console.log(pdw.allDataSince());
 
 function createTwoTestFiles(){
     //Testing createNewDef && Def.setPointDefs
@@ -80,8 +90,8 @@ function createTwoTestFiles(){
         _did: 'ay7l',
         _note: 'Orig note',
         _period: '2023-04-22T06',
-        '0tb7': false,
-        '0pc6': 5
+        'Boolean Thing': false, //key by _lbl
+        '0pc6': 5 //key by _pid
     })
     pdw.createNewEntry({
         _did: '0m7w',
@@ -108,7 +118,7 @@ function createTwoTestFiles(){
     })
     //Write to file before any updates
     let outFileOneame = 'data-files/OutExcel1.xlsx';
-    exportToFile(outFileOneame, pdw.allDataSince());
+    exportToFile(outFileOneame, pdw.getAll());
 
     //update def (and pointdef)
     pdw.setDefs([{
@@ -149,9 +159,12 @@ function createTwoTestFiles(){
     }])
 
     //Write to updated files
-    let data = pdw.allDataSince();
+    let data = pdw.getAll();
     let outFileTwoName = 'data-files/OutExcel2.xlsx';
     exportToFile(outFileTwoName, data);
     let outJsonName = 'data-files/OutJSON.json';
     exportToFile(outJsonName, data);
+    let outYamlName = 'data-files/OutYaml.yaml';
+    exportToFile(outYamlName, data);
+    
 }

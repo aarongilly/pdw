@@ -1,20 +1,23 @@
 import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as pdw from '../pdw.js';
+import * as YAML from 'yaml';
 import { Temporal } from 'temporal-polyfill';
 
 //#region ### EXPORTED FUNCTIONS ###
 export function exportToFile(filepath: string, data: pdw.CompleteDataset) {
     const fileType = inferFileType(filepath)
-    if (fileType === 'excel') return ExcelTabularImportExport.exportToExcel(filepath, data);
-    if (fileType === 'json') return JsonImportExport.exportToJson(filepath, data);
+    if (fileType === 'excel') return new ExcelTabularImportExport().exportTo(data, filepath);
+    if (fileType === 'json') return new JsonImportExport().exportTo(data, filepath);
+    if (fileType === 'yaml') return new YamlImportExport().exportTo(data, filepath);
     throw new Error('Unimplemented export type: ' + fileType)
 }
 
 export function importFromFile(filepath: string) {
     const fileType = inferFileType(filepath)
-    if (fileType === 'excel') return ExcelTabularImportExport.importFromExcel(filepath);
-    if (fileType === 'json') return JsonImportExport.importFromJson(filepath);
+    if (fileType === 'excel') return new ExcelTabularImportExport().importFrom(filepath);
+    if (fileType === 'json') return new JsonImportExport().importFrom(filepath);
+    if (fileType === 'yaml') return new YamlImportExport().importFrom(filepath);
     throw new Error('Unimplemented import type: ' + fileType)
 }
 
@@ -25,25 +28,34 @@ export function importFromFile(filepath: string) {
  * TABULAR Excel. These stack all types on one-another
  * and are **not** the "natural" way of working within Excel
  */
-export class ExcelTabularImportExport {
+export class ExcelTabularImportExport implements pdw.AsyncDataStore {
     static overViewShtName = 'Overview';
     static defShtName = 'Defs';
     static pointDefShtName = 'Point Defs';
-    static entryShtName = "Entry Base";
+    static entryShtName = "Entry";
     static entryPointShtName = "Entry Points";
     static tagDefShtName = "Tag Defs";
     static tagShtName = "Tags"
-
-    static exportToExcel(filename: string, data: pdw.CompleteDataset) {
+    
+    exportTo(data: pdw.CompleteDataset, filename: string) {
         XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();
+        
+        if (data.overview !== undefined){
+            let aoa = [];
+            aoa.push(['Store Name:', data.overview.storeName]);
+            aoa.push(['Last updated:', pdw.parseTemporalFromEpochStr(data.overview.lastUpdated).toLocaleString()]);
+            aoa.push(['Element Type', 'Count Active', 'Count Deleted']);
+            if(data.defs !== undefined) aoa.push(['defs',data.overview.defs.current,data.overview.defs.deleted]);
+            if(data.pointDefs !== undefined) aoa.push(['pointDefs',data.overview.pointDefs.current,data.overview.pointDefs.deleted]);
+            if(data.entries !== undefined) aoa.push(['entries',data.overview.entries.current,data.overview.entries.deleted]);
+            if(data.entryPoints !== undefined) aoa.push(['entryPoints',data.overview.entryPoints.current,data.overview.entryPoints.deleted]);
+            if(data.tagDefs !== undefined) aoa.push(['tagDefs',data.overview.tagDefs.current,data.overview.tagDefs.deleted]);
+            if(data.tags !== undefined) aoa.push(['tags',data.overview.tags.current,data.overview.tags.deleted]);
+            let overviewSht = XLSX.utils.aoa_to_sheet(aoa);
+            XLSX.utils.book_append_sheet(wb, overviewSht, ExcelTabularImportExport.overViewShtName);
+        }
 
-        //#TODO - overview sheet
-
-        // let overviewSht = XLSX.utils.aoa_to_sheet([['to','do'],['over'],['view']]);
-        // XLSX.utils.book_append_sheet(wb, overviewSht, overViewShtName);
-
-        //###DEFS
         if (data.defs !== undefined && data.defs.length > 0) {
             let defBaseArr = data.defs.map(def => ExcelTabularImportExport.makeExcelDefRow(def));
             defBaseArr.unshift(tabularHeaders.def);
@@ -95,18 +107,20 @@ export class ExcelTabularImportExport {
         XLSX.writeFile(wb, filename);
     }
 
-    static importFromExcel(filepath: string) {
+    importFrom(filepath: string): pdw.CompleteDataset {
         console.log('loading...');
+        let returnData: pdw.CompleteDataset = {}
         XLSX.set_fs(fs);
         let loadedWb = XLSX.readFile(filepath);
         const shts = loadedWb.SheetNames;
+        const pdwRef = pdw.PDW.getInstance();
         if (!shts.some(name => name === ExcelTabularImportExport.defShtName)) {
             console.warn('No Defs sheet found in ' + filepath);
         } else {
             const defSht = loadedWb.Sheets[ExcelTabularImportExport.defShtName];
             let defBaseRawArr = XLSX.utils.sheet_to_json(defSht) as pdw.DefLike[];
-            let parsedDefs = defBaseRawArr.map(rawDef => ExcelTabularImportExport.parseExcelDefRow(rawDef))
-            pdw.PDW.getInstance().setDefs(parsedDefs);
+            returnData.defs = defBaseRawArr.map(rawDef => ExcelTabularImportExport.parseExcelDefRow(rawDef))
+            pdwRef.setDefs(returnData.defs);
         }
 
         if (!shts.some(name => name === ExcelTabularImportExport.pointDefShtName)) {
@@ -114,8 +128,8 @@ export class ExcelTabularImportExport {
         } else {
             const pointDefSht = loadedWb.Sheets[ExcelTabularImportExport.pointDefShtName];
             let pointDefRawArr = XLSX.utils.sheet_to_json(pointDefSht) as pdw.PointDefLike[];
-            let parsedPointDefs = pointDefRawArr.map(rawPointDef => ExcelTabularImportExport.parseExcelPointDefRow(rawPointDef))
-            pdw.PDW.getInstance().setPointDefs(parsedPointDefs);
+            returnData.pointDefs = pointDefRawArr.map(rawPointDef => ExcelTabularImportExport.parseExcelPointDefRow(rawPointDef))
+            pdwRef.setPointDefs(returnData.pointDefs);
         }
 
         if (!shts.some(name => name === ExcelTabularImportExport.entryShtName)) {
@@ -123,8 +137,8 @@ export class ExcelTabularImportExport {
         } else {
             const entrySht = loadedWb.Sheets[ExcelTabularImportExport.entryShtName];
             let entryRawArr = XLSX.utils.sheet_to_json(entrySht) as pdw.EntryLike[];
-            let parsedEntries = entryRawArr.map(rawEntry => ExcelTabularImportExport.parseExcelEntryRow(rawEntry))
-            pdw.PDW.getInstance().setEntries(parsedEntries);
+            returnData.entries = entryRawArr.map(rawEntry => ExcelTabularImportExport.parseExcelEntryRow(rawEntry))
+            pdwRef.setEntries(returnData.entries);
         }
 
         if (!shts.some(name => name === ExcelTabularImportExport.entryPointShtName)) {
@@ -132,8 +146,8 @@ export class ExcelTabularImportExport {
         } else {
             const entrySht = loadedWb.Sheets[ExcelTabularImportExport.entryPointShtName];
             let entryPointRawArr = XLSX.utils.sheet_to_json(entrySht) as pdw.EntryPointLike[];
-            let parsedEntryPoints = entryPointRawArr.map(rawEntryPoint => ExcelTabularImportExport.parseExcelEntryPointRow(rawEntryPoint))
-            pdw.PDW.getInstance().setEntryPoints(parsedEntryPoints);
+            returnData.entryPoints = entryPointRawArr.map(rawEntryPoint => ExcelTabularImportExport.parseExcelEntryPointRow(rawEntryPoint))
+            pdwRef.setEntryPoints(returnData.entryPoints);
         }
 
         if (!shts.some(name => name === ExcelTabularImportExport.tagDefShtName)) {
@@ -141,8 +155,8 @@ export class ExcelTabularImportExport {
         } else {
             const entrySht = loadedWb.Sheets[ExcelTabularImportExport.tagDefShtName];
             let tagDefRawArr = XLSX.utils.sheet_to_json(entrySht) as pdw.TagDefLike[];
-            let parsedTagDefs = tagDefRawArr.map(rawTagDef => ExcelTabularImportExport.parseExcelTagDefRow(rawTagDef))
-            pdw.PDW.getInstance().setTagDefs(parsedTagDefs);
+            returnData.tagDefs = tagDefRawArr.map(rawTagDef => ExcelTabularImportExport.parseExcelTagDefRow(rawTagDef))
+            pdwRef.setTagDefs(returnData.tagDefs);
         }
 
         if (!shts.some(name => name === ExcelTabularImportExport.tagShtName)) {
@@ -150,9 +164,13 @@ export class ExcelTabularImportExport {
         } else {
             const entrySht = loadedWb.Sheets[ExcelTabularImportExport.tagShtName];
             let tagRawArr = XLSX.utils.sheet_to_json(entrySht) as pdw.TagLike[];
-            let parsedTags = tagRawArr.map(rawTag => ExcelTabularImportExport.parseExcelTagRow(rawTag))
-            pdw.PDW.getInstance().setTags(parsedTags);
+            returnData.tags = tagRawArr.map(rawTag => ExcelTabularImportExport.parseExcelTagRow(rawTag))
+            pdwRef.setTags(returnData.tags);
         }
+
+        returnData = pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
+
+        return returnData;
     }
 
     /**
@@ -375,25 +393,123 @@ export class ExcelTabularImportExport {
 
 }
 
-export class JsonImportExport {
+export class JsonImportExport implements pdw.AsyncDataStore {
 
-    static exportToJson(filename: string, data: pdw.CompleteDataset) {
-        let callback = () => {
-            console.log('Wrote successfully?');
-        }
+    exportTo(data: pdw.CompleteDataset, filepath: string) {
         let json = JSON.stringify(data);
-        fs.writeFile(filename, json, 'utf8', callback);
+        fs.writeFile(filepath, json, 'utf8', ()=>{});
     }
 
-    static importFromJson(filepath: string) {
+    importFrom(filepath: string): pdw.CompleteDataset {
         const file = JSON.parse(fs.readFileSync(filepath).toString());
+        const returnData: pdw.CompleteDataset = {
+            defs: file.defs,
+            pointDefs: file.pointDefs,
+            entries: file.entries,
+            entryPoints: file.entryPoints,
+            tagDefs: file.tagDefs,
+            tags: file.tags
+        }
         const pdwRef = pdw.PDW.getInstance();
-        if (file.defs !== undefined) pdwRef.setDefs(file.defs);
-        if (file.pointDefs !== undefined) pdwRef.setPointDefs(file.pointDefs);
-        if (file.entries !== undefined) pdwRef.setEntries(file.entries);
-        if (file.entryPoints !== undefined) pdwRef.setEntryPoints(file.entryPoints);
-        if (file.tagDefs !== undefined) pdwRef.setTagDefs(file.tagDefs);
-        if (file.tags !== undefined) pdwRef.setTags(file.tags);
+        if (returnData.defs !== undefined) pdwRef.setDefs(returnData.defs);
+        if (returnData.pointDefs !== undefined) pdwRef.setPointDefs(returnData.pointDefs);
+        if (returnData.entries !== undefined) pdwRef.setEntries(returnData.entries);
+        if (returnData.entryPoints !== undefined) pdwRef.setEntryPoints(returnData.entryPoints);
+        if (returnData.tagDefs !== undefined) pdwRef.setTagDefs(returnData.tagDefs);
+        if (returnData.tags !== undefined) pdwRef.setTags(returnData.tags);
+        
+        returnData.overview = {
+            storeName: filepath,
+            defs: {
+                current: returnData.defs?.filter(element=>element._deleted===false).length,
+                deleted: returnData.defs?.filter(element=>element._deleted).length
+            },
+            pointDefs: {
+                current: returnData.pointDefs?.filter(element=>element._deleted===false).length,
+                deleted: returnData.pointDefs?.filter(element=>element._deleted).length
+            },
+            entries: {
+                current: returnData.entries?.filter(element=>element._deleted===false).length,
+                deleted: returnData.entries?.filter(element=>element._deleted).length
+            },
+            entryPoints: {
+                current: returnData.entryPoints?.filter(element=>element._deleted===false).length,
+                deleted: returnData.entryPoints?.filter(element=>element._deleted).length
+            },
+            tagDefs: {
+                current: returnData.tagDefs?.filter(element=>element._deleted===false).length,
+                deleted: returnData.tagDefs?.filter(element=>element._deleted).length
+            },
+            tags: {
+                current: returnData.tags?.filter(element=>element._deleted===false).length,
+                deleted: returnData.tags?.filter(element=>element._deleted).length
+            },
+            lastUpdated: pdw.PDW.getDatasetLastUpdate(returnData)
+        }
+
+        return returnData;
+    }
+}
+
+/**
+ * This was crazy easy.
+ */
+export class YamlImportExport implements pdw.AsyncDataStore {
+
+    exportTo(data: pdw.CompleteDataset, filepath: string) {
+        //crazy simple implementation
+        const yaml = YAML.stringify(data);
+        fs.writeFile(filepath, yaml, 'utf8', ()=>{});
+    }
+
+    importFrom(filepath: string): pdw.CompleteDataset {
+        const file = YAML.parse(fs.readFileSync(filepath).toString());
+        const returnData: pdw.CompleteDataset = {
+            defs: file.defs,
+            pointDefs: file.pointDefs,
+            entries: file.entries,
+            entryPoints: file.entryPoints,
+            tagDefs: file.tagDefs,
+            tags: file.tags
+        }
+        const pdwRef = pdw.PDW.getInstance();
+        if (returnData.defs !== undefined) pdwRef.setDefs(returnData.defs);
+        if (returnData.pointDefs !== undefined) pdwRef.setPointDefs(returnData.pointDefs);
+        if (returnData.entries !== undefined) pdwRef.setEntries(returnData.entries);
+        if (returnData.entryPoints !== undefined) pdwRef.setEntryPoints(returnData.entryPoints);
+        if (returnData.tagDefs !== undefined) pdwRef.setTagDefs(returnData.tagDefs);
+        if (returnData.tags !== undefined) pdwRef.setTags(returnData.tags);
+        
+        returnData.overview = {
+            storeName: filepath,
+            defs: {
+                current: returnData.defs?.filter(element=>element._deleted===false).length,
+                deleted: returnData.defs?.filter(element=>element._deleted).length
+            },
+            pointDefs: {
+                current: returnData.pointDefs?.filter(element=>element._deleted===false).length,
+                deleted: returnData.pointDefs?.filter(element=>element._deleted).length
+            },
+            entries: {
+                current: returnData.entries?.filter(element=>element._deleted===false).length,
+                deleted: returnData.entries?.filter(element=>element._deleted).length
+            },
+            entryPoints: {
+                current: returnData.entryPoints?.filter(element=>element._deleted===false).length,
+                deleted: returnData.entryPoints?.filter(element=>element._deleted).length
+            },
+            tagDefs: {
+                current: returnData.tagDefs?.filter(element=>element._deleted===false).length,
+                deleted: returnData.tagDefs?.filter(element=>element._deleted).length
+            },
+            tags: {
+                current: returnData.tags?.filter(element=>element._deleted===false).length,
+                deleted: returnData.tags?.filter(element=>element._deleted).length
+            },
+            lastUpdated: pdw.PDW.getDatasetLastUpdate(returnData)
+        }
+
+        return returnData;
     }
 }
 
@@ -408,10 +524,10 @@ export const tabularHeaders = {
 }
 
 function inferFileType(path: string): "excel" | "json" | "csv" | "yaml" | "unknown" {
-    if (path.slice(-5) === ".xlsx") return 'excel'
-    if (path.slice(-5) === ".json") return 'json'
-    if (path.slice(-4) === ".csv") return 'csv'
-    if (path.slice(-5) === ".yaml") return 'yaml'
+    if (path.slice(-5).toUpperCase() === ".XLSX") return 'excel'
+    if (path.slice(-5).toUpperCase() === ".JSON") return 'json'
+    if (path.slice(-4).toUpperCase() === ".CSV") return 'csv'
+    if (path.slice(-5).toUpperCase() === ".YAML" || path.slice(-4).toUpperCase() === ".YML") return 'yaml'
     return "unknown"
 }
 //#endregion
