@@ -41,7 +41,7 @@ const pdw = PDW.getInstance();
 importFromFile('data-files/OutExcel2.xlsx');
 
 let mydef = pdw.getDefs({
-    updatedTo: 'lgvn3a11',
+    updatedBefore: 'lgvn3a11',
     includeDeleted: 'yes'
 })
 // importFromFile('data-files/OutYaml.yaml');

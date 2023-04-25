@@ -195,10 +195,10 @@ export interface StandardParams {
      */
     from?: Period | PeriodStr,
     to?: Period | PeriodStr,
-    createdFrom?: Temporal.ZonedDateTime | EpochStr,
-    createdTo?: Temporal.ZonedDateTime | EpochStr,
-    updatedFrom?: Temporal.ZonedDateTime | EpochStr,
-    updatedTo?: Temporal.ZonedDateTime | EpochStr,
+    createdAfter?: Temporal.ZonedDateTime | EpochStr,
+    createdBefore?: Temporal.ZonedDateTime | EpochStr,
+    updatedAfter?: Temporal.ZonedDateTime | EpochStr,
+    updatedBefore?: Temporal.ZonedDateTime | EpochStr,
     uid?: UID[],
     did?: SmallID[],
     pid?: SmallID[],
@@ -218,14 +218,14 @@ export interface SanitizedParams {
      */
     from?: Period,
     to?: Period,
-    createdFrom?: Temporal.ZonedDateTime,
-    createdFromEpochStr?: EpochStr,
-    createdTo?: Temporal.ZonedDateTime,
-    createdToEpochStr?: EpochStr,
-    updatedFrom?: Temporal.ZonedDateTime,
-    updatedFromEpochStr?: EpochStr,
-    updatedTo?: Temporal.ZonedDateTime
-    updatedToEpochStr?: EpochStr,
+    createdAfter?: Temporal.ZonedDateTime,
+    createdAfterEpochStr?: EpochStr,
+    createdBefore?: Temporal.ZonedDateTime,
+    createdBeforeEpochStr?: EpochStr,
+    updatedAfter?: Temporal.ZonedDateTime,
+    updatedAfterEpochStr?: EpochStr,
+    updatedBefore?: Temporal.ZonedDateTime
+    updatedBeforeEpochStr?: EpochStr,
     uid?: UID[],
     did?: SmallID[],
     pid?: SmallID[],
@@ -631,8 +631,8 @@ export interface MinimumTag extends MinimumElement {
 export interface QueryParams {
     from?: PeriodStr;
     to?: PeriodStr;
-    updatedFrom?: PeriodStr;
-    updatedTo?: PeriodStr;
+    updatedAfter?: PeriodStr;
+    updatedBefore?: PeriodStr;
     did?: string | string[];
     eid?: string | string[];
     pid?: string | string[];
@@ -714,7 +714,7 @@ export class PDW {
 
     getDefs(rawParams: StandardParams): Def[] {
         const params = PDW.sanitizeParams(rawParams)
-        //ensure valid params //commented out because I realized "createdFrom" and stuff would also be valid
+        //ensure valid params //commented out because I realized "createdAfter" and stuff would also be valid
         // if(params.uid === undefined && 
         //     params.did === undefined && 
         //     params.defLbl === undefined && 
@@ -965,40 +965,40 @@ export class PDW {
             //otherwise I guess I'll assume it's okay
         }
         //make Temporal & EpochStr options
-        if (params.createdFrom !== undefined) {
-            if (typeof params.createdFrom === 'string') {
-                params.createdFrom = parseTemporalFromEpochStr(params.createdFrom);
-                (<SanitizedParams>params).createdFromEpochStr = makeEpochStrFromTemporal(params.createdFrom);
+        if (params.createdAfter !== undefined) {
+            if (typeof params.createdAfter === 'string') {
+                params.createdAfter = parseTemporalFromEpochStr(params.createdAfter);
+                (<SanitizedParams>params).createdAfterEpochStr = makeEpochStrFromTemporal(params.createdAfter);
             } else {
-                (<SanitizedParams>params).createdFromEpochStr = makeEpochStrFromTemporal(params.createdFrom);
-                params.createdFrom = parseTemporalFromEpochStr((<SanitizedParams>params).createdFromEpochStr!);
+                (<SanitizedParams>params).createdAfterEpochStr = makeEpochStrFromTemporal(params.createdAfter);
+                params.createdAfter = parseTemporalFromEpochStr((<SanitizedParams>params).createdAfterEpochStr!);
             }
         }
-        if (params.createdTo !== undefined) {
-            if (typeof params.createdTo === 'string') {
-                params.createdTo = parseTemporalFromEpochStr(params.createdTo);
-                (<SanitizedParams>params).createdToEpochStr = makeEpochStrFromTemporal(params.createdTo);
+        if (params.createdBefore !== undefined) {
+            if (typeof params.createdBefore === 'string') {
+                params.createdBefore = parseTemporalFromEpochStr(params.createdBefore);
+                (<SanitizedParams>params).createdBeforeEpochStr = makeEpochStrFromTemporal(params.createdBefore);
             } else {
-                (<SanitizedParams>params).createdToEpochStr = makeEpochStrFromTemporal(params.createdTo);
-                params.createdTo = parseTemporalFromEpochStr((<SanitizedParams>params).createdToEpochStr!);
+                (<SanitizedParams>params).createdBeforeEpochStr = makeEpochStrFromTemporal(params.createdBefore);
+                params.createdBefore = parseTemporalFromEpochStr((<SanitizedParams>params).createdBeforeEpochStr!);
             }
         }
-        if (params.updatedFrom !== undefined) {
-            if (typeof params.updatedFrom === 'string') {
-                params.updatedFrom = parseTemporalFromEpochStr(params.updatedFrom);
-                (<SanitizedParams>params).updatedFromEpochStr = makeEpochStrFromTemporal(params.updatedFrom);
+        if (params.updatedAfter !== undefined) {
+            if (typeof params.updatedAfter === 'string') {
+                params.updatedAfter = parseTemporalFromEpochStr(params.updatedAfter);
+                (<SanitizedParams>params).updatedAfterEpochStr = makeEpochStrFromTemporal(params.updatedAfter);
             } else {
-                (<SanitizedParams>params).updatedFromEpochStr = makeEpochStrFromTemporal(params.updatedFrom);
-                params.updatedFrom = parseTemporalFromEpochStr((<SanitizedParams>params).updatedFromEpochStr!);
+                (<SanitizedParams>params).updatedAfterEpochStr = makeEpochStrFromTemporal(params.updatedAfter);
+                params.updatedAfter = parseTemporalFromEpochStr((<SanitizedParams>params).updatedAfterEpochStr!);
             }
         }
-        if (params.updatedTo !== undefined) {
-            if (typeof params.updatedTo === 'string') {
-                params.updatedTo = parseTemporalFromEpochStr(params.updatedTo);
-                (<SanitizedParams>params).updatedToEpochStr = makeEpochStrFromTemporal(params.updatedTo);
+        if (params.updatedBefore !== undefined) {
+            if (typeof params.updatedBefore === 'string') {
+                params.updatedBefore = parseTemporalFromEpochStr(params.updatedBefore);
+                (<SanitizedParams>params).updatedBeforeEpochStr = makeEpochStrFromTemporal(params.updatedBefore);
             } else {
-                (<SanitizedParams>params).updatedToEpochStr = makeEpochStrFromTemporal(params.updatedTo);
-                params.updatedTo = parseTemporalFromEpochStr((<SanitizedParams>params).updatedToEpochStr!);
+                (<SanitizedParams>params).updatedBeforeEpochStr = makeEpochStrFromTemporal(params.updatedBefore);
+                params.updatedBefore = parseTemporalFromEpochStr((<SanitizedParams>params).updatedBeforeEpochStr!);
             }
         }
         //ensure arrays
@@ -1184,15 +1184,16 @@ export abstract class Element implements ElementLike {
             if (!assPointDef.some(pd => pd._deleted !== true && params.pointLbl?.includes(pd._lbl))) return false;
         }
 
-        if (params.createdTo !== undefined && Temporal.ZonedDateTime.compare(params.createdTo, this._tempCreated) !== 1) return false;//#UNTESTED
-        if (params.createdFrom !== undefined && Temporal.ZonedDateTime.compare(params.createdFrom, this._tempCreated) !== -1) return false;//#UNTESTED
-        if (params.createdToEpochStr !== undefined && params.createdToEpochStr < this._created) return false;
-        if (params.createdFromEpochStr !== undefined && params.createdFromEpochStr > this._created) return false;
+        // I don't **THINK** I should ever need the native Temporal compare here? It works, but... sanitized params should always have the epochstr
+        // if (params.createdBefore !== undefined && Temporal.ZonedDateTime.compare(params.createdBefore, this._tempCreated) === -1) return false;
+        // if (params.createdAfter !== undefined && Temporal.ZonedDateTime.compare(params.createdAfter, this._tempCreated) === 1) return false;
+        if (params.createdBeforeEpochStr !== undefined && params.createdBeforeEpochStr < this._created) return false;
+        if (params.createdAfterEpochStr !== undefined && params.createdAfterEpochStr > this._created) return false;
 
-        if (params.updatedTo !== undefined && Temporal.ZonedDateTime.compare(params.updatedTo, this._tempUpdated) !== 1) return false;//#UNTESTED
-        if (params.updatedFrom !== undefined && Temporal.ZonedDateTime.compare(params.updatedFrom, this._tempUpdated) !== -1) return false;//#UNTESTED
-        if (params.updatedToEpochStr !== undefined && params.updatedToEpochStr < this._updated) return false;
-        if (params.updatedFromEpochStr !== undefined && params.updatedFromEpochStr > this._updated) return false;
+        // if (params.updatedBefore !== undefined && Temporal.ZonedDateTime.compare(params.updatedBefore, this._tempUpdated) === -1) return false;
+        // if (params.updatedAfter !== undefined && Temporal.ZonedDateTime.compare(params.updatedAfter, this._tempUpdated) === 1) return false;
+        if (params.updatedBeforeEpochStr !== undefined && params.updatedBeforeEpochStr < this._updated) return false;
+        if (params.updatedAfterEpochStr !== undefined && params.updatedAfterEpochStr > this._updated) return false;
 
         if (params.includeDeleted === 'no' && this._deleted === true) return false;
         if (params.includeDeleted === 'only' && this._deleted === false) return false;
