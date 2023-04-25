@@ -29,19 +29,23 @@ const pdw = PDW.getInstance();
 // const newTemp = parseTemporalFromEpochStr('lgv0nhbf')
 // console.log(Temporal.ZonedDateTime.compare(oldTemp,newTemp));
 
-//#TODO - test all the stuff
 // createTwoTestFiles();
 
-let date = new Date('4/24/2023, 4:23:06 PM');
-console.log(date);
-console.log(Temporal.ZonedDateTime.from(date).toLocaleString());
+// let date = new Date('4/24/23 1:23 AM');
+// console.log(date.getTime());
+// console.log(Temporal.Instant.fromEpochMilliseconds(date.getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()).toLocaleString());
 // console.log(Temporal.);
 
 
 // importFromFile('data-files/OutJSON.json');
-// importFromFile('data-files/OutExcel2.xlsx');
+importFromFile('data-files/OutExcel2.xlsx');
+
+let mydef = pdw.getDefs({
+    updatedTo: 'lgvn3a11',
+    includeDeleted: 'yes'
+})
 // importFromFile('data-files/OutYaml.yaml');
-// console.log('hi')
+console.log(mydef)
 // console.log(pdw.allDataSince());
 
 function createTwoTestFiles(){

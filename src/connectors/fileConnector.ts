@@ -215,7 +215,8 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             entryData._did,
             entryData._eid,
             entryData._period,
-            entryData._note
+            entryData._note,
+            entryData._source
         ]
     }
 
@@ -249,11 +250,10 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
     static makeExcelFirstFourColumns(elementData: pdw.ElementLike) {
         return [
             elementData._uid,
-            //#TODO - try fixing the parser and going back to this
-            // pdw.parseTemporalFromEpochStr(elementData._created).toPlainDateTime().toLocaleString(),
-            // pdw.parseTemporalFromEpochStr(elementData._updated).toPlainDateTime().toLocaleString(),
-            elementData._created,
-            elementData._updated,
+            pdw.parseTemporalFromEpochStr(elementData._created).toPlainDateTime().toLocaleString(),
+            pdw.parseTemporalFromEpochStr(elementData._updated).toPlainDateTime().toLocaleString(),
+            // elementData._created,
+            // elementData._updated,
             elementData._deleted ? "TRUE" : "FALSE",
         ]
     }
@@ -286,9 +286,10 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             elementRowData._deleted = elementRowData._deleted.toUpperCase() == 'TRUE';
         }
 
-        //#TODO - try the Excel natural date thing again
-        // elementRowData._created = ExcelTabularImportExport.makeEpochStrFromExcelDate(elementRowData._created)
-        // elementRowData._updated = ExcelTabularImportExport.makeEpochStrFromExcelDate(elementRowData._updated)
+        elementRowData._created = ExcelTabularImportExport.makeEpochStrFromExcelDate(elementRowData._created)
+        elementRowData._updated = ExcelTabularImportExport.makeEpochStrFromExcelDate(elementRowData._updated)
+
+        return elementRowData;
     }
 
     /**
@@ -302,7 +303,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
                 return dateCellVal
             } catch (e) {
                 try {
-                    let temp = Temporal.ZonedDateTime.from(dateCellVal);
+                    let temp = Temporal.Instant.fromEpochMilliseconds(new Date(dateCellVal).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone());
                     return pdw.makeEpochStrFromTemporal(temp);
                 } catch (etwo) {
                     console.error('Failed to make this into an EpochStr:', dateCellVal);
@@ -311,7 +312,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             }
         }
         if (typeof dateCellVal === 'number') {
-            return Temporal.Instant.fromEpochMilliseconds((dateCellVal - (25567 + 1)) * 86400 * 1000).toZonedDateTimeISO(Temporal.Now.timeZone());
+            return pdw.makeEpochStrFromTemporal(Temporal.Instant.fromEpochMilliseconds((dateCellVal - (25567 + 1)) * 86400 * 1000).toZonedDateTimeISO(Temporal.Now.timeZone()));
         }
     }
 
@@ -348,6 +349,9 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
         entryRow = ExcelTabularImportExport.parseExcelFirstFourColumns(entryRow);
 
         entryRow._did = entryRow._did.toString(); //in case I got unlucky with an all-numeric SmallID
+        if(entryRow._note === undefined) entryRow._note = '';
+        if(entryRow._source === undefined) entryRow._source = 'Excel Import Circa ' + pdw.makeEpochStr();
+
 
         if (!pdw.Entry.isEntryLike(entryRow)) throw new Error('Failed to correctly parseExcelEntryRow for ', entryRow);
 
@@ -364,7 +368,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
         entryPointRow = ExcelTabularImportExport.parseExcelFirstFourColumns(entryPointRow);
 
         entryPointRow._did = entryPointRow._did.toString(); //in case I got unlucky with an all-numeric SmallID
-        entryPointRow._did = entryPointRow._pid.toString(); //in case I got unlucky with an all-numeric SmallID
+        entryPointRow._pid = entryPointRow._pid.toString(); //in case I got unlucky with an all-numeric SmallID
 
         if (!pdw.EntryPoint.isEntryPointLike(entryPointRow)) throw new Error('Failed to correctly parseExcelEntryPointRow for ', entryPointRow);
 
@@ -529,7 +533,7 @@ export class YamlImportExport implements pdw.AsyncDataStore {
 export const tabularHeaders = {
     def: ['_uid', '_created', '_updated', '_deleted', '_did', '_lbl', '_emoji', '_desc', '_scope'],
     pointDef: ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_lbl', '_emoji', '_desc', '_type', '_rollup'],
-    entry: ['_uid', '_created', '_updated', '_deleted', '_did', '_eid', '_period', '_note'],
+    entry: ['_uid', '_created', '_updated', '_deleted', '_did', '_eid', '_period', '_note', '_source'],
     entryPoint: ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_eid', '_val'],
     tagDef: ['_uid', '_created', '_updated', '_deleted', '_tid', '_lbl'],
     tag: ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_tid']

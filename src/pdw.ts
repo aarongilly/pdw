@@ -968,36 +968,36 @@ export class PDW {
         if (params.createdFrom !== undefined) {
             if (typeof params.createdFrom === 'string') {
                 params.createdFrom = parseTemporalFromEpochStr(params.createdFrom);
-                (<SanitizedParams>params).createdFromEpochStr = params.createdFrom.toString();
+                (<SanitizedParams>params).createdFromEpochStr = makeEpochStrFromTemporal(params.createdFrom);
             } else {
-                (<SanitizedParams>params).createdFromEpochStr = params.createdFrom.toString();
+                (<SanitizedParams>params).createdFromEpochStr = makeEpochStrFromTemporal(params.createdFrom);
                 params.createdFrom = parseTemporalFromEpochStr((<SanitizedParams>params).createdFromEpochStr!);
             }
         }
         if (params.createdTo !== undefined) {
             if (typeof params.createdTo === 'string') {
                 params.createdTo = parseTemporalFromEpochStr(params.createdTo);
-                (<SanitizedParams>params).createdToEpochStr = params.createdTo.toString();
+                (<SanitizedParams>params).createdToEpochStr = makeEpochStrFromTemporal(params.createdTo);
             } else {
-                (<SanitizedParams>params).createdToEpochStr = params.createdTo.toString();
+                (<SanitizedParams>params).createdToEpochStr = makeEpochStrFromTemporal(params.createdTo);
                 params.createdTo = parseTemporalFromEpochStr((<SanitizedParams>params).createdToEpochStr!);
             }
         }
         if (params.updatedFrom !== undefined) {
             if (typeof params.updatedFrom === 'string') {
                 params.updatedFrom = parseTemporalFromEpochStr(params.updatedFrom);
-                (<SanitizedParams>params).updatedFromEpochStr = params.updatedFrom.toString();
+                (<SanitizedParams>params).updatedFromEpochStr = makeEpochStrFromTemporal(params.updatedFrom);
             } else {
-                (<SanitizedParams>params).updatedFromEpochStr = params.updatedFrom.toString();
+                (<SanitizedParams>params).updatedFromEpochStr = makeEpochStrFromTemporal(params.updatedFrom);
                 params.updatedFrom = parseTemporalFromEpochStr((<SanitizedParams>params).updatedFromEpochStr!);
             }
         }
         if (params.updatedTo !== undefined) {
             if (typeof params.updatedTo === 'string') {
                 params.updatedTo = parseTemporalFromEpochStr(params.updatedTo);
-                (<SanitizedParams>params).updatedToEpochStr = params.updatedTo.toString();
+                (<SanitizedParams>params).updatedToEpochStr = makeEpochStrFromTemporal(params.updatedTo);
             } else {
-                (<SanitizedParams>params).updatedToEpochStr = params.updatedTo.toString();
+                (<SanitizedParams>params).updatedToEpochStr = makeEpochStrFromTemporal(params.updatedTo);
                 params.updatedTo = parseTemporalFromEpochStr((<SanitizedParams>params).updatedToEpochStr!);
             }
         }
@@ -1184,15 +1184,15 @@ export abstract class Element implements ElementLike {
             if (!assPointDef.some(pd => pd._deleted !== true && params.pointLbl?.includes(pd._lbl))) return false;
         }
 
-        if (params.createdFrom !== undefined && Temporal.ZonedDateTime.compare(params.createdFrom, this._tempCreated) !== 1) return false;//#UNTESTED
-        if (params.createdTo !== undefined && Temporal.ZonedDateTime.compare(params.createdTo, this._tempCreated) !== -1) return false;//#UNTESTED
-        if (params.createdFromEpochStr !== undefined && params.createdFromEpochStr > this._created) return false;
+        if (params.createdTo !== undefined && Temporal.ZonedDateTime.compare(params.createdTo, this._tempCreated) !== 1) return false;//#UNTESTED
+        if (params.createdFrom !== undefined && Temporal.ZonedDateTime.compare(params.createdFrom, this._tempCreated) !== -1) return false;//#UNTESTED
         if (params.createdToEpochStr !== undefined && params.createdToEpochStr < this._created) return false;
+        if (params.createdFromEpochStr !== undefined && params.createdFromEpochStr > this._created) return false;
 
-        if (params.updatedFrom !== undefined && Temporal.ZonedDateTime.compare(params.updatedFrom, this._tempUpdated) !== 1) return false;//#UNTESTED
-        if (params.updatedTo !== undefined && Temporal.ZonedDateTime.compare(params.updatedTo, this._tempUpdated) !== -1) return false;//#UNTESTED
-        if (params.updatedFromEpochStr !== undefined && params.updatedFromEpochStr > this._updated) return false;
+        if (params.updatedTo !== undefined && Temporal.ZonedDateTime.compare(params.updatedTo, this._tempUpdated) !== 1) return false;//#UNTESTED
+        if (params.updatedFrom !== undefined && Temporal.ZonedDateTime.compare(params.updatedFrom, this._tempUpdated) !== -1) return false;//#UNTESTED
         if (params.updatedToEpochStr !== undefined && params.updatedToEpochStr < this._updated) return false;
+        if (params.updatedFromEpochStr !== undefined && params.updatedFromEpochStr > this._updated) return false;
 
         if (params.includeDeleted === 'no' && this._deleted === true) return false;
         if (params.includeDeleted === 'only' && this._deleted === false) return false;
