@@ -36,22 +36,22 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
     static entryPointShtName = "Entry Points";
     static tagDefShtName = "Tag Defs";
     static tagShtName = "Tags"
-    
+
     exportTo(data: pdw.CompleteDataset, filename: string) {
         XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();
-        
-        if (data.overview !== undefined){
+
+        if (data.overview !== undefined) {
             let aoa = [];
             aoa.push(['Store Name:', data.overview.storeName]);
             aoa.push(['Last updated:', pdw.parseTemporalFromEpochStr(data.overview.lastUpdated).toLocaleString()]);
             aoa.push(['Element Type', 'Count Active', 'Count Deleted']);
-            if(data.defs !== undefined) aoa.push(['defs',data.overview.defs.current,data.overview.defs.deleted]);
-            if(data.pointDefs !== undefined) aoa.push(['pointDefs',data.overview.pointDefs.current,data.overview.pointDefs.deleted]);
-            if(data.entries !== undefined) aoa.push(['entries',data.overview.entries.current,data.overview.entries.deleted]);
-            if(data.entryPoints !== undefined) aoa.push(['entryPoints',data.overview.entryPoints.current,data.overview.entryPoints.deleted]);
-            if(data.tagDefs !== undefined) aoa.push(['tagDefs',data.overview.tagDefs.current,data.overview.tagDefs.deleted]);
-            if(data.tags !== undefined) aoa.push(['tags',data.overview.tags.current,data.overview.tags.deleted]);
+            if (data.defs !== undefined) aoa.push(['defs', data.overview.defs.current, data.overview.defs.deleted]);
+            if (data.pointDefs !== undefined) aoa.push(['pointDefs', data.overview.pointDefs.current, data.overview.pointDefs.deleted]);
+            if (data.entries !== undefined) aoa.push(['entries', data.overview.entries.current, data.overview.entries.deleted]);
+            if (data.entryPoints !== undefined) aoa.push(['entryPoints', data.overview.entryPoints.current, data.overview.entryPoints.deleted]);
+            if (data.tagDefs !== undefined) aoa.push(['tagDefs', data.overview.tagDefs.current, data.overview.tagDefs.deleted]);
+            if (data.tags !== undefined) aoa.push(['tags', data.overview.tags.current, data.overview.tags.deleted]);
             let overviewSht = XLSX.utils.aoa_to_sheet(aoa);
             XLSX.utils.book_append_sheet(wb, overviewSht, ExcelTabularImportExport.overViewShtName);
         }
@@ -181,15 +181,80 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
      */
     static makeExcelDefRow(def: pdw.DefLike) {
         return [
-            def._uid,
-            def._created.toString(),
-            def._updated,
-            def._deleted ? "TRUE" : "FALSE",
+            ...ExcelTabularImportExport.makeExcelFirstFourColumns(def),
             def._did,
             def._lbl,
             def._emoji,
             def._desc,
             def._scope.toString()
+        ]
+    }
+
+    /**
+     * Returns an array of arrays with the values of the
+     * def's points in accordance with the positions of the
+     * {@link tabularPointDefHeaders} positioning
+     */
+    static makeExcelPointDefRow(pointDef: pdw.PointDefLike) {
+        return [
+            ...ExcelTabularImportExport.makeExcelFirstFourColumns(pointDef),
+            pointDef._did,
+            pointDef._pid,
+            pointDef._lbl,
+            pointDef._emoji,
+            pointDef._desc,
+            pointDef._type,
+            pointDef._rollup,
+        ]
+    }
+
+
+    static makeExcelEntryRow(entryData: pdw.EntryLike) {
+        return [
+            ...ExcelTabularImportExport.makeExcelFirstFourColumns(entryData),
+            entryData._did,
+            entryData._eid,
+            entryData._period,
+            entryData._note
+        ]
+    }
+
+    static makeExcelEntryPointRow(entryPointData: pdw.EntryPointLike) {
+        return [
+            ...ExcelTabularImportExport.makeExcelFirstFourColumns(entryPointData),
+            entryPointData._did,
+            entryPointData._pid,
+            entryPointData._eid,
+            entryPointData._val.toString() //I think I want this
+        ]
+    }
+
+    static makeExcelTagDefRow(tagDefData: pdw.TagDefLike) {
+        return [
+            ...ExcelTabularImportExport.makeExcelFirstFourColumns(tagDefData),
+            tagDefData._tid,
+            tagDefData._lbl
+        ]
+    }
+
+    static makeExcelTagRow(tagData: pdw.TagLike) {
+        return [
+            ...ExcelTabularImportExport.makeExcelFirstFourColumns(tagData),
+            tagData._did,
+            tagData._pid,
+            tagData._tid,
+        ]
+    }
+
+    static makeExcelFirstFourColumns(elementData: pdw.ElementLike) {
+        return [
+            elementData._uid,
+            //#TODO - try fixing the parser and going back to this
+            // pdw.parseTemporalFromEpochStr(elementData._created).toPlainDateTime().toLocaleString(),
+            // pdw.parseTemporalFromEpochStr(elementData._updated).toPlainDateTime().toLocaleString(),
+            elementData._created,
+            elementData._updated,
+            elementData._deleted ? "TRUE" : "FALSE",
         ]
     }
 
@@ -205,11 +270,8 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             || defRow._did == undefined)
             throw new Error('Cannot parseExcelDefRow for ', defRow);
 
-        if (typeof defRow._deleted === 'boolean') {
-            defRow._deleted = defRow._deleted;
-        } else {
-            defRow._deleted = defRow._deleted.toUpperCase() == 'TRUE';
-        }
+        defRow = ExcelTabularImportExport.parseExcelFirstFourColumns(defRow);
+
         defRow._did = defRow._did.toString(); //in case I got unlucky with an all-numeric SmallID
 
         if (!pdw.Def.isDefLike(defRow)) throw new Error('Failed to correctly parseExcelDefRow for ', defRow);
@@ -217,75 +279,40 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
         return defRow
     }
 
+    static parseExcelFirstFourColumns(elementRowData: any): any {
+        if (typeof elementRowData._deleted === 'boolean') {
+            elementRowData._deleted = elementRowData._deleted;
+        } else {
+            elementRowData._deleted = elementRowData._deleted.toUpperCase() == 'TRUE';
+        }
+
+        //#TODO - try the Excel natural date thing again
+        // elementRowData._created = ExcelTabularImportExport.makeEpochStrFromExcelDate(elementRowData._created)
+        // elementRowData._updated = ExcelTabularImportExport.makeEpochStrFromExcelDate(elementRowData._updated)
+    }
+
     /**
-     * Returns an array of arrays with the values of the
-     * def's points in accordance with the positions of the
-     * {@link tabularPointDefHeaders} positioning
+     * Here's where I'm tryign to handle some variability in dates
+     * @param _updated value in a date cell
      */
-    static makeExcelPointDefRow(pointDef: pdw.PointDefLike) {
-        return [
-            pointDef._uid,
-            pointDef._created,
-            pointDef._updated,
-            pointDef._deleted,
-            pointDef._did,
-            pointDef._pid,
-            pointDef._lbl,
-            pointDef._emoji,
-            pointDef._desc,
-            pointDef._type,
-            pointDef._rollup,
-        ]
-    }
-
-
-    static makeExcelEntryRow(entryData: pdw.EntryLike) {
-        return [
-            entryData._uid,
-            entryData._created,
-            entryData._updated,
-            entryData._deleted,
-            entryData._did,
-            entryData._eid,
-            entryData._period,
-            entryData._note
-        ]
-    }
-
-    static makeExcelEntryPointRow(entryPointData: pdw.EntryPointLike) {
-        return [
-            entryPointData._uid,
-            entryPointData._created,
-            entryPointData._updated,
-            entryPointData._deleted,
-            entryPointData._did,
-            entryPointData._pid,
-            entryPointData._eid,
-            entryPointData._val.toString() //I think I want this
-        ]
-    }
-
-    static makeExcelTagDefRow(tagDefData: pdw.TagDefLike) {
-        return [
-            tagDefData._uid,
-            tagDefData._created,
-            tagDefData._updated,
-            tagDefData._deleted,
-            tagDefData._tid,
-            tagDefData._lbl
-        ]
-    }
-
-    static makeExcelTagRow(tagData: pdw.TagLike) {
-        return [
-            tagData._uid,
-            tagData._created,
-            tagData._updated,
-            tagData._deleted,
-            tagData._did,
-            tagData._pid,
-            tagData._tid,
-        ]
+    static makeEpochStrFromExcelDate(dateCellVal: any): any {
+        if (typeof dateCellVal === 'string') {
+            try {
+                pdw.parseTemporalFromEpochStr(dateCellVal);
+                return dateCellVal
+            } catch (e) {
+                try {
+                    let temp = Temporal.ZonedDateTime.from(dateCellVal);
+                    return pdw.makeEpochStrFromTemporal(temp);
+                } catch (etwo) {
+                    console.error('Failed to make this into an EpochStr:', dateCellVal);
+                    throw new Error('Could not parse Excel date');
+                }
+            }
+        }
+        if (typeof dateCellVal === 'number') {
+            return Temporal.Instant.fromEpochMilliseconds((dateCellVal - (25567 + 1)) * 86400 * 1000).toZonedDateTimeISO(Temporal.Now.timeZone());
+        }
     }
 
     /**
@@ -302,11 +329,8 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             || pointDefRow._pid == undefined)
             throw new Error('Cannot parseExcelDefRow for ', pointDefRow);
 
-        if (typeof pointDefRow._deleted === 'boolean') {
-            pointDefRow._deleted = pointDefRow._deleted;
-        } else {
-            pointDefRow._deleted = pointDefRow._deleted.toUpperCase() == 'TRUE';
-        }
+        pointDefRow = ExcelTabularImportExport.parseExcelFirstFourColumns(pointDefRow);
+
         pointDefRow._did = pointDefRow._did.toString(); //in case I got unlucky with an all-numeric SmallID
         pointDefRow._pid = pointDefRow._pid.toString(); //in case I got unlucky with an all-numeric SmallID
 
@@ -321,11 +345,8 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             || entryRow._did == undefined)
             throw new Error('Cannot parseExcelEntryRow for ', entryRow);
 
-        if (typeof entryRow._deleted === 'boolean') {
-            entryRow._deleted = entryRow._deleted;
-        } else {
-            entryRow._deleted = entryRow._deleted.toUpperCase() == 'TRUE';
-        }
+        entryRow = ExcelTabularImportExport.parseExcelFirstFourColumns(entryRow);
+
         entryRow._did = entryRow._did.toString(); //in case I got unlucky with an all-numeric SmallID
 
         if (!pdw.Entry.isEntryLike(entryRow)) throw new Error('Failed to correctly parseExcelEntryRow for ', entryRow);
@@ -340,11 +361,8 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             || entryPointRow._pid == undefined)
             throw new Error('Cannot parseExcelEntryPointRow for ', entryPointRow);
 
-        if (typeof entryPointRow._deleted === 'boolean') {
-            entryPointRow._deleted = entryPointRow._deleted;
-        } else {
-            entryPointRow._deleted = entryPointRow._deleted.toUpperCase() == 'TRUE';
-        }
+        entryPointRow = ExcelTabularImportExport.parseExcelFirstFourColumns(entryPointRow);
+
         entryPointRow._did = entryPointRow._did.toString(); //in case I got unlucky with an all-numeric SmallID
         entryPointRow._did = entryPointRow._pid.toString(); //in case I got unlucky with an all-numeric SmallID
 
@@ -359,11 +377,8 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             || tagDefRow._tid == undefined)
             throw new Error('Cannot parseExcelTagDefRow for ', tagDefRow);
 
-        if (typeof tagDefRow._deleted === 'boolean') {
-            tagDefRow._deleted = tagDefRow._deleted;
-        } else {
-            tagDefRow._deleted = tagDefRow._deleted.toUpperCase() == 'TRUE';
-        }
+        tagDefRow = ExcelTabularImportExport.parseExcelFirstFourColumns(tagDefRow);
+
         tagDefRow._did = tagDefRow._tid.toString(); //in case I got unlucky with an all-numeric SmallID
 
         if (!pdw.TagDef.isTagDefLike(tagDefRow)) throw new Error('Failed to correctly parseExcelTagDefRow for ', tagDefRow);
@@ -378,11 +393,8 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             || tagRow._did == undefined)
             throw new Error('Cannot parseExcelTagRow for ', tagRow);
 
-        if (typeof tagRow._deleted === 'boolean') {
-            tagRow._deleted = tagRow._deleted;
-        } else {
-            tagRow._deleted = tagRow._deleted.toUpperCase() == 'TRUE';
-        }
+        tagRow = ExcelTabularImportExport.parseExcelFirstFourColumns(tagRow);
+
         tagRow._did = tagRow._tid.toString(); //in case I got unlucky with an all-numeric SmallID
         tagRow._did = tagRow._did.toString(); //in case I got unlucky with an all-numeric SmallID
 
@@ -397,7 +409,7 @@ export class JsonImportExport implements pdw.AsyncDataStore {
 
     exportTo(data: pdw.CompleteDataset, filepath: string) {
         let json = JSON.stringify(data);
-        fs.writeFile(filepath, json, 'utf8', ()=>{});
+        fs.writeFile(filepath, json, 'utf8', () => { });
     }
 
     importFrom(filepath: string): pdw.CompleteDataset {
@@ -417,32 +429,32 @@ export class JsonImportExport implements pdw.AsyncDataStore {
         if (returnData.entryPoints !== undefined) pdwRef.setEntryPoints(returnData.entryPoints);
         if (returnData.tagDefs !== undefined) pdwRef.setTagDefs(returnData.tagDefs);
         if (returnData.tags !== undefined) pdwRef.setTags(returnData.tags);
-        
+
         returnData.overview = {
             storeName: filepath,
             defs: {
-                current: returnData.defs?.filter(element=>element._deleted===false).length,
-                deleted: returnData.defs?.filter(element=>element._deleted).length
+                current: returnData.defs?.filter(element => element._deleted === false).length,
+                deleted: returnData.defs?.filter(element => element._deleted).length
             },
             pointDefs: {
-                current: returnData.pointDefs?.filter(element=>element._deleted===false).length,
-                deleted: returnData.pointDefs?.filter(element=>element._deleted).length
+                current: returnData.pointDefs?.filter(element => element._deleted === false).length,
+                deleted: returnData.pointDefs?.filter(element => element._deleted).length
             },
             entries: {
-                current: returnData.entries?.filter(element=>element._deleted===false).length,
-                deleted: returnData.entries?.filter(element=>element._deleted).length
+                current: returnData.entries?.filter(element => element._deleted === false).length,
+                deleted: returnData.entries?.filter(element => element._deleted).length
             },
             entryPoints: {
-                current: returnData.entryPoints?.filter(element=>element._deleted===false).length,
-                deleted: returnData.entryPoints?.filter(element=>element._deleted).length
+                current: returnData.entryPoints?.filter(element => element._deleted === false).length,
+                deleted: returnData.entryPoints?.filter(element => element._deleted).length
             },
             tagDefs: {
-                current: returnData.tagDefs?.filter(element=>element._deleted===false).length,
-                deleted: returnData.tagDefs?.filter(element=>element._deleted).length
+                current: returnData.tagDefs?.filter(element => element._deleted === false).length,
+                deleted: returnData.tagDefs?.filter(element => element._deleted).length
             },
             tags: {
-                current: returnData.tags?.filter(element=>element._deleted===false).length,
-                deleted: returnData.tags?.filter(element=>element._deleted).length
+                current: returnData.tags?.filter(element => element._deleted === false).length,
+                deleted: returnData.tags?.filter(element => element._deleted).length
             },
             lastUpdated: pdw.PDW.getDatasetLastUpdate(returnData)
         }
@@ -459,7 +471,7 @@ export class YamlImportExport implements pdw.AsyncDataStore {
     exportTo(data: pdw.CompleteDataset, filepath: string) {
         //crazy simple implementation
         const yaml = YAML.stringify(data);
-        fs.writeFile(filepath, yaml, 'utf8', ()=>{});
+        fs.writeFile(filepath, yaml, 'utf8', () => { });
     }
 
     importFrom(filepath: string): pdw.CompleteDataset {
@@ -479,32 +491,32 @@ export class YamlImportExport implements pdw.AsyncDataStore {
         if (returnData.entryPoints !== undefined) pdwRef.setEntryPoints(returnData.entryPoints);
         if (returnData.tagDefs !== undefined) pdwRef.setTagDefs(returnData.tagDefs);
         if (returnData.tags !== undefined) pdwRef.setTags(returnData.tags);
-        
+
         returnData.overview = {
             storeName: filepath,
             defs: {
-                current: returnData.defs?.filter(element=>element._deleted===false).length,
-                deleted: returnData.defs?.filter(element=>element._deleted).length
+                current: returnData.defs?.filter(element => element._deleted === false).length,
+                deleted: returnData.defs?.filter(element => element._deleted).length
             },
             pointDefs: {
-                current: returnData.pointDefs?.filter(element=>element._deleted===false).length,
-                deleted: returnData.pointDefs?.filter(element=>element._deleted).length
+                current: returnData.pointDefs?.filter(element => element._deleted === false).length,
+                deleted: returnData.pointDefs?.filter(element => element._deleted).length
             },
             entries: {
-                current: returnData.entries?.filter(element=>element._deleted===false).length,
-                deleted: returnData.entries?.filter(element=>element._deleted).length
+                current: returnData.entries?.filter(element => element._deleted === false).length,
+                deleted: returnData.entries?.filter(element => element._deleted).length
             },
             entryPoints: {
-                current: returnData.entryPoints?.filter(element=>element._deleted===false).length,
-                deleted: returnData.entryPoints?.filter(element=>element._deleted).length
+                current: returnData.entryPoints?.filter(element => element._deleted === false).length,
+                deleted: returnData.entryPoints?.filter(element => element._deleted).length
             },
             tagDefs: {
-                current: returnData.tagDefs?.filter(element=>element._deleted===false).length,
-                deleted: returnData.tagDefs?.filter(element=>element._deleted).length
+                current: returnData.tagDefs?.filter(element => element._deleted === false).length,
+                deleted: returnData.tagDefs?.filter(element => element._deleted).length
             },
             tags: {
-                current: returnData.tags?.filter(element=>element._deleted===false).length,
-                deleted: returnData.tags?.filter(element=>element._deleted).length
+                current: returnData.tags?.filter(element => element._deleted === false).length,
+                deleted: returnData.tags?.filter(element => element._deleted).length
             },
             lastUpdated: pdw.PDW.getDatasetLastUpdate(returnData)
         }

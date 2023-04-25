@@ -115,55 +115,42 @@ export enum Rollup {
  * SQL (for learning)
  */
 export interface DataStore {
-    /**
-     * /**
-     * Get Definitions. 
-     * By default, returns onl undeleted definitions.
-     * Specifying no param will return all NOT DELETED definitions.
-     * @param didsAndOrLbls array of lbls and/or _did to include
-     * @param includeDeleted defaults to false;
-     */
-    getDefs(didsAndOrLbls?: string[], includeDeleted?: boolean): DefLike[];
 
-    /**
-     * Creates (or updates) definitions. 
-     */
+    getDefs(params: SanitizedParams): DefLike[];
+
+    getPointDefs(params: SanitizedParams): PointDefLike[];
+
+    getEntries(params: SanitizedParams): EntryLike[];
+
+    getEntryPoints(params: SanitizedParams): EntryPointLike[];
+
+    getTags(params: SanitizedParams): TagLike[];
+
+    getTagDefs(params: SanitizedParams): TagDefLike[];
+
+    getAll(params: SanitizedParams): CompleteDataset;
+
+
+
     setDefs(defs: Def[]): Def[];
 
-    /**
-     * Get PointDefinitions. 
-     * Specifying no param will return all definitions.
-     * @param didsAndOrLbls array of _did or _lbl vales to get, leave empty to get all Defs
-     * @returns array of all matching definitions
-     */
-    getPointDefs(didsAndOrLbls?: string[], includeDeleted?: boolean): PointDefLike[];
-
-    /**
-     * Creates (or updates) point defintions
-     */
     setPointDefs(pointDefs: PointDef[]): any
-
-    getEntries(eids?: string[], includeDeleted?: boolean): EntryLike[];
 
     setEntries(entries: Entry[]): Entry[];
 
-    getEntryPoints(eids?: UID[], pids?: SmallID[], includeDeleted?: boolean): EntryPointLike[];
-
     setEntryPoints(entryPointData: MinimumEntryPoint[]): EntryPointLike[];
-
-    getTags(tids?: string[], dids?: SmallID[], pids?: SmallID[], includeDeleted?: boolean): TagLike[];
 
     setTags(tagData: Tag[]): TagLike[];
 
-    getTagDefs(pidAndOrDidAndOrLbls?: string[], includeDeleted?: boolean): TagDefLike[];
-
     setTagDefs(tagData: TagDef[]): TagDefLike[];
 
-    getOverview(): DataStoreOverview;
+    setAll(completeDataset: CompleteDataset): CompleteDataset;
+
+
 
     query(params: QueryParams): QueryResponse;
 
-    getAll(): CompleteDataset;
+    getOverview(): DataStoreOverview;
 
     connect?(...params: any): boolean;
 
@@ -189,7 +176,13 @@ export interface AsyncDataStore {
     exportTo(allData: CompleteDataset, params: any): any
 }
 
-export interface Filters {
+/**
+ * Basic data filtering parameters, supported by the {@link DataStore} methods for
+ * {@link getDefs} & the 5 other element "getters".
+ * Not all parameters are considered for each getter, but it should make
+ * things a bit simpler to standardize the params
+ */
+export interface StandardParams {
     /**
      * Include things marked as deleted?
      * no - default
@@ -200,12 +193,12 @@ export interface Filters {
     /**
      * For entries and entryPoints only
      */
-    from?: PeriodStr,
-    to?: PeriodStr,
-    createdFrom?: Temporal.ZonedDateTime,
-    createdTo?: Temporal.ZonedDateTime,
-    updatedFrom?: Temporal.ZonedDateTime,
-    updatedTo?: Temporal.ZonedDateTime,
+    from?: Period | PeriodStr,
+    to?: Period | PeriodStr,
+    createdFrom?: Temporal.ZonedDateTime | EpochStr,
+    createdTo?: Temporal.ZonedDateTime | EpochStr,
+    updatedFrom?: Temporal.ZonedDateTime | EpochStr,
+    updatedTo?: Temporal.ZonedDateTime | EpochStr,
     uid?: UID[],
     did?: SmallID[],
     pid?: SmallID[],
@@ -215,6 +208,34 @@ export interface Filters {
     pointLbl?: string[],
     tagLbl?: string[],
     limit?: number,
+    allOnPurpose?: boolean
+}
+
+export interface SanitizedParams {
+    includeDeleted: 'yes' | 'no' | 'only',
+    /**
+     * For entries and entryPoints only
+     */
+    from?: Period,
+    to?: Period,
+    createdFrom?: Temporal.ZonedDateTime,
+    createdFromEpochStr?: EpochStr,
+    createdTo?: Temporal.ZonedDateTime,
+    createdToEpochStr?: EpochStr,
+    updatedFrom?: Temporal.ZonedDateTime,
+    updatedFromEpochStr?: EpochStr,
+    updatedTo?: Temporal.ZonedDateTime
+    updatedToEpochStr?: EpochStr,
+    uid?: UID[],
+    did?: SmallID[],
+    pid?: SmallID[],
+    eid?: UID[],
+    tid?: SmallID[],
+    defLbl?: string[],
+    pointLbl?: string[],
+    tagLbl?: string[],
+    limit?: number,
+    allOnPurpose?: boolean
 }
 
 /**
@@ -256,6 +277,13 @@ export interface ElementLike {
      * previous instance
      */
     _updated: EpochStr;
+    /**
+     * other key/value pairs will attempt to find
+     * the PointDef who's _pid == the key and spin
+     * up a new {@link EntryPoint} who's _val is 
+     * the value
+     */
+    [x: string]: any;
 }
 
 /**
@@ -416,6 +444,13 @@ export interface MinimumElement {
      * EpochStr for when this was updated. Will geenrate for you.
      */
     _updated?: EpochStr;
+    /**
+     * other key/value pairs will attempt to find
+     * the PointDef who's _pid == the key and spin
+     * up a new {@link EntryPoint} who's _val is 
+     * the value
+     */
+    [x: string]: any;
 }
 
 /**
@@ -532,13 +567,6 @@ export interface MinimumEntry extends MinimumElement {
      * Where did the data come from?
      */
     _source?: string;
-    /**
-     * other key/value pairs will attempt to find
-     * the PointDef who's _pid == the key and spin
-     * up a new {@link EntryPoint} who's _val is 
-     * the value
-     */
-    [x: string]: any;
 }
 
 /**
@@ -609,6 +637,8 @@ export interface QueryParams {
     eid?: string | string[];
     pid?: string | string[];
     tag?: string | string[];
+    search?: string | string[];
+    searchIn?: string | string[];
     includeDeleted?: boolean;
     limit?: number;
     today?: any;
@@ -668,17 +698,127 @@ export class PDW {
         this.dataStores.push(storeInstance);
     }
 
-    //#HACK - allDataSince hardcoded
-    getAll(): CompleteDataset {
+    getAll(rawParams: StandardParams): CompleteDataset {
+        const params = PDW.sanitizeParams(rawParams)
+
         let data = {
-            defs: this.dataStores[0].getDefs(undefined, true),
-            pointDefs: this.dataStores[0].getPointDefs(undefined, true),
-            entries: this.dataStores[0].getEntries(undefined, true),
-            entryPoints: this.dataStores[0].getEntryPoints(undefined, undefined, true),
-            tagDefs: this.dataStores[0].getTagDefs(undefined, true),
-            tags: this.dataStores[0].getTags(undefined, undefined, undefined, true),
+            defs: this.dataStores[0].getDefs(params),
+            pointDefs: this.dataStores[0].getPointDefs(params),
+            entries: this.dataStores[0].getEntries(params),
+            entryPoints: this.dataStores[0].getEntryPoints(params),
+            tagDefs: this.dataStores[0].getTagDefs(params),
+            tags: this.dataStores[0].getTags(params),
         }
         return PDW.addOverviewToCompleteDataset(data);
+    }
+
+    getDefs(rawParams: StandardParams): Def[] {
+        const params = PDW.sanitizeParams(rawParams)
+        //ensure valid params //commented out because I realized "createdFrom" and stuff would also be valid
+        // if(params.uid === undefined && 
+        //     params.did === undefined && 
+        //     params.defLbl === undefined && 
+        //     params.allOnPurpose === undefined){
+        //     console.error('Invalid params for getDefs:', rawParams);
+        //     throw new Error('Invalid Params supplied')
+        // }
+
+        //if there's only DataStore, bypass the combining stuff to save time
+        if (this.dataStores.length == 1) {
+            let defLikes = this.dataStores[0].getDefs(params)
+            return defLikes.map(dl => new Def(dl));
+        }
+
+        //multiple DataStores need to be all pulled, then deconflicted
+        let combinedDefs: Def[] = [];
+        //compile defs from all attached DataStores
+        //#UNTESTED - test this!
+        this.dataStores.forEach(dataStore => {
+            let thisStoreDefLikes = dataStore.getDefs(params);
+            let thisStoreDefs = thisStoreDefLikes.map(tsdl => new Def(tsdl));
+            thisStoreDefs.forEach(def => {
+                let existingCopy = combinedDefs.find(cd => cd.sameIdAs(def));
+                if (existingCopy !== undefined) {
+                    //duplicate found, determine which is newer & keep only it
+                    if (existingCopy.shouldBeReplacedWith(def)) {
+                        //find & remove exising
+                        const ind = combinedDefs.findIndex(el => el._uid === existingCopy!._uid)
+                        combinedDefs.splice(ind);
+                        //add replacement
+                        combinedDefs.push(def);
+                    }
+                    //else{ignore it. don't do anything}
+                } else {
+                    combinedDefs.push(def);
+                }
+            })
+        })
+        return combinedDefs;
+    }
+
+    getPointDefs(rawParams: StandardParams): Def[] {
+        const params = PDW.sanitizeParams(rawParams)
+
+        //if there's only DataStore, bypass the combining stuff to save time
+        if (this.dataStores.length == 1) {
+            let defLikes = this.dataStores[0].getPointDefs(params)
+            return defLikes.map(dl => new Def(dl));
+        }
+
+        throw new Error('Multiple stores not implemented yet');
+        // //multiple DataStores need to be all pulled, then deconflicted
+        // let combinedDefs: Def[] = [];
+        // //compile defs from all attached DataStores
+        // //#UNTESTED - test this!
+        // this.dataStores.forEach(dataStore => {
+        //     let thisStoreDefLikes = dataStore.getDefs(didPidOrLbls as string[], includeDeleted);
+        //     let thisStoreDefs = thisStoreDefLikes.map(tsdl => new Def(tsdl));
+        //     thisStoreDefs.forEach(def => {
+        //         let existingCopy = combinedDefs.find(cd => cd.sameIdAs(def));
+        //         if (existingCopy !== undefined) {
+        //             //duplicate found, determine which is newer & keep only it
+        //             if (existingCopy.shouldBeReplacedWith(def)) {
+        //                 //find & remove exising
+        //                 const ind = combinedDefs.findIndex(el => el._uid === existingCopy!._uid)
+        //                 combinedDefs.splice(ind);
+        //                 //add replacement
+        //                 combinedDefs.push(def);
+        //             }
+        //             //else{ignore it. don't do anything}
+        //         } else {
+        //             combinedDefs.push(def);
+        //         }
+        //     })
+        // })
+        // return combinedDefs;
+    }
+
+    getEntries(rawParams: StandardParams): Entry[] {
+        const params = PDW.sanitizeParams(rawParams)
+
+        if (this.dataStores.length == 1) {
+            let entries = this.dataStores[0].getEntries(params);
+            return entries.map(entry => new Entry(entry));
+        }
+
+        throw new Error('Multiple datastores not yet implemented');
+    }
+
+    getEntryPoints() {
+        throw new Error('You did not build this, do you need it?')
+    }
+
+
+    getTagDefs(rawParams: StandardParams): TagDef[] {
+        const params = PDW.sanitizeParams(rawParams)
+
+        //if there's only DataStore, bypass the combining stuff to save time
+        if (this.dataStores.length == 1) {
+            let tagDefLikes = this.dataStores[0].getTagDefs(params)
+            return tagDefLikes.map(tdl => new TagDef(tdl));
+        }
+
+        throw new Error('Multiple datastores not yet implemented');
     }
 
     setDefs(defsIn: MinimumDef[]): Def[] {
@@ -730,123 +870,9 @@ export class PDW {
         return tags
     }
 
-    getDefs(didOrLbls?: string[] | string, includeDeleted = false): Def[] {
-        //enforce array-of-strings type
-        if (didOrLbls !== undefined && !Array.isArray(didOrLbls)) didOrLbls = [didOrLbls]
-
-        //if there's only DataStore, bypass the combining stuff to save time
-        if (this.dataStores.length == 1) {
-            let defLikes = this.dataStores[0].getDefs(didOrLbls, includeDeleted)
-            return defLikes.map(dl => new Def(dl));
-        }
-
-        //multiple DataStores need to be all pulled, then deconflicted
-        let combinedDefs: Def[] = [];
-        //compile defs from all attached DataStores
-        //#UNTESTED - test this!
-        this.dataStores.forEach(dataStore => {
-            let thisStoreDefLikes = dataStore.getDefs(didOrLbls as string[], includeDeleted);
-            let thisStoreDefs = thisStoreDefLikes.map(tsdl => new Def(tsdl));
-            thisStoreDefs.forEach(def => {
-                let existingCopy = combinedDefs.find(cd => cd.sameIdAs(def));
-                if (existingCopy !== undefined) {
-                    //duplicate found, determine which is newer & keep only it
-                    if (existingCopy.shouldBeReplacedWith(def)) {
-                        //find & remove exising
-                        const ind = combinedDefs.findIndex(el => el._uid === existingCopy!._uid)
-                        combinedDefs.splice(ind);
-                        //add replacement
-                        combinedDefs.push(def);
-                    }
-                    //else{ignore it. don't do anything}
-                } else {
-                    combinedDefs.push(def);
-                }
-            })
-        })
-        return combinedDefs;
+    setAll(completeDataset: CompleteDataset): CompleteDataset {
+        throw new Error("Method not implemented")
     }
-
-    getPointDefs(didPidOrLbls?: string[] | string, includeDeleted = false): Def[] {
-        //enforce array-of-strings type
-        if (didPidOrLbls !== undefined && !Array.isArray(didPidOrLbls)) didPidOrLbls = [didPidOrLbls]
-
-        //if there's only DataStore, bypass the combining stuff to save time
-        if (this.dataStores.length == 1) {
-            let defLikes = this.dataStores[0].getPointDefs(didPidOrLbls, includeDeleted)
-            return defLikes.map(dl => new Def(dl));
-        }
-
-        throw new Error('Multiple stores not implemented yet');
-        // //multiple DataStores need to be all pulled, then deconflicted
-        // let combinedDefs: Def[] = [];
-        // //compile defs from all attached DataStores
-        // //#UNTESTED - test this!
-        // this.dataStores.forEach(dataStore => {
-        //     let thisStoreDefLikes = dataStore.getDefs(didPidOrLbls as string[], includeDeleted);
-        //     let thisStoreDefs = thisStoreDefLikes.map(tsdl => new Def(tsdl));
-        //     thisStoreDefs.forEach(def => {
-        //         let existingCopy = combinedDefs.find(cd => cd.sameIdAs(def));
-        //         if (existingCopy !== undefined) {
-        //             //duplicate found, determine which is newer & keep only it
-        //             if (existingCopy.shouldBeReplacedWith(def)) {
-        //                 //find & remove exising
-        //                 const ind = combinedDefs.findIndex(el => el._uid === existingCopy!._uid)
-        //                 combinedDefs.splice(ind);
-        //                 //add replacement
-        //                 combinedDefs.push(def);
-        //             }
-        //             //else{ignore it. don't do anything}
-        //         } else {
-        //             combinedDefs.push(def);
-        //         }
-        //     })
-        // })
-        // return combinedDefs;
-    }
-
-    getEntries(eids: UID[], includeDeleted = false): Entry[] {
-        if (this.dataStores.length == 1) {
-            let entries = this.dataStores[0].getEntries(eids, includeDeleted);
-            return entries.map(entry => new Entry(entry));
-        }
-
-        throw new Error('Multiple datastores not yet implemented');
-    }
-
-    getEntryPoints() {
-        throw new Error('You did not build this, do you need it?')
-    }
-
-
-    getTagDefs(tidOrLbls?: string[] | string, includeDeleted = false): TagDef[] {
-        //enforce array-of-strings type
-        if (tidOrLbls !== undefined && !Array.isArray(tidOrLbls)) tidOrLbls = [tidOrLbls]
-
-        //if there's only DataStore, bypass the combining stuff to save time
-        if (this.dataStores.length == 1) {
-            let tagDefLikes = this.dataStores[0].getTagDefs(tidOrLbls, includeDeleted)
-            return tagDefLikes.map(tdl => new TagDef(tdl));
-        }
-
-        throw new Error('Multiple datastores not yet implemented');
-    }
-
-    // /**
-    //  * Looks at an array of Elements and removes any duplicates and any
-    //  * older versions of an element (say, a Def from a DataStore that was 
-    //  * later updated in another DataStore). A CLASSIC CODING CHALLENGE.
-    //  * It does NOT modify any Elements.
-    //  * @param elementsIn array of elements to check for duplication/outdatedness within
-    //  */
-    // private deconflictElements(elementsIn: Element[]): Element[] {
-    //     let noConflict: Element[] = [];
-    //     elementsIn.forEach(el=>{
-    //         if(!noConflict.some(nc=>nc.sameIdAs(el))) return noConflict.push(el);
-    //         return 
-    //     })
-    //     return elementsIn;
-    // }
 
     /**
      * Creates a new definition from {@link MinimumDef} components
@@ -919,50 +945,125 @@ export class PDW {
         return PDW.instance;
     }
 
+
+    /**
+     * Enforces defaults. Sanity check some types.
+     * Less variability in the output
+     * @param params rawParams in
+     * @returns santized params out
+     */
+    static sanitizeParams(params: StandardParams | SanitizedParams): SanitizedParams {
+        //ensure default
+        if (params.includeDeleted === undefined) params.includeDeleted = 'no';
+        //make periods from period srings
+        if (params.from !== undefined) {
+            if (typeof params.from === 'string') params.from = new Period(params.from);
+            //otherwise I guess I'll assume it's okay
+        }
+        if (params.to !== undefined) {
+            if (typeof params.to === 'string') params.to = new Period(params.to);
+            //otherwise I guess I'll assume it's okay
+        }
+        //make Temporal & EpochStr options
+        if (params.createdFrom !== undefined) {
+            if (typeof params.createdFrom === 'string') {
+                params.createdFrom = parseTemporalFromEpochStr(params.createdFrom);
+                (<SanitizedParams>params).createdFromEpochStr = params.createdFrom.toString();
+            } else {
+                (<SanitizedParams>params).createdFromEpochStr = params.createdFrom.toString();
+                params.createdFrom = parseTemporalFromEpochStr((<SanitizedParams>params).createdFromEpochStr!);
+            }
+        }
+        if (params.createdTo !== undefined) {
+            if (typeof params.createdTo === 'string') {
+                params.createdTo = parseTemporalFromEpochStr(params.createdTo);
+                (<SanitizedParams>params).createdToEpochStr = params.createdTo.toString();
+            } else {
+                (<SanitizedParams>params).createdToEpochStr = params.createdTo.toString();
+                params.createdTo = parseTemporalFromEpochStr((<SanitizedParams>params).createdToEpochStr!);
+            }
+        }
+        if (params.updatedFrom !== undefined) {
+            if (typeof params.updatedFrom === 'string') {
+                params.updatedFrom = parseTemporalFromEpochStr(params.updatedFrom);
+                (<SanitizedParams>params).updatedFromEpochStr = params.updatedFrom.toString();
+            } else {
+                (<SanitizedParams>params).updatedFromEpochStr = params.updatedFrom.toString();
+                params.updatedFrom = parseTemporalFromEpochStr((<SanitizedParams>params).updatedFromEpochStr!);
+            }
+        }
+        if (params.updatedTo !== undefined) {
+            if (typeof params.updatedTo === 'string') {
+                params.updatedTo = parseTemporalFromEpochStr(params.updatedTo);
+                (<SanitizedParams>params).updatedToEpochStr = params.updatedTo.toString();
+            } else {
+                (<SanitizedParams>params).updatedToEpochStr = params.updatedTo.toString();
+                params.updatedTo = parseTemporalFromEpochStr((<SanitizedParams>params).updatedToEpochStr!);
+            }
+        }
+        //ensure arrays
+        if (params.uid !== undefined && typeof params.uid == 'string') params.uid = [params.uid]
+        if (params.did !== undefined && typeof params.did == 'string') params.did = [params.did]
+        if (params.pid !== undefined && typeof params.pid == 'string') params.pid = [params.pid]
+        if (params.eid !== undefined && typeof params.eid == 'string') params.eid = [params.eid]
+        if (params.tid !== undefined && typeof params.tid == 'string') params.tid = [params.tid]
+
+        if (params.defLbl !== undefined && typeof params.defLbl == 'string') params.defLbl = [params.defLbl]
+        if (params.pointLbl !== undefined && typeof params.pointLbl == 'string') params.pointLbl = [params.pointLbl]
+        if (params.tagLbl !== undefined && typeof params.tagLbl == 'string') params.tagLbl = [params.tagLbl]
+
+        if (params.limit !== undefined && typeof params.limit !== "number") {
+            console.error('Your params were: ', params)
+            throw new Error('You tried to supply a limit param with a non-number.')
+        }
+
+        return params as SanitizedParams
+    }
+
     static getDatasetLastUpdate(dataset: CompleteDataset): string {
         let recents: ElementLike[] = [];
-        if(dataset.defs !== undefined && dataset.defs.length > 0) recents.push(Element.getMostRecent(dataset.defs)!) 
-        if(dataset.pointDefs !== undefined && dataset.pointDefs.length > 0) recents.push(Element.getMostRecent(dataset.pointDefs)!) 
-        if(dataset.entries !== undefined && dataset.entries.length > 0) recents.push(Element.getMostRecent(dataset.entries)!) 
-        if(dataset.entryPoints !== undefined && dataset.entryPoints.length > 0) recents.push(Element.getMostRecent(dataset.entryPoints)!) 
-        if(dataset.tagDefs !== undefined && dataset.tagDefs.length > 0) recents.push(Element.getMostRecent(dataset.tagDefs)!) 
-        if(dataset.tags !== undefined && dataset.tags.length > 0) recents.push(Element.getMostRecent(dataset.tags)!) 
+        if (dataset.defs !== undefined && dataset.defs.length > 0) recents.push(Element.getMostRecent(dataset.defs)!)
+        if (dataset.pointDefs !== undefined && dataset.pointDefs.length > 0) recents.push(Element.getMostRecent(dataset.pointDefs)!)
+        if (dataset.entries !== undefined && dataset.entries.length > 0) recents.push(Element.getMostRecent(dataset.entries)!)
+        if (dataset.entryPoints !== undefined && dataset.entryPoints.length > 0) recents.push(Element.getMostRecent(dataset.entryPoints)!)
+        if (dataset.tagDefs !== undefined && dataset.tagDefs.length > 0) recents.push(Element.getMostRecent(dataset.tagDefs)!)
+        if (dataset.tags !== undefined && dataset.tags.length > 0) recents.push(Element.getMostRecent(dataset.tags)!)
         return Element.getMostRecent(recents)!._updated
     }
 
-    static addOverviewToCompleteDataset(data: CompleteDataset, storeName?: string): CompleteDataset{
-        if(data.overview !== undefined){
+    static addOverviewToCompleteDataset(data: CompleteDataset, storeName?: string): CompleteDataset {
+        if (data.overview !== undefined) {
             console.warn('Tried to add an overview to a dataset that already had one:', data);
             return data
         }
         data.overview = {
             defs: {
-                current: data.defs?.filter(element=>element._deleted===false).length,
-                deleted: data.defs?.filter(element=>element._deleted).length
+                current: data.defs?.filter(element => element._deleted === false).length,
+                deleted: data.defs?.filter(element => element._deleted).length
             },
             pointDefs: {
-                current: data.pointDefs?.filter(element=>element._deleted===false).length,
-                deleted: data.pointDefs?.filter(element=>element._deleted).length
+                current: data.pointDefs?.filter(element => element._deleted === false).length,
+                deleted: data.pointDefs?.filter(element => element._deleted).length
             },
             entries: {
-                current: data.entries?.filter(element=>element._deleted===false).length,
-                deleted: data.entries?.filter(element=>element._deleted).length
+                current: data.entries?.filter(element => element._deleted === false).length,
+                deleted: data.entries?.filter(element => element._deleted).length
             },
             entryPoints: {
-                current: data.entryPoints?.filter(element=>element._deleted===false).length,
-                deleted: data.entryPoints?.filter(element=>element._deleted).length
+                current: data.entryPoints?.filter(element => element._deleted === false).length,
+                deleted: data.entryPoints?.filter(element => element._deleted).length
             },
             tagDefs: {
-                current: data.tagDefs?.filter(element=>element._deleted===false).length,
-                deleted: data.tagDefs?.filter(element=>element._deleted).length
+                current: data.tagDefs?.filter(element => element._deleted === false).length,
+                deleted: data.tagDefs?.filter(element => element._deleted).length
             },
             tags: {
-                current: data.tags?.filter(element=>element._deleted===false).length,
-                deleted: data.tags?.filter(element=>element._deleted).length
+                current: data.tags?.filter(element => element._deleted === false).length,
+                deleted: data.tags?.filter(element => element._deleted).length
             },
             lastUpdated: PDW.getDatasetLastUpdate(data)
         }
-        if(storeName) data.overview!.storeName = storeName
+        if (storeName) data.overview!.storeName = storeName
         return data
     }
 }
@@ -975,16 +1076,20 @@ export abstract class Element implements ElementLike {
     _deleted: boolean;
     _created: EpochStr;
     _updated: EpochStr;
+    _tempCreated: Temporal.ZonedDateTime;
+    _tempUpdated: Temporal.ZonedDateTime;
     constructor(existingData: any) {
         this._uid = existingData._uid ?? makeUID();
         this._deleted = existingData._deleted ?? false;
         this._created = existingData._created ?? makeEpochStr();
         this._updated = existingData._updated ?? makeEpochStr();
+        this._tempCreated = parseTemporalFromEpochStr(this._created)
+        this._tempUpdated = parseTemporalFromEpochStr(this._updated)
     }
 
     markDeleted() {
         this._deleted = true;
-        this._updated =  makeEpochStr();
+        this._updated = makeEpochStr();
     }
 
     markUndeleted() {
@@ -1040,8 +1145,13 @@ export abstract class Element implements ElementLike {
         if (type === 'EntryPointLike') return this._eid === comparison._eid && this._pid === comparison._pid;
         //@ts-expect-error
         if (type === 'TagDefLike') return this._tid === comparison._tid;
-        //@ts-expect-error
-        if (type === 'TagLike') return this._tid === comparison._tid && this._did === comparison._did; //#UNTESTED - for selects
+        if (type === 'TagLike'){
+            //@ts-expect-error
+            if(this._pid === undefined) return this._tid === comparison._tid && this._did === comparison._did;
+            //@ts-expect-error
+            return this._tid === comparison._tid && this._did === comparison._did && this._pid === comparison._pid;  //#UNTESTED - for selects
+            
+        }
         //@ts-expect-error
         return this._pid === comparison._pid && this._did === comparison._did;
     }
@@ -1050,19 +1160,59 @@ export abstract class Element implements ElementLike {
         return this.getType() === Element.getTypeOfElementLike(comparison);
     }
 
+    passesFilters(params: SanitizedParams) {
+        const type = this.getType()!;
+
+        if (params.uid !== undefined && !params.uid.some(uid => uid === this._uid)) return false;
+        //@ts-expect-error
+        if (params.did !== undefined && this._did !== undefined && !params.did.some(did => did === this._did)) return false;
+        //@ts-expect-error
+        if (params.eid !== undefined && this._eid !== undefined && !params.eid.some(eid => eid === this._eid)) return false;
+        //@ts-expect-error
+        if (params.tid !== undefined && this._tid != undefined && !params.tid.some(tid => tid === this._tid)) return false;
+        //@ts-expect-error
+        if (params.pid !== undefined && this._pid !== undefined && !params.pid.some(pid => pid === this._pid)) return false;
+
+        //@ts-expect-error
+        if (params.defLbl !== undefined && type === 'DefLike' && !params.defLbl.some(lbl => lbl === this._lbl)) return false;
+        //@ts-expect-error
+        if (params.tagLbl !== undefined && type.substring(0, 3) === 'Tag' && !params.tagLbl.some(lbl => lbl === this._lbl)) return false;
+        //@ts-expect-error
+        if (params.pointLbl !== undefined && type === 'PointDefLike' && !params.pointLbl.some(lbl => lbl === this._lbl)) return false;
+        if (params.pointLbl !== undefined && type === 'EntryPointLike') {
+            const assPointDef = PDW.getInstance().getPointDefs({ pointLbl: params.pointLbl });
+            if (!assPointDef.some(pd => pd._deleted !== true && params.pointLbl?.includes(pd._lbl))) return false;
+        }
+
+        if (params.createdFrom !== undefined && Temporal.ZonedDateTime.compare(params.createdFrom, this._tempCreated) !== 1) return false;//#UNTESTED
+        if (params.createdTo !== undefined && Temporal.ZonedDateTime.compare(params.createdTo, this._tempCreated) !== -1) return false;//#UNTESTED
+        if (params.createdFromEpochStr !== undefined && params.createdFromEpochStr > this._created) return false;
+        if (params.createdToEpochStr !== undefined && params.createdToEpochStr < this._created) return false;
+
+        if (params.updatedFrom !== undefined && Temporal.ZonedDateTime.compare(params.updatedFrom, this._tempUpdated) !== 1) return false;//#UNTESTED
+        if (params.updatedTo !== undefined && Temporal.ZonedDateTime.compare(params.updatedTo, this._tempUpdated) !== -1) return false;//#UNTESTED
+        if (params.updatedFromEpochStr !== undefined && params.updatedFromEpochStr > this._updated) return false;
+        if (params.updatedToEpochStr !== undefined && params.updatedToEpochStr < this._updated) return false;
+
+        if (params.includeDeleted === 'no' && this._deleted === true) return false;
+        if (params.includeDeleted === 'only' && this._deleted === false) return false;
+
+        return true;
+    }
+
     private static getTypeOfElementLike(data: ElementLike) {
         if (data.hasOwnProperty("_tid") && data.hasOwnProperty('_did')) return "TagLike"
         if (data.hasOwnProperty("_tid")) return "TagDefLike"
         if (data.hasOwnProperty("_eid") && data.hasOwnProperty('_pid')) return "EntryPointLike"
         if (data.hasOwnProperty("_eid")) return "EntryLike"
-        if (data.hasOwnProperty("_pid")) return "PointDefLike"
+        if (data.hasOwnProperty("_did") && data.hasOwnProperty('_pid')) return "PointDefLike"
         if (data.hasOwnProperty("_did")) return "DefLike"
         return null
     }
 
     /**
      * Analyzes an object and tries to find one UNDELETED Element that
-     * has the same Xid(s). 
+     * has the same Xid(s). Does not look at UIDs or Labels.
      * @param dataIn an object that may be part of an existing Element
      * @param ofType optional, allows you to override what the dataIn would suggest it should be
      * @returns the raw DefLike, PointDefLike, EntryLike, EntryPointLike, TagLike, or TagDefLike - or undefined if none found
@@ -1075,47 +1225,49 @@ export abstract class Element implements ElementLike {
         let existing: any;
         if (type === 'DefLike') {
             pdwRef.dataStores.forEach(store => {
-                let storeResult = maybeGetOnlyResult(store.getDefs([dataIn._did], false));
+                let storeResult = maybeGetOnlyResult(store.getDefs({ did: [dataIn._did], includeDeleted: 'no' }));
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as DefLike
             })
         }
         if (type === 'PointDefLike') {
             pdwRef.dataStores.forEach(store => {
-                const pidOrLbl = dataIn._pid ?? dataIn._lbl
-                let storeResult = maybeGetOnlyResult(store.getPointDefs([pidOrLbl], false));
+                let storeResult = maybeGetOnlyResult(store.getPointDefs({ pid: [dataIn._pid], did: [dataIn._did], includeDeleted: 'no' }));
+                if (storeResult === undefined) storeResult = maybeGetOnlyResult(store.getPointDefs({ pointLbl: [dataIn._lbl], did: [dataIn._did], includeDeleted: 'no' }));
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as PointDefLike
             })
         }
         if (type === 'EntryLike') {
             pdwRef.dataStores.forEach(store => {
-                let storeResult = maybeGetOnlyResult(store.getEntries([dataIn._eid], false));
+                let storeResult = maybeGetOnlyResult(store.getEntries({ eid: [dataIn._eid], includeDeleted: 'no' }));
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as EntryLike
             })
         }
         if (type === 'EntryPointLike') {
             pdwRef.dataStores.forEach(store => {
                 const pidOrLbl = dataIn._pid ?? dataIn._lbl
-                let storeResult = maybeGetOnlyResult(store.getEntryPoints([dataIn._eid], [pidOrLbl], false));
+                let storeResult = maybeGetOnlyResult(store.getEntryPoints({ pid: [dataIn._pid], eid: [dataIn._eid], includeDeleted: 'no' }));
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as EntryPointLike
             })
         }
         if (type === 'TagDefLike') {
             pdwRef.dataStores.forEach(store => {
-                let storeResult = maybeGetOnlyResult(store.getTagDefs([dataIn._tid], false));
+                let storeResult = maybeGetOnlyResult(store.getTagDefs({ tid: [dataIn._tid], includeDeleted: 'no' }));
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as TagDefLike
             })
         }
         if (type === 'TagLike') {
             pdwRef.dataStores.forEach(store => {
-                let storeResult = maybeGetOnlyResult(store.getTags([dataIn._tid], [dataIn._did], undefined, false));
+                let storeResult
+                if (dataIn._pid === undefined) storeResult = maybeGetOnlyResult(store.getTags({ did: [dataIn._did], tid: [dataIn._tid], includeDeleted: 'no' }));
+                if (dataIn._pid !== undefined) storeResult = maybeGetOnlyResult(store.getTags({ did: [dataIn._did], tid: [dataIn._tid], pid: [dataIn._pid], includeDeleted: 'no' }));
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as TagDefLike
             })
         }
         return existing;
     }
 
-    public static getMostRecent(elementArr: ElementLike[]): ElementLike | undefined{
-        if(elementArr.length == 0){
+    public static getMostRecent(elementArr: ElementLike[]): ElementLike | undefined {
+        if (elementArr.length == 0) {
             console.warn('You tried to get the most recent of a list of zero elements');
             return undefined
         }
@@ -1125,8 +1277,8 @@ export abstract class Element implements ElementLike {
             _created: '',
             _updated: '0' // earlier than anything before 12/31/1969, 6:00:00 PM CST
         }
-        elementArr.forEach(element=>{
-            if(element._updated > mostRecent._updated) mostRecent = element
+        elementArr.forEach(element => {
+            if (element._updated > mostRecent._updated) mostRecent = element
         })
         return mostRecent
     }
@@ -1195,7 +1347,7 @@ export class Def extends Element implements DefLike {
 
         //if there's only DataStore, bypass the combining stuff to save time
         if (pdwRef.dataStores.length == 1) {
-            let pds = pdwRef.dataStores[0].getPointDefs([this._did], includeDeleted)
+            let pds = pdwRef.dataStores[0].getPointDefs({ did: [this._did], includeDeleted: includeDeleted ? 'yes' : 'no' })
             return pds.map(pointDef => new PointDef(pointDef));
         }
 
@@ -1314,8 +1466,11 @@ export class Entry extends Element implements EntryLike {
             }
         }
         super(entryData);
-        const relatedDef = maybeGetOnlyResult(PDW.getInstance().getDefs([entryData._did!]));
-        if (relatedDef === undefined) throw new Error('No def found for ' + entryData._did);
+        let relatedDef: Def | undefined;
+        if (entryData._did !== undefined) relatedDef = maybeGetOnlyResult(PDW.getInstance().getDefs({ did: [entryData._did!], includeDeleted: 'no' })) as Def;
+        if (entryData._did === undefined) true == true
+        if (relatedDef === undefined)
+            throw new Error('No def found for ' + entryData._did);
         this._did = entryData._did!;
         if (entryData._period !== undefined) {
             this._period = entryData._period;
@@ -1326,12 +1481,20 @@ export class Entry extends Element implements EntryLike {
         this._note = entryData._note ?? '';
         this._source = entryData._source ?? '';
         //spawn new EntryPoints for any non-underscore-prefixed keys
-        //#TODO - support values by _lbl in addition to current (vals by _pid) 
-        let pids = Object.keys(entryData).filter(key => key.substring(0, 1) !== '_');
-        if (pids.length > 0) {
-            let entryPoints: MinimumEntryPoint[] = pids.map(pid => {
+        let pointKey = Object.keys(entryData).filter(key => key.substring(0, 1) !== '_');
+        if (pointKey.length > 0) {
+            let entryPoints: MinimumEntryPoint[] = pointKey.map(pid => {
                 //needing to find associated PointDef to support using the _lbl as the key
-                let assPointDef = EntryPoint.findExistingData({ _lbl: pid, _pid: pid })
+                let assPointDef
+                //checking first for pointKey is a _pid
+                //making SmallID here to avoid hardcoding the length to "4"
+                if (pid.length === makeSmallID().length) assPointDef = EntryPoint.findExistingData({ _did: this._did, _pid: pid });
+                //checking for if pointKey is a _lbl
+                if (assPointDef === undefined) assPointDef = EntryPoint.findExistingData({ _did: this._did, _lbl: pid, _pid: undefined })
+                if (assPointDef === undefined) {
+                    console.error("Couldn't find associated pointDef for '" + pid + '".', entryData);
+                    throw new Error('Error creating Entry. :-(');
+                }
                 return {
                     _pid: assPointDef._pid,
                     _val: entryData[pid],
@@ -1377,7 +1540,7 @@ export class EntryPoint extends Element implements EntryPointLike {
     _pid: SmallID;
     _val: any;
     _did: SmallID
-    constructor(entryPointData: MinimumEntryPoint) { //#TODO - support supplying assPointDef as argument for speed
+    constructor(entryPointData: MinimumEntryPoint, associatedDef?: PointDef) {
         if (entryPointData._eid !== undefined) {
             let existing = Element.findExistingData(entryPointData);
             if (existing !== undefined) {
@@ -1385,7 +1548,7 @@ export class EntryPoint extends Element implements EntryPointLike {
                 if (entryPointData._did === undefined) entryPointData._did = existing._did;
             }
         }
-        const associatedDef = PointDef.findExistingData(entryPointData, 'PointDef');
+        if (associatedDef === undefined) associatedDef = PointDef.findExistingData(entryPointData, 'PointDef');
         if (associatedDef === undefined) throw new Error('No definition associated with supplied EntryPoint data')
 
         //for now, just letting that function throw warnings to the console
@@ -1433,8 +1596,8 @@ export class EntryPoint extends Element implements EntryPointLike {
             return undefined;
         }
         if (_type === PointType.MULTISELECT) {
-            if(Array.isArray(_val)) return _val.join(', ');
-            if(typeof _val === 'string') return _val;
+            if (Array.isArray(_val)) return _val.join(', ');
+            if (typeof _val === 'string') return _val;
             console.warn(`Cannot convert this to multiselect:`, _val)
             return undefined;
         }
@@ -1451,7 +1614,7 @@ export class EntryPoint extends Element implements EntryPointLike {
             return undefined;
         }
         if (_type === PointType.SELECT) {
-            if(typeof _val === 'string') return _val;
+            if (typeof _val === 'string') return _val;
             console.warn(`Cannot convert this to select:`, _val)
             return undefined;
         }
@@ -1465,7 +1628,7 @@ export class EntryPoint extends Element implements EntryPointLike {
             if (typeof _val === 'string') return _val.trim();
             if (typeof _val === "number" && _val >= 0 && _val <= 1) {
                 //attempt to support "proportion of day to time" like Excel would
-                return new Temporal.PlainTime(0,0).add({seconds: 86400 * _val}).toString();
+                return new Temporal.PlainTime(0, 0).add({ seconds: 86400 * _val }).toString();
             }
             console.warn(`Cannot convert this to time:`, _val)
             return undefined;
@@ -1615,71 +1778,28 @@ export class DefaultDataStore implements DataStore {
         throw new Error("Method not implemented.");
     }
 
-    getDefs(didsAndOrLbls?: string[] | undefined, includeDeleted = false): DefLike[] {
-        if (didsAndOrLbls === undefined) {
-            if (includeDeleted) return this.defs;
-            return this.defs.filter(def => def._deleted === false);
+    getAll(params: SanitizedParams): CompleteDataset {
+        return {
+            defs: this.getDefs(params),
+            pointDefs: this.getPointDefs(params),
+            entries: this.getEntries(params),
+            entryPoints: this.getEntryPoints(params),
+            tagDefs: this.getTagDefs(params),
+            tags: this.getTags(params),
         }
-        const labelMatches = this.defs.filter(def => didsAndOrLbls.some(p => p === def._lbl));
-        const didMatches = this.defs.filter(def => didsAndOrLbls.some(p => p === def._did));
-        //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
-        let noDupes = new Set([...labelMatches, ...didMatches]);
-        if (includeDeleted) return Array.from(noDupes);
-        return Array.from(noDupes).filter(def => def._deleted === false);
     }
 
-    setDefs(defsIn: Def[]): Def[] {
-        let newDefs: Def[] = [];
-        //mark any old defs as deleted
-        defsIn.forEach(def => {
-            let existingDef = this.defs.find(existing => existing.sameIdAs(def) && existing._deleted === false);
-            if (existingDef !== undefined) {
-                //only replace if the setDefs def is newer, necessary for StorageConnector merges
-                if (existingDef.shouldBeReplacedWith(def)) {
-                    existingDef.markDeleted();
-                    if (!def._deleted) newDefs.push(def) //don't duplicate in case of calling setDefs purely to delete
-                }
-            } else {
-                newDefs.push(def);
-            }
-        })
-        //merge newDefs with defs in the DataStore
-        this.defs.push(...newDefs);
-        return defsIn;
+    getDefs(params: SanitizedParams): DefLike[] {
+        const allMatches = this.defs.filter(def => def.passesFilters(params));
+        let noDupes = new Set(allMatches);
+        return Array.from(noDupes)
     }
 
-    getPointDefs(didsAndOrLbls?: string[] | undefined, includeDeleted = false): PointDefLike[] {
-        if (didsAndOrLbls === undefined) {
-            if (includeDeleted) return this.pointDefs;
-            return this.pointDefs.filter(def => def._deleted === false);
-        }
-        const labelMatches = this.pointDefs.filter(def => didsAndOrLbls.some(p => p === def._lbl));
-        const didMatches = this.pointDefs.filter(def => didsAndOrLbls.some(p => p === def._did));
-        const pidMatches = this.pointDefs.filter(def => didsAndOrLbls.some(p => p === def._pid));
-        //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
-        let noDupes = new Set([...labelMatches, ...didMatches, ...pidMatches]);
-        if (includeDeleted) return Array.from(noDupes);
-        return Array.from(noDupes).filter(pd => pd._deleted === false);
-    }
+    getPointDefs(params: SanitizedParams): PointDefLike[] {
 
-    setPointDefs(pointDefsIn: PointDef[]) {
-        let newDefs: PointDef[] = [];
-        //mark any old defs as deleted
-        pointDefsIn.forEach(pd => {
-            let existingDef = this.pointDefs.find(existing => existing.sameIdAs(pd) && existing._deleted === false);
-            if (existingDef !== undefined) {
-                //only replace if the setDefs def is newer, necessary for StorageConnector merges
-                if (existingDef.shouldBeReplacedWith(pd)) {
-                    existingDef.markDeleted();
-                    if (!pd._deleted) newDefs.push(pd)
-                }
-            } else {
-                newDefs.push(pd);
-            }
-        })
-        //merge newDefs with defs in the DataStore
-        this.pointDefs.push(...newDefs);
-        return pointDefsIn;
+        const allMatches = this.pointDefs.filter(pd => pd.passesFilters(params));
+        let noDupes = new Set(allMatches);
+        return Array.from(noDupes);
     }
 
     /**
@@ -1688,148 +1808,101 @@ export class DefaultDataStore implements DataStore {
      * @param includeDeleted 
      * @returns an array of all entries matching the criteria
      */
-    getEntries(eids?: string[], includeDeleted = false): EntryLike[] {
-        if (eids === undefined) {
-            if (includeDeleted) return this.entries;
-            return this.entries.filter(entry => entry._deleted === false);
-        }
-        const entries = this.entries.filter(entry => eids.some(p => p === entry._eid));
-        //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
-        let noDupes = new Set([...entries]);
-        if (includeDeleted) return Array.from(noDupes);
-        return Array.from(noDupes).filter(entry => entry._deleted === false);
+    getEntries(params: SanitizedParams): EntryLike[] {
+        const allMatches = this.entries.filter(entry => entry.passesFilters(params));
+        let noDupes = new Set(allMatches);
+        return Array.from(noDupes);
+    }
 
+    getEntryPoints(params: SanitizedParams): EntryPointLike[] {
+        const allMatches = this.entryPoints.filter(entryPoint => entryPoint.passesFilters(params));
+        let noDupes = new Set(allMatches);
+        return Array.from(noDupes);
+    }
+
+    getTags(params: SanitizedParams): TagLike[] {
+        const allMatches = this.tags.filter(tag => tag.passesFilters(params));
+        let noDupes = new Set(allMatches);
+        return Array.from(noDupes);
+    }
+
+    getTagDefs(params: SanitizedParams): TagDefLike[] {
+
+        const allMatches = this.tagDefs.filter(tagDef => tagDef.passesFilters(params));
+        let noDupes = new Set(allMatches);
+        return Array.from(noDupes);
+    }
+
+    /**
+     * This function is a bit strange, but was extracted from
+     * the 6 functions below, which were duplicates code-wise
+     * @param elementsIn list of Elements (Defs, Entries, etc) to set
+     * @param elementRepo the existing set of Elements in the DataStore (this.defs, this.entries, etc)
+     */
+    setElementsInRepo(elementsIn: Element[], elementRepo: Element[]) {
+        let newElements: Element[] = [];
+        elementsIn.forEach(el => {
+            let existing = elementRepo.find(existingElement => existingElement._deleted === false && existingElement.sameIdAs(el))
+            if (existing !== undefined) {
+                //only replace if the setDefs def is newer, necessary for StorageConnector merges
+                if (existing.shouldBeReplacedWith(el)) {
+                    existing.markDeleted();
+                    if (!el._deleted) newElements.push(el) //don't duplicate in case of calling setElement purely to delete
+                }
+            } else {
+                newElements.push(el)
+            }
+        })
+        elementRepo.push(...newElements)
+        return elementsIn;
+    }
+
+    setDefs(defsIn: Def[]): Def[] {
+        return this.setElementsInRepo(defsIn, this.defs) as Def[]
+        // let newDefs: Def[] = [];
+        // //mark any old defs as deleted
+        // defsIn.forEach(def => {
+        //     let existingDef = this.defs.find(existing => existing.sameIdAs(def) && existing._deleted === false);
+        //     if (existingDef !== undefined) {
+        //         //only replace if the setDefs def is newer, necessary for StorageConnector merges
+        //         if (existingDef.shouldBeReplacedWith(def)) {
+        //             existingDef.markDeleted();
+        //             if (!def._deleted) newDefs.push(def) //don't duplicate in case of calling setDefs purely to delete
+        //         }
+        //     } else {
+        //         newDefs.push(def);
+        //     }
+        // })
+        // //merge newDefs with defs in the DataStore
+        // this.defs.push(...newDefs);
+        // return defsIn;
+    }
+
+    setPointDefs(pointDefsIn: PointDef[]) {
+        return this.setElementsInRepo(pointDefsIn, this.pointDefs) as PointDef[]
     }
 
     setEntries(entriesIn: Entry[]): Entry[] {
-        let entries: Entry[] = [];
-        //mark any old defs as deleted
-        entriesIn.forEach(entry => {
-            let existingEntry = this.entries.find(existing => existing.sameIdAs(entry) && existing._deleted === false);
-            if (existingEntry !== undefined) {
-                //only replace if the setDefs def is newer, necessary for StorageConnector merges
-                if (existingEntry.shouldBeReplacedWith(entry)) {
-                    existingEntry.markDeleted();
-                    if (!entry._deleted) entries.push(entry)
-                }
-            } else {
-                entries.push(entry);
-            }
-        })
-        //merge newDefs with defs in the DataStore
-        this.entries.push(...entries);
-        return entries;
-    }
-
-    getEntryPoints(eids?: UID[], pids?: SmallID[], includeDeleted = false): EntryPointLike[] {
-        if (eids === undefined && pids === undefined) {
-            if (includeDeleted) return this.entryPoints;
-            return this.entryPoints.filter(entryPoint => entryPoint._deleted === false);
-        }
-        const eidMatches = eids === undefined ? [] : this.entryPoints.filter(entry => eids.some(p => p === entry._eid));
-        const pidMatches = pids === undefined ? [] : this.entryPoints.filter(entry => pids.some(p => p === entry._pid));
-        //in case a _lbl & _did were supplied for the same entry, remove the duplicate (tested, works)
-        let noDupes = Array.from(new Set([...eidMatches, ...pidMatches]));
-        if (eids !== undefined && pids !== undefined) {
-            noDupes = noDupes.filter(entryPoint => {
-                const eidSame = eids.some(p => p === entryPoint._eid);
-                const pidSame = pids.some(p => p === entryPoint._pid)
-                return eidSame && pidSame
-            })
-        }
-        if (includeDeleted) return Array.from(noDupes);
-        return Array.from(noDupes).filter(entry => entry._deleted === false);
+        return this.setElementsInRepo(entriesIn, this.entries) as Entry[]
     }
 
     setEntryPoints(entryPointData: EntryPoint[]): EntryPoint[] {
-        let entryPoints: EntryPoint[] = [];
-        //mark any old defs as deleted
-        entryPointData.forEach(entryPoint => {
-            let existingEntry = this.entryPoints.find(existing => existing.sameIdAs(entryPoint) && existing._deleted === false);
-            if (existingEntry !== undefined) {
-                //only replace if the setDefs def is newer, necessary for StorageConnector merges
-                if (existingEntry.shouldBeReplacedWith(entryPoint)) {
-                    existingEntry.markDeleted();
-                    if (!entryPoint._deleted) entryPoints.push(entryPoint)
-                }
-            } else {
-                entryPoints.push(entryPoint);
-            }
-        })
-        this.entryPoints.push(...entryPoints);
-        return entryPoints;
-    }
-
-
-    getTags(tids?: UID[], dids?: SmallID[], pids?: SmallID[], includeDeleted = false): TagLike[] {
-        if (tids === undefined && dids === undefined && pids === undefined) {
-            if (includeDeleted) return this.tags;
-            return this.tags.filter(entry => entry._deleted === false);
-        }
-        const didMatches = dids === undefined ? [] : this.tags.filter(def => dids.some(p => p === def._did));
-        const tidMatches = tids === undefined ? [] : this.tags.filter(def => tids.some(p => p === def._tid));
-        const pidMatches = pids === undefined ? [] : this.tags.filter(def => pids.some(p => p === def._pid));
-        let noDupes = new Set([...didMatches, ...pidMatches, ...tidMatches]);
-        if (includeDeleted) return Array.from(noDupes);
-        return Array.from(noDupes).filter(entry => entry._deleted === false);
+        return this.setElementsInRepo(entryPointData, this.entryPoints) as EntryPoint[]
     }
 
     setTags(tagData: Tag[]): TagLike[] {
-        let tags: Tag[] = [];
-        //mark any old defs as deleted
-        tagData.forEach(tag => {
-            let existingTag = this.tags.find(existing => existing.sameIdAs(tag) && existing._deleted === false);
-            if (existingTag !== undefined) {
-                //only replace if the setDefs def is newer, necessary for StorageConnector merges
-                if (existingTag.shouldBeReplacedWith(tag)) {
-                    existingTag.markDeleted();
-                    if (!tag._deleted) tags.push(tag)
-                }
-            } else {
-                tags.push(tag);
-            }
-        })
-        this.tags.push(...tags);
-        return tags;
-    }
-
-    getTagDefs(tidAndOrLbls?: string[], includeDeleted = false): TagDefLike[] {
-        if (tidAndOrLbls === undefined) {
-            if (includeDeleted) return this.tagDefs;
-            return this.tagDefs.filter(entry => entry._deleted === false);
-        }
-        const didMatches = this.tagDefs.filter(def => tidAndOrLbls.some(p => p === def._tid));
-        const lblMatches = this.tagDefs.filter(def => tidAndOrLbls.some(p => p === def._lbl));
-        let noDupes = new Set([...lblMatches, ...didMatches]);
-        if (includeDeleted) return Array.from(noDupes);
-        return Array.from(noDupes).filter(entry => entry._deleted === false);
+        return this.setElementsInRepo(tagData, this.tags) as Tag[]
     }
 
     setTagDefs(tagDefsIn: TagDef[]): TagDefLike[] {
-        let tagDefs: TagDef[] = [];
-        //mark any old defs as deleted
-        tagDefsIn.forEach(tagDef => {
-            let existingTagDef = this.tagDefs.find(existing => existing.sameIdAs(tagDef) && existing._deleted === false);
-            if (existingTagDef !== undefined) {
-                //only replace if the setDefs def is newer, necessary for StorageConnector merges
-                if (existingTagDef.shouldBeReplacedWith(tagDef)) {
-                    existingTagDef.markDeleted();
-                    if (!tagDef._deleted) tagDefs.push(tagDef) //don't duplicate if you're just deleting
-                }
-            } else {
-                tagDefs.push(tagDef);
-            }
-        })
-        //merge newDefs with defs in the DataStore
-        this.tagDefs.push(...tagDefs);
-        return tagDefs;
+        return this.setElementsInRepo(tagDefsIn, this.tagDefs) as TagDef[]
     }
 
     getOverview(): DataStoreOverview {
         throw new Error("Method not implemented.");
     }
 
-    getAll(): CompleteDataset {
+    setAll(completeData: CompleteDataset): CompleteDataset {
         throw new Error("Method not implemented.");
     }
 
@@ -1864,9 +1937,14 @@ export function parseTemporalFromUid(uid: UID): Temporal.ZonedDateTime {
     return parseTemporalFromEpochStr(uid.split("-")[0]);
 }
 
+export function makeEpochStrFromTemporal(temp: Temporal.ZonedDateTime): EpochStr {
+    return temp.epochMilliseconds.toString(36);
+}
+
 export function parseTemporalFromEpochStr(epochStr: EpochStr): Temporal.ZonedDateTime {
     const epochMillis = parseInt(epochStr, 36)
     const parsedTemporal = Temporal.Instant.fromEpochMilliseconds(epochMillis).toZonedDateTimeISO(Temporal.Now.timeZone());
+    if(parsedTemporal.epochSeconds == 0) throw new Error('Unable to parse temporal from ' + epochStr)
     return parsedTemporal
 }
 

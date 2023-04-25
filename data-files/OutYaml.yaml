@@ -1,45 +1,55 @@
 defs:
-  - _uid: lgu21myt-0jj9
+  - _uid: lgvd2meq-0dvl
     _deleted: false
-    _created: 2023-04-23T23:43:04.327Z
-    _updated: lgu21myv
+    _created: lgvd2met
+    _updated: lgvd2met
+    _tempCreated: 2023-04-24T16:39:32.213-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:32.213-05:00[America/Chicago]
     _did: 0m7w
     _lbl: defOne
     _desc: This is now inerited
     _emoji: 1️⃣
     _scope: SECOND
-  - _uid: lgu21myw-2pbr
+  - _uid: lgvd2srg-2iap
     _deleted: true
-    _created: 2023-04-23T23:43:04.328Z
-    _updated: lgu21mza
+    _created: lgvd2srg
+    _updated: lgvd2sse
+    _tempCreated: 2023-04-24T16:39:40.444-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.445-05:00[America/Chicago]
     _did: ay7l
     _lbl: TWO
     _desc: Scoped at an **hour**, cause why not have that option?
     _emoji: 2️⃣
     _scope: HOUR
-  - _uid: lgu21myw-qjeo
+  - _uid: lgvd2srh-p9y5
     _deleted: false
-    _created: 2023-04-23T23:43:04.328Z
-    _updated: lgu21myx
+    _created: lgvd2sri
+    _updated: lgvd2sri
+    _tempCreated: 2023-04-24T16:39:40.446-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.446-05:00[America/Chicago]
     _did: 05a8
     _lbl: FREE
     _desc: Set a description
     _emoji: 3️⃣
     _scope: DAY
-  - _uid: lgu21mz9-1m8q
+  - _uid: lgvd2ssc-lwud
     _deleted: false
-    _created: 2023-04-23T23:43:04.328Z
-    _updated: lgu21mza
+    _created: lgvd2srg
+    _updated: lgvd2ssc
+    _tempCreated: 2023-04-24T16:39:40.444-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.476-05:00[America/Chicago]
     _did: ay7l
     _lbl: Two Relabeled
     _desc: Scoped at an **hour**, cause why not have that option?
     _emoji: 2️⃣
     _scope: HOUR
 pointDefs:
-  - _uid: lgu21myw-ln9d
+  - _uid: lgvd2sre-03jg
     _deleted: false
-    _created: 2023-04-23T23:43:04.328Z
-    _updated: lgu21myw
+    _created: lgvd2sre
+    _updated: lgvd2srf
+    _tempCreated: 2023-04-24T16:39:40.442-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.443-05:00[America/Chicago]
     _did: 0m7w
     _pid: 8esq
     _lbl: Select Test
@@ -47,21 +57,25 @@ pointDefs:
     _emoji: ⛏️
     _type: SELECT
     _rollup: COUNTOFEACH
-  - _uid: lgu21myx-mgvr
+  - _uid: lgvd2srj-0l0p
     _deleted: false
-    _created: 2023-04-23T23:43:04.329Z
-    _updated: lgu21myx
+    _created: lgvd2srj
+    _updated: lgvd2srj
+    _tempCreated: 2023-04-24T16:39:40.447-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.447-05:00[America/Chicago]
     _did: 05a8
-    _pid: 0kye
+    _pid: dste
     _lbl: Free Item
     _desc: Set a description
     _emoji: 🆓
     _type: TEXT
     _rollup: COUNT
-  - _uid: lgu21myx-vpyj
+  - _uid: lgvd2srk-0kv9
     _deleted: true
-    _created: 2023-04-23T23:43:04.329Z
-    _updated: lgu21mza
+    _created: lgvd2srk
+    _updated: lgvd2sse
+    _tempCreated: 2023-04-24T16:39:40.448-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.448-05:00[America/Chicago]
     _did: ay7l
     _pid: 0pc6
     _lbl: Numeric Thing
@@ -69,10 +83,12 @@ pointDefs:
     _emoji: "#️⃣"
     _type: NUM
     _rollup: AVERAGE
-  - _uid: lgu21myy-rzar
+  - _uid: lgvd2srl-pb7n
     _deleted: true
-    _created: 2023-04-23T23:43:04.330Z
-    _updated: lgu21mzb
+    _created: lgvd2srl
+    _updated: lgvd2ssf
+    _tempCreated: 2023-04-24T16:39:40.449-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.449-05:00[America/Chicago]
     _did: ay7l
     _pid: 0tb7
     _lbl: Boolean Thing
@@ -80,10 +96,12 @@ pointDefs:
     _emoji: 👍
     _type: BOOL
     _rollup: COUNT
-  - _uid: lgu21mza-vsjr
+  - _uid: lgvd2ssd-g6fq
     _deleted: false
-    _created: 2023-04-23T23:43:04.329Z
-    _updated: lgu21mza
+    _created: lgvd2srk
+    _updated: lgvd2ssd
+    _tempCreated: 2023-04-24T16:39:40.448-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.477-05:00[America/Chicago]
     _did: ay7l
     _pid: 0pc6
     _lbl: Test Relabel
@@ -91,10 +109,12 @@ pointDefs:
     _emoji: "#️⃣"
     _type: NUM
     _rollup: AVERAGE
-  - _uid: lgu21mzb-pd0n
+  - _uid: lgvd2sse-g4qp
     _deleted: false
-    _created: 2023-04-23T23:43:04.330Z
-    _updated: lgu21mzb
+    _created: lgvd2srl
+    _updated: lgvd2sse
+    _tempCreated: 2023-04-24T16:39:40.449-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.478-05:00[America/Chicago]
     _did: ay7l
     _pid: 0tb7
     _lbl: Boolean Thing
@@ -103,102 +123,128 @@ pointDefs:
     _type: BOOL
     _rollup: COUNT
 entries:
-  - _uid: lgu21myy-702s
+  - _uid: lgvd2srm-jd3o
     _deleted: true
-    _created: 2023-04-23T23:43:04.330Z
-    _updated: lgu21mzc
+    _created: lgvd2srm
+    _updated: lgvd2ssg
+    _tempCreated: 2023-04-24T16:39:40.45-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.45-05:00[America/Chicago]
     _eid: lgricx7k-08al
     _note: Orig note
     _did: ay7l
     _period: 2023-04-22T06
     _source: ""
-  - _uid: lgu21myz-zvts
+  - _uid: lgvd2srp-v8mb
     _deleted: false
-    _created: 2023-04-23T23:43:04.331Z
-    _updated: lgu21myz
-    _eid: lgu21mz0-0h65
+    _created: lgvd2srp
+    _updated: lgvd2srq
+    _tempCreated: 2023-04-24T16:39:40.453-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.454-05:00[America/Chicago]
+    _eid: lgvd2srr-ginp
     _note: ""
     _did: 0m7w
-    _period: 2023-04-23T18:43:04
+    _period: 2023-04-24T16:39:40
     _source: ""
-  - _uid: lgu21mzb-f9pf
+  - _uid: lgvd2ssf-0kbz
     _deleted: false
-    _created: 2023-04-23T23:43:04.330Z
-    _updated: lgu21mzb
+    _created: lgvd2srm
+    _updated: lgvd2ssf
+    _tempCreated: 2023-04-24T16:39:40.45-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.479-05:00[America/Chicago]
     _eid: lgricx7k-08al
     _note: Updated noted
     _did: ay7l
     _period: 2023-04-22T06
     _source: ""
 entryPoints:
-  - _uid: lgu21myz-003z
+  - _uid: lgvd2sro-0v1h
     _deleted: true
-    _created: 2023-04-23T23:43:04.331Z
-    _updated: lgu21mzc
+    _created: lgvd2sro
+    _updated: lgvd2ssg
+    _tempCreated: 2023-04-24T16:39:40.452-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.452-05:00[America/Chicago]
     _eid: lgricx7k-08al
     _pid: 0tb7
     _val: false
     _did: ay7l
-  - _uid: lgu21myz-j4ma
+  - _uid: lgvd2sro-0n8o
     _deleted: true
-    _created: 2023-04-23T23:43:04.331Z
-    _updated: lgu21mzc
+    _created: lgvd2srp
+    _updated: lgvd2ssg
+    _tempCreated: 2023-04-24T16:39:40.453-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.453-05:00[America/Chicago]
     _eid: lgricx7k-08al
     _pid: 0pc6
     _val: 5
     _did: ay7l
-  - _uid: lgu21mzb-vhx3
+  - _uid: lgvd2ssf-6jj7
     _deleted: false
-    _created: 2023-04-23T23:43:04.331Z
-    _updated: lgu21mzb
+    _created: lgvd2sro
+    _updated: lgvd2ssg
+    _tempCreated: 2023-04-24T16:39:40.452-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.48-05:00[America/Chicago]
     _eid: lgricx7k-08al
     _pid: 0tb7
     _val: true
     _did: ay7l
-  - _uid: lgu21mzc-hvji
+  - _uid: lgvd2ssg-2jxg
     _deleted: false
-    _created: 2023-04-23T23:43:04.331Z
-    _updated: lgu21mzc
+    _created: lgvd2srp
+    _updated: lgvd2ssg
+    _tempCreated: 2023-04-24T16:39:40.453-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.48-05:00[America/Chicago]
     _eid: lgricx7k-08al
     _pid: 0pc6
     _val: 6
     _did: ay7l
 tagDefs:
-  - _uid: lgu21mz0-olwq
+  - _uid: lgvd2srr-a2ma
     _deleted: false
-    _created: 2023-04-23T23:43:04.332Z
-    _updated: lgu21mz1
-    _tid: fspr
+    _created: lgvd2srr
+    _updated: lgvd2srs
+    _tempCreated: 2023-04-24T16:39:40.455-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.456-05:00[America/Chicago]
+    _tid: 0kcl
     _lbl: My Tag!
-  - _uid: lgu21mz1-9k6t
+  - _uid: lgvd2srs-frdi
     _deleted: true
-    _created: 2023-04-23T23:43:04.333Z
-    _updated: lgu21mzc
+    _created: lgvd2srs
+    _updated: lgvd2ssh
+    _tempCreated: 2023-04-24T16:39:40.456-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.456-05:00[America/Chicago]
     _tid: vvct
     _lbl: Orig Tag Label
-  - _uid: lgu21mz1-0xtz
+  - _uid: lgvd2srt-0ujx
     _deleted: false
-    _created: 2023-04-23T23:43:04.333Z
-    _updated: lgu21mz1
+    _created: lgvd2srt
+    _updated: lgvd2srt
+    _tempCreated: 2023-04-24T16:39:40.457-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.457-05:00[America/Chicago]
     _tid: 0vvi
     _lbl: Select Option Test
-  - _uid: lgu21mzc-0a76
+  - _uid: lgvd2ssh-0aqw
     _deleted: false
-    _created: 2023-04-23T23:43:04.333Z
-    _updated: lgu21mzc
+    _created: lgvd2srs
+    _updated: lgvd2ssh
+    _tempCreated: 2023-04-24T16:39:40.456-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.481-05:00[America/Chicago]
     _tid: vvct
     _lbl: New Label
 tags:
-  - _uid: lgu21mz1-dp86
+  - _uid: lgvd2srv-a6gm
     _deleted: true
-    _created: 2023-04-23T23:43:04.333Z
-    _updated: lgu21mzd
+    _created: lgvd2srv
+    _updated: lgvd2ssi
+    _tempCreated: 2023-04-24T16:39:40.459-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.459-05:00[America/Chicago]
     _tid: vvct
     _did: ay7l
-  - _uid: lgu21mz1-0dlf
+  - _uid: lgvd2srw-301n
     _deleted: false
-    _created: 2023-04-23T23:43:04.333Z
-    _updated: lgu21mz2
+    _created: lgvd2srw
+    _updated: lgvd2srw
+    _tempCreated: 2023-04-24T16:39:40.46-05:00[America/Chicago]
+    _tempUpdated: 2023-04-24T16:39:40.46-05:00[America/Chicago]
     _tid: 0vvi
     _did: 0m7w
     _pid: 8esq
@@ -221,4 +267,4 @@ overview:
   tags:
     current: 1
     deleted: 1
-  lastUpdated: lgu21mzd
+  lastUpdated: lgvd2ssi
