@@ -1,8 +1,8 @@
 //// @ts-nocheck
 import {EntryPoint, PDW, Period, PointType, Rollup, makeEpochStr, parseTemporalFromEpochStr, parseTemporalFromUid} from './pdw.js'
 import {Scope} from './pdw.js'
-import { exportToFile } from './connectors/fileConnector.js';
-import { importFromFile } from './connectors/fileConnector.js';
+import { exportToFile } from './dataStores/fileAsyncDataStores.js';
+import { importFromFile } from './dataStores/fileAsyncDataStores.js';
 import { sampleDefinitions, sampleEntries, samplePointDefs } from './sampleData.js';
 import { Temporal, toTemporalInstant } from 'temporal-polyfill';
 // import { FileConnector } from "./connectors/fileConnector.js";
