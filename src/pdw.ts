@@ -714,14 +714,6 @@ export class PDW {
 
     getDefs(rawParams: StandardParams): Def[] {
         const params = PDW.sanitizeParams(rawParams)
-        //ensure valid params //commented out because I realized "createdAfter" and stuff would also be valid
-        // if(params.uid === undefined && 
-        //     params.did === undefined && 
-        //     params.defLbl === undefined && 
-        //     params.allOnPurpose === undefined){
-        //     console.error('Invalid params for getDefs:', rawParams);
-        //     throw new Error('Invalid Params supplied')
-        // }
 
         //if there's only DataStore, bypass the combining stuff to save time
         if (this.dataStores.length == 1) {
