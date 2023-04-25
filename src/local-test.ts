@@ -4,7 +4,7 @@ import {Scope} from './pdw.js'
 import { exportToFile } from './connectors/fileConnector.js';
 import { importFromFile } from './connectors/fileConnector.js';
 import { sampleDefinitions, sampleEntries, samplePointDefs } from './sampleData.js';
-import { Temporal } from 'temporal-polyfill';
+import { Temporal, toTemporalInstant } from 'temporal-polyfill';
 // import { FileConnector } from "./connectors/fileConnector.js";
 
 const pdw = PDW.getInstance();
@@ -21,17 +21,27 @@ const pdw = PDW.getInstance();
 
 // Think I solved it!
 // const myTemp = parseTemporalFromEpochStr(makeEpochStr());
-// console.log(myTemp.toPlainDateTime().toString());
+// console.log(myTemp.toPlainDateTime().toLocaleString());
 // console.log(myTemp.toPlainDateTime().toJSON());
 // console.log(myTemp.toLocaleString());
 // console.log(myTemp.toString())
+// const oldTemp = parseTemporalFromEpochStr('lgv0m6d5')
+// const newTemp = parseTemporalFromEpochStr('lgv0nhbf')
+// console.log(Temporal.ZonedDateTime.compare(oldTemp,newTemp));
 
+//#TODO - test all the stuff
 // createTwoTestFiles();
 
+let date = new Date('4/24/2023, 4:23:06 PM');
+console.log(date);
+console.log(Temporal.ZonedDateTime.from(date).toLocaleString());
+// console.log(Temporal.);
+
+
 // importFromFile('data-files/OutJSON.json');
-// importFromFile('data-files/OutExcel4.xlsx');
+// importFromFile('data-files/OutExcel2.xlsx');
 // importFromFile('data-files/OutYaml.yaml');
-console.log('hi')
+// console.log('hi')
 // console.log(pdw.allDataSince());
 
 function createTwoTestFiles(){
@@ -118,7 +128,7 @@ function createTwoTestFiles(){
     })
     //Write to file before any updates
     let outFileOneame = 'data-files/OutExcel1.xlsx';
-    exportToFile(outFileOneame, pdw.getAll());
+    exportToFile(outFileOneame, pdw.getAll({includeDeleted: 'yes'}));
 
     //update def (and pointdef)
     pdw.setDefs([{
@@ -159,7 +169,7 @@ function createTwoTestFiles(){
     }])
 
     //Write to updated files
-    let data = pdw.getAll();
+    let data = pdw.getAll({includeDeleted: 'yes'});
     let outFileTwoName = 'data-files/OutExcel2.xlsx';
     exportToFile(outFileTwoName, data);
     let outJsonName = 'data-files/OutJSON.json';
