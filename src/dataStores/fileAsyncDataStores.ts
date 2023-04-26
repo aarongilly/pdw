@@ -469,18 +469,24 @@ export class JsonImportExport implements pdw.AsyncDataStore {
 
 /**
  * This was crazy easy.
+ * I made it harder just to prove that I could simultaneusly read
+ * & write from different datafiles with different source formats.
+ * json -> dates stored as EpochStr
+ * yaml -> dates stored as ISO Strings (native YAML dates)
+ * excel -> dates stored as Local Strings AND native Excel dates! 
  */
 export class YamlImportExport implements pdw.AsyncDataStore {
 
     exportTo(data: pdw.CompleteDataset, filepath: string) {
         //crazy simple implementation
+        data = this.convertCompleteDatasetDatesToISO(data);
         const yaml = YAML.stringify(data);
         fs.writeFile(filepath, yaml, 'utf8', () => { });
     }
 
     importFrom(filepath: string): pdw.CompleteDataset {
         const file = YAML.parse(fs.readFileSync(filepath).toString());
-        const returnData: pdw.CompleteDataset = {
+        let returnData: pdw.CompleteDataset = {
             defs: file.defs,
             pointDefs: file.pointDefs,
             entries: file.entries,
@@ -488,6 +494,7 @@ export class YamlImportExport implements pdw.AsyncDataStore {
             tagDefs: file.tagDefs,
             tags: file.tags
         }
+        this.convertCompleteDatasetISOToEpoch(returnData);
         const pdwRef = pdw.PDW.getInstance();
         if (returnData.defs !== undefined) pdwRef.setDefs(returnData.defs);
         if (returnData.pointDefs !== undefined) pdwRef.setPointDefs(returnData.pointDefs);
@@ -496,37 +503,169 @@ export class YamlImportExport implements pdw.AsyncDataStore {
         if (returnData.tagDefs !== undefined) pdwRef.setTagDefs(returnData.tagDefs);
         if (returnData.tags !== undefined) pdwRef.setTags(returnData.tags);
 
-        returnData.overview = {
-            storeName: filepath,
-            defs: {
-                current: returnData.defs?.filter(element => element._deleted === false).length,
-                deleted: returnData.defs?.filter(element => element._deleted).length
-            },
-            pointDefs: {
-                current: returnData.pointDefs?.filter(element => element._deleted === false).length,
-                deleted: returnData.pointDefs?.filter(element => element._deleted).length
-            },
-            entries: {
-                current: returnData.entries?.filter(element => element._deleted === false).length,
-                deleted: returnData.entries?.filter(element => element._deleted).length
-            },
-            entryPoints: {
-                current: returnData.entryPoints?.filter(element => element._deleted === false).length,
-                deleted: returnData.entryPoints?.filter(element => element._deleted).length
-            },
-            tagDefs: {
-                current: returnData.tagDefs?.filter(element => element._deleted === false).length,
-                deleted: returnData.tagDefs?.filter(element => element._deleted).length
-            },
-            tags: {
-                current: returnData.tags?.filter(element => element._deleted === false).length,
-                deleted: returnData.tags?.filter(element => element._deleted).length
-            },
-            lastUpdated: pdw.PDW.getDatasetLastUpdate(returnData)
-        }
+        returnData = pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
 
         return returnData;
     }
+
+    convertCompleteDatasetISOToEpoch(data: pdw.CompleteDataset){
+        if(data.overview !== undefined){
+            let temporal = this.makeEpochStrFromISO(data.overview.lastUpdated);
+            data.overview.lastUpdated = temporal.toString().split('[')[0]
+        }
+        if(data.defs !== undefined){
+            data.defs = data.defs.map(def=> this.convertElementISOToEpoch(def)) as unknown as pdw.DefLike[];
+        }
+        if(data.pointDefs !== undefined){
+            data.pointDefs = data.pointDefs.map(element=> this.convertElementISOToEpoch(element)) as unknown as pdw.PointDefLike[];
+        }
+        if(data.entries !== undefined){
+            data.entries = data.entries.map(element=> this.convertElementISOToEpoch(element)) as unknown as pdw.EntryLike[];
+        }
+        if(data.entryPoints !== undefined){
+            data.entryPoints = data.entryPoints.map(element=> this.convertElementISOToEpoch(element)) as unknown as pdw.EntryPointLike[];
+        }
+        if(data.tagDefs !== undefined){
+            data.tagDefs = data.tagDefs.map(element=> this.convertElementISOToEpoch(element)) as unknown as pdw.TagDefLike[];
+        }
+        if(data.tags !== undefined){
+            data.tags = data.tags.map(element=> this.convertElementISOToEpoch(element)) as unknown as pdw.TagLike[];
+        }
+        return data;
+    }
+
+    convertElementISOToEpoch(element: pdw.ElementLike): pdw.ElementLike{
+        element._created = this.makeEpochStrFromISO(element._created)
+        element._updated = this.makeEpochStrFromISO(element._updated)
+        return element
+    }
+
+    makeEpochStrFromISO(ISOString: string): pdw.EpochStr{
+        let temp =  Temporal.Instant.fromEpochMilliseconds(new Date(ISOString).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone());
+        return pdw.makeEpochStrFromTemporal(temp);
+    }
+
+    convertCompleteDatasetDatesToISO(data: pdw.CompleteDataset){
+        if(data.overview !== undefined){
+            let temporal = pdw.parseTemporalFromEpochStr(data.overview.lastUpdated);
+            data.overview.lastUpdated = temporal.toString().split('[')[0]
+        }
+        if(data.defs !== undefined){
+            data.defs = data.defs.map(def=> this.convertElementEpochToISO(def)) as unknown as pdw.DefLike[];
+        }
+        if(data.pointDefs !== undefined){
+            data.pointDefs = data.pointDefs.map(element=> this.convertElementEpochToISO(element)) as unknown as pdw.PointDefLike[];
+        }
+        if(data.entries !== undefined){
+            data.entries = data.entries.map(element=> this.convertElementEpochToISO(element)) as unknown as pdw.EntryLike[];
+        }
+        if(data.entryPoints !== undefined){
+            data.entryPoints = data.entryPoints.map(element=> this.convertElementEpochToISO(element)) as unknown as pdw.EntryPointLike[];
+        }
+        if(data.tagDefs !== undefined){
+            data.tagDefs = data.tagDefs.map(element=> this.convertElementEpochToISO(element)) as unknown as pdw.TagDefLike[];
+        }
+        if(data.tags !== undefined){
+            data.tags = data.tags.map(element=> this.convertElementEpochToISO(element)) as unknown as pdw.TagLike[];
+        }
+        return data;
+    }
+
+    convertElementEpochToISO(element: any): Element{
+        if(element._tempCreated !== undefined) delete element._tempCreated
+        if(element._tempUpdated !== undefined) delete element._tempUpdated
+        element._created = pdw.parseTemporalFromEpochStr(element._created).toString().split('[')[0]
+        element._updated = pdw.parseTemporalFromEpochStr(element._updated).toString().split('[')[0]
+        return element as Element
+    }
+}
+
+export class NaturalExcelImportExport implements pdw.AsyncDataStore {
+    static overViewShtName = 'Overview';
+    static defShtName = 'Defs';
+    static pointDefShtName = 'Point Defs';
+    static entryShtName = "Entry";
+    static entryPointShtName = "Entry Points";
+    static tagDefShtName = "Tag Defs";
+    static tagShtName = "Tags"
+
+    importFrom(params: any): pdw.CompleteDataset {
+        throw new Error('Method not implemented.');
+    }
+    exportTo(data: pdw.CompleteDataset, filename: string) {
+        throw new Error('Method not implemented.');
+        
+        /*
+        XLSX.set_fs(fs);
+        const wb = XLSX.utils.book_new();
+
+        if (data.overview !== undefined) {
+            let aoa = [];
+            aoa.push(['Store Name:', data.overview.storeName]);
+            aoa.push(['Last updated:', pdw.parseTemporalFromEpochStr(data.overview.lastUpdated).toLocaleString()]);
+            aoa.push(['Element Type', 'Count Active', 'Count Deleted']);
+            if (data.defs !== undefined) aoa.push(['defs', data.overview.defs.current, data.overview.defs.deleted]);
+            if (data.pointDefs !== undefined) aoa.push(['pointDefs', data.overview.pointDefs.current, data.overview.pointDefs.deleted]);
+            if (data.entries !== undefined) aoa.push(['entries', data.overview.entries.current, data.overview.entries.deleted]);
+            if (data.entryPoints !== undefined) aoa.push(['entryPoints', data.overview.entryPoints.current, data.overview.entryPoints.deleted]);
+            if (data.tagDefs !== undefined) aoa.push(['tagDefs', data.overview.tagDefs.current, data.overview.tagDefs.deleted]);
+            if (data.tags !== undefined) aoa.push(['tags', data.overview.tags.current, data.overview.tags.deleted]);
+            let overviewSht = XLSX.utils.aoa_to_sheet(aoa);
+            XLSX.utils.book_append_sheet(wb, overviewSht, ExcelTabularImportExport.overViewShtName);
+        }
+
+        if (data.defs !== undefined && data.defs.length > 0) {
+            let defBaseArr = data.defs.map(def => ExcelTabularImportExport.makeExcelDefRow(def));
+            defBaseArr.unshift(tabularHeaders.def);
+
+            let defSht = XLSX.utils.aoa_to_sheet(defBaseArr);
+            XLSX.utils.book_append_sheet(wb, defSht, ExcelTabularImportExport.defShtName);
+        }
+
+        if (data.pointDefs !== undefined && data.pointDefs.length > 0) {
+            let pointDefArr = data.pointDefs.map(pd => ExcelTabularImportExport.makeExcelPointDefRow(pd));
+            pointDefArr.unshift(tabularHeaders.pointDef);
+
+            let pointDefSht = XLSX.utils.aoa_to_sheet(pointDefArr);
+            XLSX.utils.book_append_sheet(wb, pointDefSht, ExcelTabularImportExport.pointDefShtName);
+        }
+
+        if (data.entries !== undefined) {
+            let entryArr = data.entries.map(entry => ExcelTabularImportExport.makeExcelEntryRow(entry));
+            entryArr.unshift(tabularHeaders.entry);
+
+            let entryBaseSht = XLSX.utils.aoa_to_sheet(entryArr);
+            XLSX.utils.book_append_sheet(wb, entryBaseSht, ExcelTabularImportExport.entryShtName);
+        }
+
+        if (data.entryPoints !== undefined) {
+            let entryPointArr = data.entryPoints.map(entryPoint => ExcelTabularImportExport.makeExcelEntryPointRow(entryPoint));
+            entryPointArr.unshift(tabularHeaders.entryPoint);
+
+            let entryPointSht = XLSX.utils.aoa_to_sheet(entryPointArr);
+            XLSX.utils.book_append_sheet(wb, entryPointSht, ExcelTabularImportExport.entryPointShtName);
+        }
+
+        if (data.tagDefs !== undefined) {
+            let tagDefArr = data.tagDefs.map(tagDef => ExcelTabularImportExport.makeExcelTagDefRow(tagDef))
+            tagDefArr.unshift(tabularHeaders.tagDef);
+
+            let tagDefSht = XLSX.utils.aoa_to_sheet(tagDefArr);
+            XLSX.utils.book_append_sheet(wb, tagDefSht, ExcelTabularImportExport.tagDefShtName);
+        }
+
+        if (data.tags !== undefined) {
+            let tagArr = data.tags.map(tag => ExcelTabularImportExport.makeExcelTagRow(tag))
+            tagArr.unshift(tabularHeaders.tag);
+
+            let tagSht = XLSX.utils.aoa_to_sheet(tagArr);
+            XLSX.utils.book_append_sheet(wb, tagSht, ExcelTabularImportExport.tagShtName);
+        }
+
+        XLSX.writeFile(wb, filename);
+        */
+    }
+
 }
 
 //#region ### SHARED  ###

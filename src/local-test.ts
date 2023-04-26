@@ -5,7 +5,6 @@ import { exportToFile } from './dataStores/fileAsyncDataStores.js';
 import { importFromFile } from './dataStores/fileAsyncDataStores.js';
 import { sampleDefinitions, sampleEntries, samplePointDefs } from './sampleData.js';
 import { Temporal, toTemporalInstant } from 'temporal-polyfill';
-// import { FileConnector } from "./connectors/fileConnector.js";
 
 const pdw = PDW.getInstance();
 
@@ -31,21 +30,21 @@ const pdw = PDW.getInstance();
 
 // createTwoTestFiles();
 
-// let date = new Date('4/24/23 1:23 AM');
+// let date = new Date('2023-04-25T13:41:07.502-05:00');
 // console.log(date.getTime());
-// console.log(Temporal.Instant.fromEpochMilliseconds(date.getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()).toLocaleString());
-// console.log(Temporal.);
-
+// let myTemp = Temporal.Instant.fromEpochMilliseconds(date.getTime()).toZonedDateTimeISO(Temporal.Now.timeZone());
+// console.log(myTemp.toString().split('[')[0]);
 
 // importFromFile('data-files/OutJSON.json');
 importFromFile('data-files/OutExcel2.xlsx');
 
-let mydef = pdw.getDefs({
-    updatedBefore: 'lgvn3a11',
-    includeDeleted: 'yes'
-})
+// let mydef = pdw.getDefs({
+//     updatedBefore: 'lgvn3a11',
+//     includeDeleted: 'yes'
+// })
+
 // importFromFile('data-files/OutYaml.yaml');
-console.log(mydef)
+console.log('mydef')
 // console.log(pdw.allDataSince());
 
 function createTwoTestFiles(){
@@ -76,6 +75,7 @@ function createTwoTestFiles(){
         _lbl: 'FREE',
         _emoji: '3️⃣',
         _scope: Scope.DAY,
+        _created: 'lgvm3a11'
     })
     pdw.createNewPointDef({
         _did: '05a8',

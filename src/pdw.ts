@@ -761,7 +761,6 @@ export class PDW {
         // //multiple DataStores need to be all pulled, then deconflicted
         // let combinedDefs: Def[] = [];
         // //compile defs from all attached DataStores
-        // //#UNTESTED - test this!
         // this.dataStores.forEach(dataStore => {
         //     let thisStoreDefLikes = dataStore.getDefs(didPidOrLbls as string[], includeDeleted);
         //     let thisStoreDefs = thisStoreDefLikes.map(tsdl => new Def(tsdl));
