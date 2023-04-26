@@ -432,12 +432,16 @@ export interface MinimumElement {
      */
     _uid?: UID;
     /**
-     * Deleted
-     * Defaults to false
+     * Sets based on `typeof` your inputVal
+     * if undefined => false
+     * if boolean => inputVal
+     * if string => inputVal.toUpperCase() === 'TRUE'
+     * if number => inputVal === 1 ? true : false
+     * else throw error
      */
-    _deleted?: boolean;
+    _deleted?: boolean | boolean | number;
     /**
-     * EpochStr for when this was updated. Will geenrate for you.q  
+     * EpochStr for when this was updated. Will geenrate for you.  
      */
     _created?: EpochStr;
     /**
@@ -445,10 +449,7 @@ export interface MinimumElement {
      */
     _updated?: EpochStr;
     /**
-     * other key/value pairs will attempt to find
-     * the PointDef who's _pid == the key and spin
-     * up a new {@link EntryPoint} who's _val is 
-     * the value
+     * Additional arbitrary key/value pairs are allowed
      */
     [x: string]: any;
 }
@@ -1069,13 +1070,37 @@ export abstract class Element implements ElementLike {
     _updated: EpochStr;
     _tempCreated: Temporal.ZonedDateTime;
     _tempUpdated: Temporal.ZonedDateTime;
-    constructor(existingData: any) {
-        this._uid = existingData._uid ?? makeUID();
-        this._deleted = existingData._deleted ?? false;
-        this._created = existingData._created ?? makeEpochStr();
-        this._updated = existingData._updated ?? makeEpochStr();
+    constructor(inputData: MinimumElement) {
+        this._uid = inputData._uid ?? makeUID();
+        this._deleted = this.handleDeletedInputVariability(inputData._deleted);
+        this._created = this.handleEpochStrInputVariability(inputData._created);
+        this._updated = this.handleEpochStrInputVariability(inputData._updated);
         this._tempCreated = parseTemporalFromEpochStr(this._created)
         this._tempUpdated = parseTemporalFromEpochStr(this._updated)
+    }
+
+    // extraction & "never nesting" really made this code way more readable... huh
+    private handleDeletedInputVariability(deletedVal: any): boolean{
+        if (deletedVal === undefined) return false
+        if (typeof deletedVal === 'boolean') return deletedVal;
+        if (typeof deletedVal === 'string') return (<string>deletedVal).toUpperCase() === 'TRUE';
+        if (typeof deletedVal === 'number') return (<number>deletedVal) === 1 ? true : false
+        console.warn(`Didn't know how to set '_deleted' based on input. Defaulting to 'false':`, deletedVal);
+        return false 
+    }
+
+    private handleEpochStrInputVariability(inputSeen: any): EpochStr{
+        if(inputSeen === undefined) return makeEpochStr();
+        if(typeof inputSeen === 'string'){
+            if(isValidEpochStr(inputSeen)) return inputSeen;
+            //try passing through new Date()'s wide-open interpretations
+            return makeEpochStrFromTemporal( Temporal.Instant.fromEpochMilliseconds(new Date(inputSeen).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()));
+        }
+        if(typeof inputSeen === 'number'){
+            makeEpochStrFromTemporal( Temporal.Instant.fromEpochMilliseconds(inputSeen).toZonedDateTimeISO(Temporal.Now.timeZone()));
+        }
+        console.warn('Did not know how to handle parsing this date input, defaulting to now:', inputSeen);
+        return makeEpochStr();
     }
 
     markDeleted() {
@@ -1136,12 +1161,12 @@ export abstract class Element implements ElementLike {
         if (type === 'EntryPointLike') return this._eid === comparison._eid && this._pid === comparison._pid;
         //@ts-expect-error
         if (type === 'TagDefLike') return this._tid === comparison._tid;
-        if (type === 'TagLike'){
+        if (type === 'TagLike') {
             //@ts-expect-error
-            if(this._pid === undefined) return this._tid === comparison._tid && this._did === comparison._did;
+            if (this._pid === undefined) return this._tid === comparison._tid && this._did === comparison._did;
             //@ts-expect-error
-            return this._tid === comparison._tid && this._did === comparison._did && this._pid === comparison._pid;  //#UNTESTED - for selects
-            
+            return this._tid === comparison._tid && this._did === comparison._did && this._pid === comparison._pid;
+
         }
         //@ts-expect-error
         return this._pid === comparison._pid && this._did === comparison._did;
@@ -1191,6 +1216,8 @@ export abstract class Element implements ElementLike {
 
         return true;
     }
+
+    //#TODO - fallsInPeriod(period: Period): boolean
 
     private static getTypeOfElementLike(data: ElementLike) {
         if (data.hasOwnProperty("_tid") && data.hasOwnProperty('_did')) return "TagLike"
@@ -1370,6 +1397,8 @@ export class Def extends Element implements DefLike {
         return values.includes(typeStr as unknown as Scope)
     }
 
+    //#TODO - implement an 'addTag() method
+    //#TODO - and a 'removeTag() method, for that matter
 }
 
 export class PointDef extends Element implements PointDefLike {
@@ -1697,8 +1726,9 @@ export class Tag extends Element implements TagLike {
 
 export class Period {
     constructor(periodStr: PeriodStr) {
-
+        //#TODO - think of what you want to handle in terms of input
     }
+
     static now(scope: Scope): PeriodStr {
         let seedStr = '';
         let nowTemp = Temporal.Now.zonedDateTimeISO();
@@ -1714,6 +1744,7 @@ export class Period {
     }
 
     static inferScope(ISOString: string): Scope {
+        // /https://xkcd.com/208/
         if (/\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d/i.test(ISOString))
             return Scope.SECOND;
         if (/\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d/i.test(ISOString))
@@ -1732,9 +1763,19 @@ export class Period {
             return Scope.YEAR;
         throw new Error('Attempted to infer scope failed for: ' + ISOString);
     }
+
+    //#TODO - implement Period Methods...
+    //getPeriodEnd(scope: Scope): Period?
+    //getPeriodStart(scope: Scope): Period?
+    //zoomIn(): Period
+    //zoomOut(): Period
+    //getNext(): Period
+    //getPrev(): Period
+    //allPeriodsBetween(start: Period, end: Period, scope: Scope): Period
 }
 
 export class Query {
+    //#TODO - build Query Class
     constructor() {
 
     }
@@ -1933,10 +1974,20 @@ export function makeEpochStrFromTemporal(temp: Temporal.ZonedDateTime): EpochStr
     return temp.epochMilliseconds.toString(36);
 }
 
+export function isValidEpochStr(epochStr: string): boolean{
+    if(typeof epochStr !== 'string') return false;
+    if(epochStr.length !== 8) return false; //not supporting way in the past or future
+    //☝️ technically creates a 2059 problem... but that's my problem when I'm 2x as old as I am now
+    //console.log(parseTemporalFromEpochStr('zzzzzzz').toLocaleString()) //is "6/25/1972, 6:49:24 PM CDT"
+    //console.log(parseTemporalFromEpochStr('100000000').toLocaleString()) //is "5/25/2059, 12:38:27 PM CDT"
+    //for now this is good enough. I could parse a temporal out then check if it succeed & is in a resonable year, but meh
+    return true
+}
+
 export function parseTemporalFromEpochStr(epochStr: EpochStr): Temporal.ZonedDateTime {
     const epochMillis = parseInt(epochStr, 36)
     const parsedTemporal = Temporal.Instant.fromEpochMilliseconds(epochMillis).toZonedDateTimeISO(Temporal.Now.timeZone());
-    if(parsedTemporal.epochSeconds == 0) throw new Error('Unable to parse temporal from ' + epochStr)
+    if (parsedTemporal.epochSeconds == 0) throw new Error('Unable to parse temporal from ' + epochStr)
     return parsedTemporal
 }
 

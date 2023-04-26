@@ -33,7 +33,7 @@ const pdw = PDW.getInstance();
 // let date = new Date('2023-04-25T13:41:07.502-05:00');
 // console.log(date.getTime());
 // let myTemp = Temporal.Instant.fromEpochMilliseconds(date.getTime()).toZonedDateTimeISO(Temporal.Now.timeZone());
-// console.log(myTemp.toString().split('[')[0]);
+// console.log(makeEpochStr());
 
 // importFromFile('data-files/OutJSON.json');
 importFromFile('data-files/OutExcel2.xlsx');
@@ -44,7 +44,8 @@ importFromFile('data-files/OutExcel2.xlsx');
 // })
 
 // importFromFile('data-files/OutYaml.yaml');
-console.log('mydef')
+console.log('yo');
+
 // console.log(pdw.allDataSince());
 
 function createTwoTestFiles(){
@@ -164,6 +165,12 @@ function createTwoTestFiles(){
     pdw.setTagDefs([{
         _tid: 'vvct',
         _lbl: 'New Label'
+    }])
+    pdw.setTags([{
+        _tid:'0vvi',
+        _pid:'8esq',
+        _did:'0m7w',
+        _deleted: true
     }])
     //update a tag
     pdw.setTags([{

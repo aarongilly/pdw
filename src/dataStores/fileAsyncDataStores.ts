@@ -293,7 +293,9 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
     }
 
     /**
-     * Here's where I'm tryign to handle some variability in dates
+     * Here's where I'm tryign to handle some variability in dates.
+     * Some of this functionality is baked-into pdw.Element's constructor now,
+     * but not THIS interpretation of number-types, so I'm just keeping all of it
      * @param _updated value in a date cell
      */
     static makeEpochStrFromExcelDate(dateCellVal: any): any {
