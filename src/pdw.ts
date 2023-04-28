@@ -1080,24 +1080,24 @@ export abstract class Element implements ElementLike {
     }
 
     // extraction & "never nesting" really made this code way more readable... huh
-    private handleDeletedInputVariability(deletedVal: any): boolean{
+    private handleDeletedInputVariability(deletedVal: any): boolean {
         if (deletedVal === undefined) return false
         if (typeof deletedVal === 'boolean') return deletedVal;
         if (typeof deletedVal === 'string') return (<string>deletedVal).toUpperCase() === 'TRUE';
         if (typeof deletedVal === 'number') return (<number>deletedVal) === 1 ? true : false
         console.warn(`Didn't know how to set '_deleted' based on input. Defaulting to 'false':`, deletedVal);
-        return false 
+        return false
     }
 
-    private handleEpochStrInputVariability(inputSeen: any): EpochStr{
-        if(inputSeen === undefined) return makeEpochStr();
-        if(typeof inputSeen === 'string'){
-            if(isValidEpochStr(inputSeen)) return inputSeen;
+    private handleEpochStrInputVariability(inputSeen: any): EpochStr {
+        if (inputSeen === undefined) return makeEpochStr();
+        if (typeof inputSeen === 'string') {
+            if (isValidEpochStr(inputSeen)) return inputSeen;
             //try passing through new Date()'s wide-open interpretations
-            return makeEpochStrFromTemporal( Temporal.Instant.fromEpochMilliseconds(new Date(inputSeen).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()));
+            return makeEpochStrFromTemporal(Temporal.Instant.fromEpochMilliseconds(new Date(inputSeen).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()));
         }
-        if(typeof inputSeen === 'number'){
-            makeEpochStrFromTemporal( Temporal.Instant.fromEpochMilliseconds(inputSeen).toZonedDateTimeISO(Temporal.Now.timeZone()));
+        if (typeof inputSeen === 'number') {
+            makeEpochStrFromTemporal(Temporal.Instant.fromEpochMilliseconds(inputSeen).toZonedDateTimeISO(Temporal.Now.timeZone()));
         }
         console.warn('Did not know how to handle parsing this date input, defaulting to now:', inputSeen);
         return makeEpochStr();
@@ -1724,10 +1724,243 @@ export class Tag extends Element implements TagLike {
     }
 }
 
+/**
+ * Periods are Immutable. All methods return new copies of Period.
+ * They are basically wrappers around a string.
+ */
 export class Period {
-    constructor(periodStr: PeriodStr) {
-        //#TODO - think of what you want to handle in terms of input
+    periodStr: string;
+    scope: Scope;
+    private _zoomLevel: number
+
+    constructor(periodStr: PeriodStr | Period, desiredScope?: Scope) {
+        if (typeof periodStr !== 'string') periodStr = periodStr.periodStr;
+        this.periodStr = periodStr;
+        this.scope = Period.inferScope(periodStr);
+        this._zoomLevel = Period.zoomLevel(this.scope)
+
+        if (desiredScope !== undefined && this.scope !== desiredScope) {
+            console.log('Converting ' + periodStr + ' to scope ' + desiredScope);
+            return this.zoomTo(desiredScope);
+        }
     }
+
+    private static zoomLevel(scope: Scope): number {
+        return [
+            Scope.SECOND,
+            Scope.MINUTE,
+            Scope.HOUR,
+            Scope.DAY,
+            Scope.WEEK,
+            Scope.MONTH,
+            Scope.QUARTER,
+            Scope.YEAR
+        ].findIndex(val => val === scope)
+    }
+
+    /**
+     * Yay overriding default Object prototype methods!
+     * @returns periodStr
+     */
+    toString() {
+        return this.periodStr;
+    }
+
+    getEnd(): Period {
+        if (this.scope === Scope.SECOND) return new Period(this.periodStr);
+        if (this.scope === Scope.MINUTE) return new Period(this.periodStr + ':59');
+        if (this.scope === Scope.HOUR) return new Period(this.periodStr + ':59:59');
+        if (this.scope === Scope.DAY) return new Period(this.periodStr + 'T23:59:59');
+
+        if (this.scope === Scope.WEEK) {
+            let numWks = Number.parseInt(this.periodStr.split('W')[1])-1;
+            let init = Temporal.PlainDate.from(this.periodStr.split('-')[0] + '01-01')
+            let sun = init.add({ days: 7 - init.dayOfWeek })
+            sun = sun.add({ days: numWks * 7 });
+            return new Period(sun.toString() + 'T23:59:59')
+            
+        }
+        if (this.scope === Scope.MONTH){
+            let lastDay = Temporal.PlainDate.from(this.periodStr+'-01').daysInMonth;
+            return new Period(this.periodStr + '-' + lastDay.toString() + 'T23:59:59')
+        }
+        if (this.scope === Scope.QUARTER){
+            const year = this.periodStr.substring(0,4)
+            const q = Number.parseInt(this.periodStr.slice(-1));
+            const month = q * 3
+            const d =  Temporal.PlainDate.from(year+'-'+month.toString().padStart(2,'0')+'-01').daysInMonth;
+            return new Period(year+'-'+month.toString().padStart(2,'0')+'-'+d+'T23:59:59')
+        }
+        return new Period(this.periodStr + "-12-31T23:59:59")
+    }
+
+    /**
+     * 
+     * @returns the first second of the period (e.g. 2020-01-01T00:00:00)
+     */
+    getStart(): Period{
+        if(this._zoomLevel === 0) return new Period(this);
+        if(this.scope === Scope.YEAR) return new Period(this.toString() + '-01-01T00:00:00')
+        if(this.scope === Scope.QUARTER) return new Period(this.zoomIn() + '-01T00:00:00')
+        if(this.scope === Scope.MONTH) return new Period(this.toString() + '-01T00:00:00')
+        //above preempts week, cause it's not purely hierarchical,
+        //from here you can just "zoomIn" to the beginning of the period
+        let per = this.zoomIn();
+        while(per._zoomLevel !== 0){
+            per = per.zoomIn()
+        }
+        return per;
+    }
+
+    /**
+     * 
+     */
+    zoomTo(desiredScope: Scope): Period {
+        const desiredLevel = Period.zoomLevel(desiredScope);
+        if(this._zoomLevel === desiredLevel) return new Period(this);
+        if(this._zoomLevel < desiredLevel){
+            let zoomOut = this.zoomOut()
+            while(zoomOut._zoomLevel < desiredLevel){
+                //need to bypass weeks
+                if(desiredLevel !== 4 && zoomOut._zoomLevel === 3){
+                    zoomOut = new Period(zoomOut.periodStr.substring(0,7))
+                }else{
+                    zoomOut = zoomOut.zoomOut()
+                }
+            }
+            return zoomOut;
+        }
+            let zoomIn = this.zoomIn()
+            while(zoomIn._zoomLevel > desiredLevel){
+                if(desiredLevel !== 4 && zoomIn._zoomLevel === 5){
+                    zoomIn = new Period(zoomIn.periodStr+'-01')
+                }else{
+                    zoomIn = zoomIn.zoomIn()
+                }
+            }
+            return zoomIn;
+    }
+
+    /**
+     * Zooms in on the BEGINNING (?) of the Period
+     * @returns the next level finer-grain scope at the beginning of this scope
+     */
+    zoomIn(): Period {
+        if (this.scope === Scope.YEAR) return new Period(this.periodStr + '-Q1');
+        if (this.scope === Scope.QUARTER) {
+            const year = this.periodStr.substring(0, 4);
+            const month = Number.parseInt(this.periodStr.slice(-1)) * 3 - 2
+            return new Period(year + '-' + month.toString().padStart(2, '0'));
+        }
+        if (this.scope === Scope.MONTH) {
+            const temp = Temporal.PlainDate.from(this.periodStr + "-01")
+            let year = temp.year;
+            if (temp.weekOfYear > 50 && temp.dayOfYear < 14) year = year - 1;
+            if (temp.weekOfYear == 1 && temp.dayOfYear > 360) year = year + 1
+            return new Period(year + "-W" + temp.weekOfYear.toString().padStart(2, '0'));
+        }
+        if (this.scope === Scope.WEEK) {
+            let numWks = Number.parseInt(this.periodStr.split('W')[1]);
+            let init = Temporal.PlainDate.from(this.periodStr.split('-')[0] + '01-01')
+            let mon = init.add({ days: 1 - init.dayOfWeek }).add({ days: numWks * 7 })
+            return new Period(mon.toString());
+        }
+        if (this.scope === Scope.DAY) return new Period(this.periodStr + "T00")
+        if (this.scope === Scope.HOUR) return new Period(this.periodStr + ":00")
+        if (this.scope === Scope.MINUTE) return new Period(this.periodStr + ":00")
+        //zooming in from a second returns itself
+        return new Period(this.periodStr)
+    }
+
+    zoomOut(): Period {
+        if (this.scope === Scope.SECOND) return new Period(this.periodStr.slice(0, -3));
+        if (this.scope === Scope.MINUTE) return new Period(this.periodStr.slice(0, -3));
+        if (this.scope === Scope.HOUR) return new Period(this.periodStr.slice(0, -3));
+        if (this.scope === Scope.DAY) {
+            const temp = Temporal.PlainDateTime.from(this.periodStr);
+            //catching edge cases like 2019-12-31 => 2020-W01 & 2023-01-01 => 2022-W52
+            let year = temp.year;
+            if (temp.weekOfYear > 50 && temp.dayOfYear < 14) year = year - 1;
+            if (temp.weekOfYear == 1 && temp.dayOfYear > 360) year = year + 1
+            return new Period(year + "-W" + temp.weekOfYear.toString().padStart(2, '0'));
+        }
+        if (this.scope === Scope.WEEK) {
+            //weeks zooming out resolve to whichever month contains the THURSDAY of the week
+            let numWks = Number.parseInt(this.periodStr.split('W')[1]);
+            let init = Temporal.PlainDate.from(this.periodStr.split('-')[0] + '01-01')
+            let thur = init.add({ days: 4 - init.dayOfWeek }).add({ days: numWks * 7 })
+            return new Period(thur.toPlainYearMonth().toString());
+        }
+        if (this.scope === Scope.MONTH) {
+            let yearStr = this.periodStr.split('-')[0];
+            let month = Number.parseInt(this.periodStr.split('-')[1]);
+            let quarterStr = Math.ceil(month / 3).toString();
+            return new Period(yearStr + '-Q' + quarterStr);
+        }
+        // else is a Scope.QUARTER or Scope.YEAR, I think I'm goign to let Scope.YEAR return itself
+        return new Period(this.periodStr.substring(0, 4))
+    }
+
+    addDuration(temporalDurationStr: string): Period{
+        const startTemp = Temporal.PlainDateTime.from(this.getStart().periodStr);
+        const endTemp = startTemp.add(temporalDurationStr);
+        return new Period(endTemp.toString()).zoomTo(this.scope);
+    }
+
+    contains(period: Period): boolean{
+        const inBegin = Temporal.PlainDateTime.from(period.getStart().periodStr)
+        const inEnd = Temporal.PlainDateTime.from(period.getEnd().periodStr)
+        const thisBegin = Temporal.PlainDateTime.from(this.getStart().periodStr);
+        const thisEnd = Temporal.PlainDateTime.from(this.getEnd().periodStr);
+        const start = Temporal.PlainDateTime.compare(inBegin, thisBegin);
+        const end = Temporal.PlainDateTime.compare(thisEnd,inEnd);
+        return start !== -1 && end !== -1
+    }
+        
+    // I can't believe I was able to reduce these to a 1 liner
+    getNext(): Period{
+        let end = this.getEnd();
+        let plusOne = end.addDuration('PT1S');
+        let zoomed = plusOne.zoomTo(this.scope);
+        return this.getEnd().addDuration('PT1S').zoomTo(this.scope);
+        
+    }
+    getPrev(): Period{
+        return this.getStart().addDuration('-PT1S').zoomTo(this.scope);
+    }
+
+    static allPeriodsBetween(start: Period, end: Period, scope: Scope, asStrings = false): Period[] | string[]{
+        if(Temporal.PlainDateTime.compare(Temporal.PlainDateTime.from(start.getStart().periodStr), Temporal.PlainDateTime.from(end.getStart().periodStr)) === 1){
+            const temp = start;
+            start = end;
+            end = temp;            
+        }
+        const startOfStart = start.getStart().periodStr;
+        const endOfEnd = end.getEnd().periodStr;
+        let first, last, list: any[];
+        first = start.zoomTo(scope);
+        last = end.getNext().zoomTo(Scope.SECOND).addDuration('-PT1S').zoomTo(scope);
+
+        let member = first;
+        list = [];
+        if(asStrings){
+            do{
+                list.push(member.periodStr);
+                member = member.getNext();
+            }while(member.periodStr !== last.periodStr)
+            return list as string[]
+        }else{
+            do{
+                list.push(member);
+                member = member.getNext();
+                
+            }while(member.periodStr <= last.periodStr)
+            return list as Period[]
+        }
+    }
+
+    //#TODO - enable Periods to query for Entries
+    //getEntriesInPeriodMatchingFilter(params: StandardFilters): Element[]
 
     static now(scope: Scope): PeriodStr {
         let seedStr = '';
@@ -1763,15 +1996,6 @@ export class Period {
             return Scope.YEAR;
         throw new Error('Attempted to infer scope failed for: ' + ISOString);
     }
-
-    //#TODO - implement Period Methods...
-    //getPeriodEnd(scope: Scope): Period?
-    //getPeriodStart(scope: Scope): Period?
-    //zoomIn(): Period
-    //zoomOut(): Period
-    //getNext(): Period
-    //getPrev(): Period
-    //allPeriodsBetween(start: Period, end: Period, scope: Scope): Period
 }
 
 export class Query {
@@ -1974,9 +2198,9 @@ export function makeEpochStrFromTemporal(temp: Temporal.ZonedDateTime): EpochStr
     return temp.epochMilliseconds.toString(36);
 }
 
-export function isValidEpochStr(epochStr: string): boolean{
-    if(typeof epochStr !== 'string') return false;
-    if(epochStr.length !== 8) return false; //not supporting way in the past or future
+export function isValidEpochStr(epochStr: string): boolean {
+    if (typeof epochStr !== 'string') return false;
+    if (epochStr.length !== 8) return false; //not supporting way in the past or future
     //☝️ technically creates a 2059 problem... but that's my problem when I'm 2x as old as I am now
     //console.log(parseTemporalFromEpochStr('zzzzzzz').toLocaleString()) //is "6/25/1972, 6:49:24 PM CDT"
     //console.log(parseTemporalFromEpochStr('100000000').toLocaleString()) //is "5/25/2059, 12:38:27 PM CDT"
