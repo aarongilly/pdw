@@ -45,7 +45,7 @@ export enum PointType {
     /**
      * a number
      */
-    NUM = "NUM",
+    NUMBER = "NUMBER",
     /**
      * A string, assumed to be short-ish
      */
@@ -645,6 +645,14 @@ export interface QueryParams {
     today?: any;
     thisWeek: any;
     thisMonth: any;
+    /**
+     * MoA - map of Arrays
+     * NestPoints - Entrys with _points: [EntryPoints], Defs with _points: [PointDefs]
+     * ByEntry - Entries with _points: [EntryPoints] & _defs: [Def], where Def has Tags & PointDefs
+     * ByDef - Defs with _entries: [Entry] & _points: [PointDefs
+     * MyPeriod - Periods with _entries: [ByEntry]
+     */
+    shape?: 'MoA' | 'NestPoints'
 
     //#TODO - more query params?
 }
@@ -1622,7 +1630,7 @@ export class EntryPoint extends Element implements EntryPointLike {
             console.warn(`Cannot convert this to multiselect:`, _val)
             return undefined;
         }
-        if (_type === PointType.NUM) {
+        if (_type === PointType.NUMBER) {
             if (typeof _val === 'boolean') return _val ? 1 : 0;
             if (typeof _val === 'string') return Number.parseInt(_val);
             if (typeof _val === "number") return _val;
@@ -1774,7 +1782,10 @@ export class Period {
 
         if (this.scope === Scope.WEEK) {
             let numWks = Number.parseInt(this.periodStr.split('W')[1])-1;
+            //if the previous year had 53 weeks, this is necessary
+            if(Period.prevYearHas53Weeks(this.periodStr.substring(0,4))) numWks = numWks + 1
             let init = Temporal.PlainDate.from(this.periodStr.split('-')[0] + '01-01')
+            
             let sun = init.add({ days: 7 - init.dayOfWeek })
             sun = sun.add({ days: numWks * 7 });
             return new Period(sun.toString() + 'T23:59:59')
@@ -1857,10 +1868,13 @@ export class Period {
             let year = temp.year;
             if (temp.weekOfYear > 50 && temp.dayOfYear < 14) year = year - 1;
             if (temp.weekOfYear == 1 && temp.dayOfYear > 360) year = year + 1
-            return new Period(year + "-W" + temp.weekOfYear.toString().padStart(2, '0'));
+            const weekNum = temp.weekOfYear
+            return new Period(year + "-W" + weekNum.toString().padStart(2, '0'));
         }
         if (this.scope === Scope.WEEK) {
-            let numWks = Number.parseInt(this.periodStr.split('W')[1]);
+            let numWks = Number.parseInt(this.periodStr.split('W')[1])-1;
+            //if the previous year had 53 weeks, this is necessary
+            if(Period.prevYearHas53Weeks(this.periodStr.substring(0,4))) numWks = numWks + 1
             let init = Temporal.PlainDate.from(this.periodStr.split('-')[0] + '01-01')
             let mon = init.add({ days: 1 - init.dayOfWeek }).add({ days: numWks * 7 })
             return new Period(mon.toString());
@@ -1886,7 +1900,9 @@ export class Period {
         }
         if (this.scope === Scope.WEEK) {
             //weeks zooming out resolve to whichever month contains the THURSDAY of the week
-            let numWks = Number.parseInt(this.periodStr.split('W')[1]);
+            let numWks = Number.parseInt(this.periodStr.split('W')[1])-1;
+            //if the previous year had 53 weeks, this is necessary
+            if(Period.prevYearHas53Weeks(this.periodStr.substring(0,4))) numWks = numWks + 1
             let init = Temporal.PlainDate.from(this.periodStr.split('-')[0] + '01-01')
             let thur = init.add({ days: 4 - init.dayOfWeek }).add({ days: numWks * 7 })
             return new Period(thur.toPlainYearMonth().toString());
@@ -1919,6 +1935,7 @@ export class Period {
         
     // I can't believe I was able to reduce these to a 1 liner
     getNext(): Period{
+        let start = this.getStart();
         let end = this.getEnd();
         let plusOne = end.addDuration('PT1S');
         let zoomed = plusOne.zoomTo(this.scope);
@@ -1929,9 +1946,16 @@ export class Period {
         return this.getStart().addDuration('-PT1S').zoomTo(this.scope);
     }
 
+    private static prevYearHas53Weeks(yearStr: string):boolean{
+        const prevYear = Number.parseInt(yearStr)-1;
+        return Temporal.PlainDate.from(prevYear + '-12-31').weekOfYear == 53;
+        
+    }
+
     static allPeriodsBetween(start: Period, end: Period, scope: Scope, asStrings = false): Period[] | string[]{
         if(Temporal.PlainDateTime.compare(Temporal.PlainDateTime.from(start.getStart().periodStr), Temporal.PlainDateTime.from(end.getStart().periodStr)) === 1){
-            const temp = start;
+            console.warn('You may have flipped your start and end dates accidentally... or something')
+            const temp = start; 
             start = end;
             end = temp;            
         }
@@ -1945,9 +1969,10 @@ export class Period {
         list = [];
         if(asStrings){
             do{
+                // list.push({[member.periodStr]: {from: member.getStart().toString(), to: member.getEnd().toString()}});
                 list.push(member.periodStr);
                 member = member.getNext();
-            }while(member.periodStr !== last.periodStr)
+            }while(member.periodStr <= last.periodStr)
             return list as string[]
         }else{
             do{

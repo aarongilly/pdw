@@ -1,50 +1,22 @@
 //// @ts-nocheck
 import {EntryPoint, PDW, Period, PointType, Rollup, makeEpochStr, parseTemporalFromEpochStr, parseTemporalFromUid} from './pdw.js'
 import {Scope} from './pdw.js'
-import { exportToFile } from './dataStores/fileAsyncDataStores.js';
+import { AsyncExcelNatural, exportToFile } from './dataStores/fileAsyncDataStores.js';
 import { importFromFile } from './dataStores/fileAsyncDataStores.js';
 import { Temporal, toTemporalInstant } from 'temporal-polyfill';
 
 const pdw = PDW.getInstance();
 
-// console.log(Period.inferScope(Period.now(Scope.SECOND)));
-// console.log(Period.inferScope(Period.now(Scope.MINUTE)));
-// console.log(Period.inferScope(Period.now(Scope.HOUR)));
-// console.log(Period.inferScope(Period.now(Scope.DAY)));
-// console.log(Period.inferScope(Period.now(Scope.WEEK)));
-// console.log(Period.inferScope(Period.now(Scope.MONTH)));
-// console.log(Period.inferScope(Period.now(Scope.QUARTER)));
-// console.log(Period.inferScope(Period.now(Scope.YEAR)));
-
-// Think I solved it!
-
 // createTestFiles();
-
-// let date = new Date('2023-04-25T13:41:07.502-05:00');
-// let date = new Date('2023-04-25');
-// let myTemp = Temporal.Instant.fromEpochMilliseconds(date.getTime()).toZonedDateTimeISO(Temporal.Now.timeZone());
-// console.log(myTemp.toLocaleString());
-// console.log(myTemp.startOfDay().toLocaleString());
-// console.log(myTemp.startOfDay().add({days: 1}).subtract({milliseconds:1}).toLocaleString());
-
-// let per = new Period('2023-02');
-// console.log(new Period('2020-01-01').addDuration('P3W').toString());
-//console.log(new Period('2020-04').getNext().toString());
-let arr = Period.allPeriodsBetween(new Period('2020'), new Period('2020'), Scope.WEEK);
-// let arr = Period.allPeriodsBetween(new Period('2020-01-01T06:02'), new Period('2020-01-01T06:02'), Scope.SECOND);
-//@ts-expect-error
-console.log(arr.map(a=>a.periodStr).join(', '));
-
-
-// .add('P2W').dayOfWeek.toLocaleString());
-// console.log(new Period('2023-01-01').zoomOut());
-// console.log(new Period('2019-12-31').zoomOut());
-
-// console.log(Temporal.PlainDateTime.from('2020-01').toString());
-
 
 // importFromFile('data-files/OutJSON.json');
 // importFromFile('data-files/OutExcel2.xlsx');
+let xl = new AsyncExcelNatural().importFrom('data-files/Nightly Review.xlsx')
+
+// const endOfJan = new Period('2023-01-30')
+// const januaryDateButFirstWeekOfFeb = new Period(endOfJan.zoomOut());
+// const toMonth = januaryDateButFirstWeekOfFeb.zoomOut()
+// console.log(januaryDateButFirstWeekOfFeb);
 
 // let mydef = pdw.getDefs({
 //     updatedBefore: 'lgvn3a11',
@@ -95,7 +67,7 @@ function createTestFiles(){
     pdw.createNewPointDef({
         _did: 'ay7l',
         _pid: '0pc6',
-        _type: PointType.NUM,
+        _type: PointType.NUMBER,
         _lbl: 'Numeric Thing',
         _emoji: '#️⃣',
         _rollup: Rollup.AVERAGE

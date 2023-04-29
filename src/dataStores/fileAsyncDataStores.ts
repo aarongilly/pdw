@@ -7,17 +7,17 @@ import { Temporal } from 'temporal-polyfill';
 //#region ### EXPORTED FUNCTIONS ###
 export function exportToFile(filepath: string, data: pdw.CompleteDataset) {
     const fileType = inferFileType(filepath)
-    if (fileType === 'excel') return new ExcelTabularImportExport().exportTo(data, filepath);
-    if (fileType === 'json') return new JsonImportExport().exportTo(data, filepath);
-    if (fileType === 'yaml') return new YamlImportExport().exportTo(data, filepath);
+    if (fileType === 'excel') return new AsyncExcelTabular().exportTo(data, filepath);
+    if (fileType === 'json') return new AsyncJson().exportTo(data, filepath);
+    if (fileType === 'yaml') return new AsyncYaml().exportTo(data, filepath);
     throw new Error('Unimplemented export type: ' + fileType)
 }
 
 export function importFromFile(filepath: string) {
     const fileType = inferFileType(filepath)
-    if (fileType === 'excel') return new ExcelTabularImportExport().importFrom(filepath);
-    if (fileType === 'json') return new JsonImportExport().importFrom(filepath);
-    if (fileType === 'yaml') return new YamlImportExport().importFrom(filepath);
+    if (fileType === 'excel') return new AsyncExcelTabular().importFrom(filepath);
+    if (fileType === 'json') return new AsyncJson().importFrom(filepath);
+    if (fileType === 'yaml') return new AsyncYaml().importFrom(filepath);
     throw new Error('Unimplemented import type: ' + fileType)
 }
 
@@ -28,7 +28,7 @@ export function importFromFile(filepath: string) {
  * TABULAR Excel. These stack all types on one-another
  * and are **not** the "natural" way of working within Excel
  */
-export class ExcelTabularImportExport implements pdw.AsyncDataStore {
+export class AsyncExcelTabular implements pdw.AsyncDataStore {
     static overViewShtName = 'Overview';
     static defShtName = 'Defs';
     static pointDefShtName = 'Point Defs';
@@ -53,55 +53,55 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             if (data.tagDefs !== undefined) aoa.push(['tagDefs', data.overview.tagDefs.current, data.overview.tagDefs.deleted]);
             if (data.tags !== undefined) aoa.push(['tags', data.overview.tags.current, data.overview.tags.deleted]);
             let overviewSht = XLSX.utils.aoa_to_sheet(aoa);
-            XLSX.utils.book_append_sheet(wb, overviewSht, ExcelTabularImportExport.overViewShtName);
+            XLSX.utils.book_append_sheet(wb, overviewSht, AsyncExcelTabular.overViewShtName);
         }
 
         if (data.defs !== undefined && data.defs.length > 0) {
-            let defBaseArr = data.defs.map(def => ExcelTabularImportExport.makeExcelDefRow(def));
+            let defBaseArr = data.defs.map(def => AsyncExcelTabular.makeExcelDefRow(def));
             defBaseArr.unshift(tabularHeaders.def);
 
             let defSht = XLSX.utils.aoa_to_sheet(defBaseArr);
-            XLSX.utils.book_append_sheet(wb, defSht, ExcelTabularImportExport.defShtName);
+            XLSX.utils.book_append_sheet(wb, defSht, AsyncExcelTabular.defShtName);
         }
 
         if (data.pointDefs !== undefined && data.pointDefs.length > 0) {
-            let pointDefArr = data.pointDefs.map(pd => ExcelTabularImportExport.makeExcelPointDefRow(pd));
+            let pointDefArr = data.pointDefs.map(pd => AsyncExcelTabular.makeExcelPointDefRow(pd));
             pointDefArr.unshift(tabularHeaders.pointDef);
 
             let pointDefSht = XLSX.utils.aoa_to_sheet(pointDefArr);
-            XLSX.utils.book_append_sheet(wb, pointDefSht, ExcelTabularImportExport.pointDefShtName);
+            XLSX.utils.book_append_sheet(wb, pointDefSht, AsyncExcelTabular.pointDefShtName);
         }
 
         if (data.entries !== undefined) {
-            let entryArr = data.entries.map(entry => ExcelTabularImportExport.makeExcelEntryRow(entry));
+            let entryArr = data.entries.map(entry => AsyncExcelTabular.makeExcelEntryRow(entry));
             entryArr.unshift(tabularHeaders.entry);
 
             let entryBaseSht = XLSX.utils.aoa_to_sheet(entryArr);
-            XLSX.utils.book_append_sheet(wb, entryBaseSht, ExcelTabularImportExport.entryShtName);
+            XLSX.utils.book_append_sheet(wb, entryBaseSht, AsyncExcelTabular.entryShtName);
         }
 
         if (data.entryPoints !== undefined) {
-            let entryPointArr = data.entryPoints.map(entryPoint => ExcelTabularImportExport.makeExcelEntryPointRow(entryPoint));
+            let entryPointArr = data.entryPoints.map(entryPoint => AsyncExcelTabular.makeExcelEntryPointRow(entryPoint));
             entryPointArr.unshift(tabularHeaders.entryPoint);
 
             let entryPointSht = XLSX.utils.aoa_to_sheet(entryPointArr);
-            XLSX.utils.book_append_sheet(wb, entryPointSht, ExcelTabularImportExport.entryPointShtName);
+            XLSX.utils.book_append_sheet(wb, entryPointSht, AsyncExcelTabular.entryPointShtName);
         }
 
         if (data.tagDefs !== undefined) {
-            let tagDefArr = data.tagDefs.map(tagDef => ExcelTabularImportExport.makeExcelTagDefRow(tagDef))
+            let tagDefArr = data.tagDefs.map(tagDef => AsyncExcelTabular.makeExcelTagDefRow(tagDef))
             tagDefArr.unshift(tabularHeaders.tagDef);
 
             let tagDefSht = XLSX.utils.aoa_to_sheet(tagDefArr);
-            XLSX.utils.book_append_sheet(wb, tagDefSht, ExcelTabularImportExport.tagDefShtName);
+            XLSX.utils.book_append_sheet(wb, tagDefSht, AsyncExcelTabular.tagDefShtName);
         }
 
         if (data.tags !== undefined) {
-            let tagArr = data.tags.map(tag => ExcelTabularImportExport.makeExcelTagRow(tag))
+            let tagArr = data.tags.map(tag => AsyncExcelTabular.makeExcelTagRow(tag))
             tagArr.unshift(tabularHeaders.tag);
 
             let tagSht = XLSX.utils.aoa_to_sheet(tagArr);
-            XLSX.utils.book_append_sheet(wb, tagSht, ExcelTabularImportExport.tagShtName);
+            XLSX.utils.book_append_sheet(wb, tagSht, AsyncExcelTabular.tagShtName);
         }
 
         XLSX.writeFile(wb, filename);
@@ -114,57 +114,57 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
         let loadedWb = XLSX.readFile(filepath);
         const shts = loadedWb.SheetNames;
         const pdwRef = pdw.PDW.getInstance();
-        if (!shts.some(name => name === ExcelTabularImportExport.defShtName)) {
+        if (!shts.some(name => name === AsyncExcelTabular.defShtName)) {
             console.warn('No Defs sheet found in ' + filepath);
         } else {
-            const defSht = loadedWb.Sheets[ExcelTabularImportExport.defShtName];
+            const defSht = loadedWb.Sheets[AsyncExcelTabular.defShtName];
             let defBaseRawArr = XLSX.utils.sheet_to_json(defSht) as pdw.DefLike[];
-            returnData.defs = defBaseRawArr.map(rawDef => ExcelTabularImportExport.parseExcelDefRow(rawDef))
+            returnData.defs = defBaseRawArr.map(rawDef => AsyncExcelTabular.parseExcelDefRow(rawDef))
             pdwRef.setDefs(returnData.defs);
         }
 
-        if (!shts.some(name => name === ExcelTabularImportExport.pointDefShtName)) {
+        if (!shts.some(name => name === AsyncExcelTabular.pointDefShtName)) {
             console.warn('No Point Defs sheet found in ' + filepath);
         } else {
-            const pointDefSht = loadedWb.Sheets[ExcelTabularImportExport.pointDefShtName];
+            const pointDefSht = loadedWb.Sheets[AsyncExcelTabular.pointDefShtName];
             let pointDefRawArr = XLSX.utils.sheet_to_json(pointDefSht) as pdw.PointDefLike[];
-            returnData.pointDefs = pointDefRawArr.map(rawPointDef => ExcelTabularImportExport.parseExcelPointDefRow(rawPointDef))
+            returnData.pointDefs = pointDefRawArr.map(rawPointDef => AsyncExcelTabular.parseExcelPointDefRow(rawPointDef))
             pdwRef.setPointDefs(returnData.pointDefs);
         }
 
-        if (!shts.some(name => name === ExcelTabularImportExport.entryShtName)) {
+        if (!shts.some(name => name === AsyncExcelTabular.entryShtName)) {
             console.warn('No Entry sheet found in ' + filepath);
         } else {
-            const entrySht = loadedWb.Sheets[ExcelTabularImportExport.entryShtName];
+            const entrySht = loadedWb.Sheets[AsyncExcelTabular.entryShtName];
             let entryRawArr = XLSX.utils.sheet_to_json(entrySht) as pdw.EntryLike[];
-            returnData.entries = entryRawArr.map(rawEntry => ExcelTabularImportExport.parseExcelEntryRow(rawEntry))
+            returnData.entries = entryRawArr.map(rawEntry => AsyncExcelTabular.parseExcelEntryRow(rawEntry))
             pdwRef.setEntries(returnData.entries);
         }
 
-        if (!shts.some(name => name === ExcelTabularImportExport.entryPointShtName)) {
+        if (!shts.some(name => name === AsyncExcelTabular.entryPointShtName)) {
             console.warn('No Entry sheet found in ' + filepath);
         } else {
-            const entrySht = loadedWb.Sheets[ExcelTabularImportExport.entryPointShtName];
+            const entrySht = loadedWb.Sheets[AsyncExcelTabular.entryPointShtName];
             let entryPointRawArr = XLSX.utils.sheet_to_json(entrySht) as pdw.EntryPointLike[];
-            returnData.entryPoints = entryPointRawArr.map(rawEntryPoint => ExcelTabularImportExport.parseExcelEntryPointRow(rawEntryPoint))
+            returnData.entryPoints = entryPointRawArr.map(rawEntryPoint => AsyncExcelTabular.parseExcelEntryPointRow(rawEntryPoint))
             pdwRef.setEntryPoints(returnData.entryPoints);
         }
 
-        if (!shts.some(name => name === ExcelTabularImportExport.tagDefShtName)) {
+        if (!shts.some(name => name === AsyncExcelTabular.tagDefShtName)) {
             console.warn('No Entry sheet found in ' + filepath);
         } else {
-            const entrySht = loadedWb.Sheets[ExcelTabularImportExport.tagDefShtName];
+            const entrySht = loadedWb.Sheets[AsyncExcelTabular.tagDefShtName];
             let tagDefRawArr = XLSX.utils.sheet_to_json(entrySht) as pdw.TagDefLike[];
-            returnData.tagDefs = tagDefRawArr.map(rawTagDef => ExcelTabularImportExport.parseExcelTagDefRow(rawTagDef))
+            returnData.tagDefs = tagDefRawArr.map(rawTagDef => AsyncExcelTabular.parseExcelTagDefRow(rawTagDef))
             pdwRef.setTagDefs(returnData.tagDefs);
         }
 
-        if (!shts.some(name => name === ExcelTabularImportExport.tagShtName)) {
+        if (!shts.some(name => name === AsyncExcelTabular.tagShtName)) {
             console.warn('No Entry sheet found in ' + filepath);
         } else {
-            const entrySht = loadedWb.Sheets[ExcelTabularImportExport.tagShtName];
+            const entrySht = loadedWb.Sheets[AsyncExcelTabular.tagShtName];
             let tagRawArr = XLSX.utils.sheet_to_json(entrySht) as pdw.TagLike[];
-            returnData.tags = tagRawArr.map(rawTag => ExcelTabularImportExport.parseExcelTagRow(rawTag))
+            returnData.tags = tagRawArr.map(rawTag => AsyncExcelTabular.parseExcelTagRow(rawTag))
             pdwRef.setTags(returnData.tags);
         }
 
@@ -181,7 +181,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
      */
     static makeExcelDefRow(def: pdw.DefLike) {
         return [
-            ...ExcelTabularImportExport.makeExcelFirstFourColumns(def),
+            ...AsyncExcelTabular.makeExcelFirstFourColumns(def),
             def._did,
             def._lbl,
             def._emoji,
@@ -197,7 +197,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
      */
     static makeExcelPointDefRow(pointDef: pdw.PointDefLike) {
         return [
-            ...ExcelTabularImportExport.makeExcelFirstFourColumns(pointDef),
+            ...AsyncExcelTabular.makeExcelFirstFourColumns(pointDef),
             pointDef._did,
             pointDef._pid,
             pointDef._lbl,
@@ -211,7 +211,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
 
     static makeExcelEntryRow(entryData: pdw.EntryLike) {
         return [
-            ...ExcelTabularImportExport.makeExcelFirstFourColumns(entryData),
+            ...AsyncExcelTabular.makeExcelFirstFourColumns(entryData),
             entryData._did,
             entryData._eid,
             entryData._period,
@@ -222,7 +222,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
 
     static makeExcelEntryPointRow(entryPointData: pdw.EntryPointLike) {
         return [
-            ...ExcelTabularImportExport.makeExcelFirstFourColumns(entryPointData),
+            ...AsyncExcelTabular.makeExcelFirstFourColumns(entryPointData),
             entryPointData._did,
             entryPointData._pid,
             entryPointData._eid,
@@ -232,7 +232,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
 
     static makeExcelTagDefRow(tagDefData: pdw.TagDefLike) {
         return [
-            ...ExcelTabularImportExport.makeExcelFirstFourColumns(tagDefData),
+            ...AsyncExcelTabular.makeExcelFirstFourColumns(tagDefData),
             tagDefData._tid,
             tagDefData._lbl
         ]
@@ -240,7 +240,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
 
     static makeExcelTagRow(tagData: pdw.TagLike) {
         return [
-            ...ExcelTabularImportExport.makeExcelFirstFourColumns(tagData),
+            ...AsyncExcelTabular.makeExcelFirstFourColumns(tagData),
             tagData._did,
             tagData._pid,
             tagData._tid,
@@ -270,7 +270,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             || defRow._did == undefined)
             throw new Error('Cannot parseExcelDefRow for ', defRow);
 
-        defRow = ExcelTabularImportExport.parseExcelFirstFourColumns(defRow);
+        defRow = AsyncExcelTabular.parseExcelFirstFourColumns(defRow);
 
         defRow._did = defRow._did.toString(); //in case I got unlucky with an all-numeric SmallID
 
@@ -286,8 +286,8 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             elementRowData._deleted = elementRowData._deleted.toUpperCase() == 'TRUE';
         }
 
-        elementRowData._created = ExcelTabularImportExport.makeEpochStrFromExcelDate(elementRowData._created)
-        elementRowData._updated = ExcelTabularImportExport.makeEpochStrFromExcelDate(elementRowData._updated)
+        elementRowData._created = AsyncExcelTabular.makeEpochStrFromExcelDate(elementRowData._created)
+        elementRowData._updated = AsyncExcelTabular.makeEpochStrFromExcelDate(elementRowData._updated)
 
         return elementRowData;
     }
@@ -332,7 +332,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             || pointDefRow._pid == undefined)
             throw new Error('Cannot parseExcelDefRow for ', pointDefRow);
 
-        pointDefRow = ExcelTabularImportExport.parseExcelFirstFourColumns(pointDefRow);
+        pointDefRow = AsyncExcelTabular.parseExcelFirstFourColumns(pointDefRow);
 
         pointDefRow._did = pointDefRow._did.toString(); //in case I got unlucky with an all-numeric SmallID
         pointDefRow._pid = pointDefRow._pid.toString(); //in case I got unlucky with an all-numeric SmallID
@@ -348,11 +348,11 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             || entryRow._did == undefined)
             throw new Error('Cannot parseExcelEntryRow for ', entryRow);
 
-        entryRow = ExcelTabularImportExport.parseExcelFirstFourColumns(entryRow);
+        entryRow = AsyncExcelTabular.parseExcelFirstFourColumns(entryRow);
 
         entryRow._did = entryRow._did.toString(); //in case I got unlucky with an all-numeric SmallID
-        if(entryRow._note === undefined) entryRow._note = '';
-        if(entryRow._source === undefined) entryRow._source = 'Excel Import Circa ' + pdw.makeEpochStr();
+        if (entryRow._note === undefined) entryRow._note = '';
+        if (entryRow._source === undefined) entryRow._source = 'Excel Import Circa ' + pdw.makeEpochStr();
 
 
         if (!pdw.Entry.isEntryLike(entryRow)) throw new Error('Failed to correctly parseExcelEntryRow for ', entryRow);
@@ -367,7 +367,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             || entryPointRow._pid == undefined)
             throw new Error('Cannot parseExcelEntryPointRow for ', entryPointRow);
 
-        entryPointRow = ExcelTabularImportExport.parseExcelFirstFourColumns(entryPointRow);
+        entryPointRow = AsyncExcelTabular.parseExcelFirstFourColumns(entryPointRow);
 
         entryPointRow._did = entryPointRow._did.toString(); //in case I got unlucky with an all-numeric SmallID
         entryPointRow._pid = entryPointRow._pid.toString(); //in case I got unlucky with an all-numeric SmallID
@@ -383,7 +383,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             || tagDefRow._tid == undefined)
             throw new Error('Cannot parseExcelTagDefRow for ', tagDefRow);
 
-        tagDefRow = ExcelTabularImportExport.parseExcelFirstFourColumns(tagDefRow);
+        tagDefRow = AsyncExcelTabular.parseExcelFirstFourColumns(tagDefRow);
 
         tagDefRow._did = tagDefRow._tid.toString(); //in case I got unlucky with an all-numeric SmallID
 
@@ -399,7 +399,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
             || tagRow._did == undefined)
             throw new Error('Cannot parseExcelTagRow for ', tagRow);
 
-        tagRow = ExcelTabularImportExport.parseExcelFirstFourColumns(tagRow);
+        tagRow = AsyncExcelTabular.parseExcelFirstFourColumns(tagRow);
 
         tagRow._did = tagRow._tid.toString(); //in case I got unlucky with an all-numeric SmallID
         tagRow._did = tagRow._did.toString(); //in case I got unlucky with an all-numeric SmallID
@@ -411,7 +411,7 @@ export class ExcelTabularImportExport implements pdw.AsyncDataStore {
 
 }
 
-export class JsonImportExport implements pdw.AsyncDataStore {
+export class AsyncJson implements pdw.AsyncDataStore {
 
     exportTo(data: pdw.CompleteDataset, filepath: string) {
         let json = JSON.stringify(data);
@@ -477,7 +477,7 @@ export class JsonImportExport implements pdw.AsyncDataStore {
  * yaml -> dates stored as ISO Strings (native YAML dates)
  * excel -> dates stored as Local Strings AND native Excel dates! 
  */
-export class YamlImportExport implements pdw.AsyncDataStore {
+export class AsyncYaml implements pdw.AsyncDataStore {
 
     exportTo(data: pdw.CompleteDataset, filepath: string) {
         //crazy simple implementation
@@ -510,93 +510,232 @@ export class YamlImportExport implements pdw.AsyncDataStore {
         return returnData;
     }
 
-    convertCompleteDatasetISOToEpoch(data: pdw.CompleteDataset){
-        if(data.overview !== undefined){
+    convertCompleteDatasetISOToEpoch(data: pdw.CompleteDataset) {
+        if (data.overview !== undefined) {
             let temporal = this.makeEpochStrFromISO(data.overview.lastUpdated);
             data.overview.lastUpdated = temporal.toString().split('[')[0]
         }
-        if(data.defs !== undefined){
-            data.defs = data.defs.map(def=> this.convertElementISOToEpoch(def)) as unknown as pdw.DefLike[];
+        if (data.defs !== undefined) {
+            data.defs = data.defs.map(def => this.convertElementISOToEpoch(def)) as unknown as pdw.DefLike[];
         }
-        if(data.pointDefs !== undefined){
-            data.pointDefs = data.pointDefs.map(element=> this.convertElementISOToEpoch(element)) as unknown as pdw.PointDefLike[];
+        if (data.pointDefs !== undefined) {
+            data.pointDefs = data.pointDefs.map(element => this.convertElementISOToEpoch(element)) as unknown as pdw.PointDefLike[];
         }
-        if(data.entries !== undefined){
-            data.entries = data.entries.map(element=> this.convertElementISOToEpoch(element)) as unknown as pdw.EntryLike[];
+        if (data.entries !== undefined) {
+            data.entries = data.entries.map(element => this.convertElementISOToEpoch(element)) as unknown as pdw.EntryLike[];
         }
-        if(data.entryPoints !== undefined){
-            data.entryPoints = data.entryPoints.map(element=> this.convertElementISOToEpoch(element)) as unknown as pdw.EntryPointLike[];
+        if (data.entryPoints !== undefined) {
+            data.entryPoints = data.entryPoints.map(element => this.convertElementISOToEpoch(element)) as unknown as pdw.EntryPointLike[];
         }
-        if(data.tagDefs !== undefined){
-            data.tagDefs = data.tagDefs.map(element=> this.convertElementISOToEpoch(element)) as unknown as pdw.TagDefLike[];
+        if (data.tagDefs !== undefined) {
+            data.tagDefs = data.tagDefs.map(element => this.convertElementISOToEpoch(element)) as unknown as pdw.TagDefLike[];
         }
-        if(data.tags !== undefined){
-            data.tags = data.tags.map(element=> this.convertElementISOToEpoch(element)) as unknown as pdw.TagLike[];
+        if (data.tags !== undefined) {
+            data.tags = data.tags.map(element => this.convertElementISOToEpoch(element)) as unknown as pdw.TagLike[];
         }
         return data;
     }
 
-    convertElementISOToEpoch(element: pdw.ElementLike): pdw.ElementLike{
+    convertElementISOToEpoch(element: pdw.ElementLike): pdw.ElementLike {
         element._created = this.makeEpochStrFromISO(element._created)
         element._updated = this.makeEpochStrFromISO(element._updated)
         return element
     }
 
-    makeEpochStrFromISO(ISOString: string): pdw.EpochStr{
-        let temp =  Temporal.Instant.fromEpochMilliseconds(new Date(ISOString).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone());
+    makeEpochStrFromISO(ISOString: string): pdw.EpochStr {
+        let temp = Temporal.Instant.fromEpochMilliseconds(new Date(ISOString).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone());
         return pdw.makeEpochStrFromTemporal(temp);
     }
 
-    convertCompleteDatasetDatesToISO(data: pdw.CompleteDataset){
-        if(data.overview !== undefined){
+    convertCompleteDatasetDatesToISO(data: pdw.CompleteDataset) {
+        if (data.overview !== undefined) {
             let temporal = pdw.parseTemporalFromEpochStr(data.overview.lastUpdated);
             data.overview.lastUpdated = temporal.toString().split('[')[0]
         }
-        if(data.defs !== undefined){
-            data.defs = data.defs.map(def=> this.convertElementEpochToISO(def)) as unknown as pdw.DefLike[];
+        if (data.defs !== undefined) {
+            data.defs = data.defs.map(def => this.convertElementEpochToISO(def)) as unknown as pdw.DefLike[];
         }
-        if(data.pointDefs !== undefined){
-            data.pointDefs = data.pointDefs.map(element=> this.convertElementEpochToISO(element)) as unknown as pdw.PointDefLike[];
+        if (data.pointDefs !== undefined) {
+            data.pointDefs = data.pointDefs.map(element => this.convertElementEpochToISO(element)) as unknown as pdw.PointDefLike[];
         }
-        if(data.entries !== undefined){
-            data.entries = data.entries.map(element=> this.convertElementEpochToISO(element)) as unknown as pdw.EntryLike[];
+        if (data.entries !== undefined) {
+            data.entries = data.entries.map(element => this.convertElementEpochToISO(element)) as unknown as pdw.EntryLike[];
         }
-        if(data.entryPoints !== undefined){
-            data.entryPoints = data.entryPoints.map(element=> this.convertElementEpochToISO(element)) as unknown as pdw.EntryPointLike[];
+        if (data.entryPoints !== undefined) {
+            data.entryPoints = data.entryPoints.map(element => this.convertElementEpochToISO(element)) as unknown as pdw.EntryPointLike[];
         }
-        if(data.tagDefs !== undefined){
-            data.tagDefs = data.tagDefs.map(element=> this.convertElementEpochToISO(element)) as unknown as pdw.TagDefLike[];
+        if (data.tagDefs !== undefined) {
+            data.tagDefs = data.tagDefs.map(element => this.convertElementEpochToISO(element)) as unknown as pdw.TagDefLike[];
         }
-        if(data.tags !== undefined){
-            data.tags = data.tags.map(element=> this.convertElementEpochToISO(element)) as unknown as pdw.TagLike[];
+        if (data.tags !== undefined) {
+            data.tags = data.tags.map(element => this.convertElementEpochToISO(element)) as unknown as pdw.TagLike[];
         }
         return data;
     }
 
-    convertElementEpochToISO(element: any): Element{
-        if(element._tempCreated !== undefined) delete element._tempCreated
-        if(element._tempUpdated !== undefined) delete element._tempUpdated
+    convertElementEpochToISO(element: any): Element {
+        if (element._tempCreated !== undefined) delete element._tempCreated
+        if (element._tempUpdated !== undefined) delete element._tempUpdated
         element._created = pdw.parseTemporalFromEpochStr(element._created).toString().split('[')[0]
         element._updated = pdw.parseTemporalFromEpochStr(element._updated).toString().split('[')[0]
         return element as Element
     }
 }
 
-export class NaturalExcelImportExport implements pdw.AsyncDataStore {
-    static overViewShtName = 'Overview';
+/**
+ * Let's party.
+ */
+export class AsyncExcelNatural implements pdw.AsyncDataStore {
+    static entryShtName = 'Entries';
     static defShtName = 'Defs';
-    static pointDefShtName = 'Point Defs';
-    static entryShtName = "Entry";
-    static entryPointShtName = "Entry Points";
-    static tagDefShtName = "Tag Defs";
-    static tagShtName = "Tags"
+    static schemaShtName = 'Schema';
 
-    importFrom(params: any): pdw.CompleteDataset {
+    importFrom(filepath: string): pdw.CompleteDataset {
+        console.log('loading...');
+        let returnData: pdw.CompleteDataset = {}
+        XLSX.set_fs(fs);
+        let loadedWb = XLSX.readFile(filepath);
+        const shts = loadedWb.SheetNames;
+        const pdwRef = pdw.PDW.getInstance();
+        if (!shts.some(name => name === AsyncExcelNatural.defShtName)) {
+            console.warn('No Defs sheet found in ' + filepath);
+        } else {
+            const defSht = loadedWb.Sheets[AsyncExcelNatural.defShtName];
+            let defBaseRawArr = XLSX.utils.sheet_to_json(defSht) as pdw.DefLike[];
+            returnData.defs = defBaseRawArr.map(rawDef => AsyncExcelNatural.parseExcelDefRow(rawDef))
+            pdwRef.setDefs(returnData.defs);
+        }
+
+        let pidOrder : string[] = [];
+        let didOrder : string[] = [];
+
+        if (!shts.some(name => name === AsyncExcelNatural.schemaShtName)) {
+            console.warn('No Schema sheet found in ' + filepath);
+        } else {
+            const schemaSht = loadedWb.Sheets[AsyncExcelNatural.schemaShtName];
+            let schemaRawArr = XLSX.utils.sheet_to_json(schemaSht);
+            returnData.pointDefs = this.convertSchemaShtDataToPointDefs(schemaRawArr)
+            const schemaAoA = XLSX.utils.sheet_to_json(schemaSht, {header:1});
+            pidOrder = schemaAoA[0] as string[]; //_pid must be on row 1
+            didOrder = schemaAoA[1] as string[]; //_did must be on row 2
+        }
+
+        if (!shts.some(name => name === AsyncExcelNatural.entryShtName)) {
+            console.warn('No Entry sheet found in ' + filepath);
+        } else {
+            const entrySht = loadedWb.Sheets[AsyncExcelNatural.entryShtName];
+            let entryRawArr = XLSX.utils.sheet_to_json(entrySht,{header: 1}) as any[][];
+            let entriesAndEntryPoints:{entries:pdw.EntryLike[],entryPoints: pdw.EntryPointLike[]} = {
+                entries: [],
+                entryPoints: [],
+            }
+            entriesAndEntryPoints = this.parseEntrySht(entryRawArr, pidOrder, didOrder);
+            pdwRef.setEntries(entriesAndEntryPoints.entries);
+            pdwRef.setEntryPoints(entriesAndEntryPoints.entryPoints);
+            // returnData.entryPoints = this.convertEntryShtToEntryPoints(entryRawArr, columns);
+            // pdwRef.setEntryPoints(returnData.entryPoints);
+        }
+
+        returnData = pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
+
+        return returnData;
+    }
+
+    private parseEntrySht(rawRows: any[][], schemaHeaders: string[], didOrder: string[]):{entries:pdw.EntryLike[],entryPoints: pdw.EntryPointLike[]} {
+        let returnData:{entries:pdw.EntryLike[],entryPoints: pdw.EntryPointLike[]} = {
+            entries:[],
+            entryPoints: []
+        }
+        // if(entryRawArr[0].length !== columns.length - 1) throw new Error('Schema sheet should have exactly one more column than the Entries sheet')
+        
+        let positionMap: any = {};
+
+        schemaHeaders.forEach((headerVal, j)=>{
+            positionMap[headerVal] = j
+        })
+
+        rawRows.forEach((row,i)=>{
+            if(i===0) return //skip header row
+            //spin up entry
+            
+            let entry = this.maybeMakeEntryFrom(row, positionMap)
+            //spin up entryPoints
+            row.forEach((col, j)=>{
+                
+                console.log(schemaHeaders, didOrder);
+            })
+            
+        })
         throw new Error('Method not implemented.');
     }
+
+    private maybeMakeEntryFrom(row:any[], positionMap: any[]){
+        //@ts-expect-error
+        if(positionMap._period === undefined) return undefined
+        //@ts-expect-error
+        let period = row[positionMap['_period']-1] //gave up on good code
+
+        console.log('h');
+        return {
+            _period: AsyncExcelTabular.makeEpochStrFromExcelDate(period)
+        }
+    }
+
+    private convertSchemaShtDataToPointDefs(shtData: any[]): pdw.PointDefLike[] {
+        // let returnArr: pdw.MinimumPointDef[] = [];
+        const keys = Object.keys(shtData[0]);
+        let map: any = {};
+        keys.forEach(key => map[key] = {})
+        shtData.forEach(row => {
+            Object.keys(row).forEach((key: string) => {
+                if (row.META !== undefined && key !== 'META' && key !== '_period' && key !== '_note' && key !== '_source' && key !== '_eid') {
+                    map[key][row['META']] = row[key] //this is so weird and seemingly prone to breaking
+                }
+            })
+        })
+        let returnArr: any[] = []
+        keys.forEach((key: string) => {
+            if (key !== 'META' && key !== '_period' && key !== '_note' && key !== '_source' && key !== '_eid') {
+                const rawPD = map[key];
+                let parsedPD: pdw.MinimumPointDef = {
+                    _did: rawPD._did
+                }
+
+                parsedPD._pid = key; //guess I'm going this route.
+                parsedPD._created = rawPD._created === undefined ? pdw.makeEpochStr() : AsyncExcelTabular.makeEpochStrFromExcelDate(rawPD._created);
+                parsedPD._updated = rawPD._updated === undefined ? pdw.makeEpochStr() : AsyncExcelTabular.makeEpochStrFromExcelDate(rawPD._updated);
+                parsedPD._deleted = rawPD._deleted === undefined ? false : rawPD._deleted.toString().toUpperCase() === 'TRUE';
+                parsedPD._emoji = rawPD._emoji === undefined ? '🆕' : rawPD._emoji;
+                parsedPD._desc = rawPD._desc === undefined ? '' : rawPD._desc;
+                parsedPD._uid = rawPD._uid === undefined ? pdw.makeUID() : rawPD._uid;
+                parsedPD._type = rawPD._type === undefined ? pdw.PointType.TEXT : rawPD._type;
+                parsedPD._rollup = rawPD._rollup === undefined ? pdw.Rollup.COUNT : rawPD._rollup;
+                returnArr.push(parsedPD as pdw.MinimumPointDef);
+            }
+        })
+        return returnArr as pdw.PointDefLike[]
+    }
+
+    static parseExcelDefRow(rawDef: pdw.DefLike): pdw.DefLike {
+        let parsedDef: pdw.MinimumDef = {
+            _lbl: rawDef._lbl
+        }
+        //#TODO - handle checks & variability
+        parsedDef._did = rawDef._did === undefined ? pdw.makeSmallID() : rawDef._did;
+        parsedDef._created = rawDef._created === undefined ? pdw.makeEpochStr() : AsyncExcelTabular.makeEpochStrFromExcelDate(rawDef._created);
+        parsedDef._updated = rawDef._updated === undefined ? pdw.makeEpochStr() : AsyncExcelTabular.makeEpochStrFromExcelDate(rawDef._updated);
+        parsedDef._deleted = rawDef._deleted === undefined ? false : rawDef._deleted.toString().toUpperCase() === 'TRUE';
+        parsedDef._emoji = rawDef._emoji === undefined ? '🆕' : rawDef._emoji;
+        parsedDef._desc = rawDef._desc === undefined ? '' : rawDef._desc;
+        parsedDef._scope = rawDef._scope === undefined ? pdw.Scope.SECOND : rawDef._scope;
+        parsedDef._uid = rawDef._uid === undefined ? pdw.makeUID() : rawDef._uid;
+
+        return parsedDef as pdw.DefLike
+    }
+
     exportTo(data: pdw.CompleteDataset, filename: string) {
         throw new Error('Method not implemented.');
-        
+
         /*
         XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();
