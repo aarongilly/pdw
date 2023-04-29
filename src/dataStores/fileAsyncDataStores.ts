@@ -19,14 +19,79 @@ export function importFromFile(filepath: string) {
     if (fileType === 'excel') return new AsyncExcelTabular().importFrom(filepath);
     if (fileType === 'json') return new AsyncJson().importFrom(filepath);
     if (fileType === 'yaml') return new AsyncYaml().importFrom(filepath);
+    if (fileType === 'csv') return new AsyncCSV().importFrom(filepath);
     throw new Error('Unimplemented import type: ' + fileType)
 }
 
 //#endregion
 
 export class AsyncCSV implements pdw.AsyncDataStore {
-    importFrom(params: any): pdw.CompleteDataset {
-        throw new Error('Method not implemented.');
+    importFrom(filepath: string): pdw.CompleteDataset {
+        console.log('loading...');
+        let returnData: pdw.CompleteDataset = {}
+        XLSX.set_fs(fs);
+        let loadedWb = XLSX.readFile(filepath);
+        const shts = loadedWb.SheetNames;
+        const pdwRef = pdw.PDW.getInstance();
+        const sht = loadedWb.Sheets[shts[0]];
+        let elements = XLSX.utils.sheet_to_json(sht) as pdw.DefLike[];
+        
+        let defs: any = [];
+        let pointDefs: any = [];
+        let entries: any = [];
+        let entryPoints: any = [];
+        let tagDefs: any = [];
+        let tags: any = [];
+
+        elements.forEach((element: any )=>{
+            if(element['Row Type'] === 'Def') defs.push(buildElement(element));
+            if(element['Row Type'] === 'PointDef') pointDefs.push(buildElement(element));
+            if(element['Row Type'] === 'Entry') entries.push(buildElement(element));
+            if(element['Row Type'] === 'EntryPoint') entryPoints.push(buildElement(element));
+            if(element['Row Type'] === 'TagDef') tagDefs.push(buildElement(element));
+            if(element['Row Type'] === 'Tag') tags.push(buildElement(element));
+        })
+
+        pdwRef.setDefs((<pdw.DefLike[]>defs))
+        pdwRef.setPointDefs((<pdw.PointDefLike[]>pointDefs))
+        pdwRef.setEntries((<pdw.EntryLike[]>entries))
+        pdwRef.setEntryPoints((<pdw.EntryPointLike[]>entryPoints))
+        pdwRef.setTagDefs((<pdw.TagDefLike[]>tagDefs))
+        pdwRef.setTags((<pdw.TagLike[]>tags))
+
+        return {
+            defs: defs,
+            pointDefs: pointDefs,
+            entries:entries,
+            entryPoints: entryPoints,
+            tagDefs:tagDefs,
+            tags:tags
+        }
+        
+        function buildElement(elementData: any){
+            let returnObj: any = {
+                _uid: elementData._uid,
+                _created: elementData._created,
+                _updated: elementData._updated,
+                _deleted: elementData._deleted === 'TRUE' ? true : false
+            };
+            if(elementData._did !== undefined) returnObj._did = elementData._did;
+            if(elementData._pid !== undefined) returnObj._pid = elementData._pid;
+            if(elementData._eid !== undefined) returnObj._eid = elementData._eid;
+            if(elementData._tid !== undefined) returnObj._tid = elementData._tid;
+            if(elementData._lbl !== undefined) returnObj._lbl = elementData._lbl;
+            if(elementData._emoji !== undefined) returnObj._emoji = elementData._emoji;
+            if(elementData._desc !== undefined) returnObj._desc = elementData._desc;
+            if(elementData._scope !== undefined) returnObj._scope = elementData._scope;
+            if(elementData._type !== undefined) returnObj._type = elementData._type;
+            if(elementData._rollup !== undefined) returnObj._rollup = elementData._rollup;
+            if(elementData._period !== undefined) returnObj._period = elementData._period;
+            if(elementData._note !== undefined) returnObj._note = elementData._note;
+            if(elementData._source !== undefined) returnObj._source = elementData._source;
+            if(elementData._val !== undefined) returnObj._val = elementData._val;
+
+            return returnObj;
+        }
     }
     exportTo(allData: pdw.CompleteDataset, filename: string) {
         XLSX.set_fs(fs);
@@ -47,7 +112,6 @@ export class AsyncCSV implements pdw.AsyncDataStore {
         XLSX.writeFile(wb, filename);
 
         return
-        throw new Error('Method not implemented.');
         
         function makeRowFromElement(data: any) {//pdw.Def | pdw.Entry | pdw.Tag | pdw.TagDef | pdw.PointDef | pdw.EntryPoint): string[]{
             return [
@@ -144,22 +208,22 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
         if (data.tagDefs !== undefined) {
             let tagDefArr = data.tagDefs.map(tagDef => AsyncExcelTabular.makeExcelTagDefRow(tagDef))
             tagDefArr.unshift(tabularHeaders.tagDef);
-
+            
             let tagDefSht = XLSX.utils.aoa_to_sheet(tagDefArr);
             XLSX.utils.book_append_sheet(wb, tagDefSht, AsyncExcelTabular.tagDefShtName);
         }
-
+        
         if (data.tags !== undefined) {
             let tagArr = data.tags.map(tag => AsyncExcelTabular.makeExcelTagRow(tag))
             tagArr.unshift(tabularHeaders.tag);
-
+            
             let tagSht = XLSX.utils.aoa_to_sheet(tagArr);
             XLSX.utils.book_append_sheet(wb, tagSht, AsyncExcelTabular.tagShtName);
         }
-
+        
         XLSX.writeFile(wb, filename);
     }
-
+    
     importFrom(filepath: string): pdw.CompleteDataset {
         console.log('loading...');
         let returnData: pdw.CompleteDataset = {}
@@ -175,7 +239,7 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
             returnData.defs = defBaseRawArr.map(rawDef => AsyncExcelTabular.parseExcelDefRow(rawDef))
             pdwRef.setDefs(returnData.defs);
         }
-
+        
         if (!shts.some(name => name === AsyncExcelTabular.pointDefShtName)) {
             console.warn('No Point Defs sheet found in ' + filepath);
         } else {
@@ -184,7 +248,7 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
             returnData.pointDefs = pointDefRawArr.map(rawPointDef => AsyncExcelTabular.parseExcelPointDefRow(rawPointDef))
             pdwRef.setPointDefs(returnData.pointDefs);
         }
-
+        
         if (!shts.some(name => name === AsyncExcelTabular.entryShtName)) {
             console.warn('No Entry sheet found in ' + filepath);
         } else {
@@ -193,7 +257,7 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
             returnData.entries = entryRawArr.map(rawEntry => AsyncExcelTabular.parseExcelEntryRow(rawEntry))
             pdwRef.setEntries(returnData.entries);
         }
-
+        
         if (!shts.some(name => name === AsyncExcelTabular.entryPointShtName)) {
             console.warn('No Entry sheet found in ' + filepath);
         } else {
@@ -201,6 +265,7 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
             let entryPointRawArr = XLSX.utils.sheet_to_json(entrySht) as pdw.EntryPointLike[];
             returnData.entryPoints = entryPointRawArr.map(rawEntryPoint => AsyncExcelTabular.parseExcelEntryPointRow(rawEntryPoint))
             pdwRef.setEntryPoints(returnData.entryPoints);
+            
         }
 
         if (!shts.some(name => name === AsyncExcelTabular.tagDefShtName)) {

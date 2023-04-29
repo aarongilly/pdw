@@ -12,8 +12,10 @@ const pdw = PDW.getInstance();
 // exportToFile('real-data/out-fromfirestore.xlsx', pdw.getAll({includeDeleted: 'no'}))
 // importFromFile('real-data/out-fromfirestore.xlsx');
 
-importFromFile('real-data/out-fromfirestore.xlsx');
-exportToFile('real-data/out-fromfirestore-CSV.csv',pdw.getAll({}))
+importFromFile('data-files/outCSV.csv');
+console.log('yo');
+
+// exportToFile('data-files/out-',pdw.getAll({}))
 
 // createTestFiles();
 
@@ -32,7 +34,6 @@ exportToFile('real-data/out-fromfirestore-CSV.csv',pdw.getAll({}))
 // })
 
 // importFromFile('data-files/OutYaml.yaml');
-console.log('yo');
 
 // console.log(pdw.allDataSince());
 
