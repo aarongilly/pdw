@@ -587,37 +587,22 @@ export class AsyncYaml implements pdw.AsyncDataStore {
  */
 export class AsyncExcelNatural implements pdw.AsyncDataStore {
     static entryShtName = 'Entries';
-    static defShtName = 'Defs';
-    static schemaShtName = 'Schema';
+    static elementsShtName = 'Elements';
 
     importFrom(filepath: string): pdw.CompleteDataset {
         console.log('loading...');
         let returnData: pdw.CompleteDataset = {}
         XLSX.set_fs(fs);
-        let loadedWb = XLSX.readFile(filepath);
+        let loadedWb = XLSX.readFile(filepath, {dense: true});
         const shts = loadedWb.SheetNames;
         const pdwRef = pdw.PDW.getInstance();
-        if (!shts.some(name => name === AsyncExcelNatural.defShtName)) {
+        if (!shts.some(name => name === AsyncExcelNatural.elementsShtName)) {
             console.warn('No Defs sheet found in ' + filepath);
         } else {
-            const defSht = loadedWb.Sheets[AsyncExcelNatural.defShtName];
-            let defBaseRawArr = XLSX.utils.sheet_to_json(defSht) as pdw.DefLike[];
+            const defSht = loadedWb.Sheets[AsyncExcelNatural.elementsShtName];
+            let defBaseRawArr = XLSX.utils.sheet_to_json(defSht, {header: 1}) as pdw.DefLike[];
             returnData.defs = defBaseRawArr.map(rawDef => AsyncExcelNatural.parseExcelDefRow(rawDef))
             pdwRef.setDefs(returnData.defs);
-        }
-
-        let pidOrder : string[] = [];
-        let didOrder : string[] = [];
-
-        if (!shts.some(name => name === AsyncExcelNatural.schemaShtName)) {
-            console.warn('No Schema sheet found in ' + filepath);
-        } else {
-            const schemaSht = loadedWb.Sheets[AsyncExcelNatural.schemaShtName];
-            let schemaRawArr = XLSX.utils.sheet_to_json(schemaSht);
-            returnData.pointDefs = this.convertSchemaShtDataToPointDefs(schemaRawArr)
-            const schemaAoA = XLSX.utils.sheet_to_json(schemaSht, {header:1});
-            pidOrder = schemaAoA[0] as string[]; //_pid must be on row 1
-            didOrder = schemaAoA[1] as string[]; //_did must be on row 2
         }
 
         if (!shts.some(name => name === AsyncExcelNatural.entryShtName)) {
@@ -629,7 +614,7 @@ export class AsyncExcelNatural implements pdw.AsyncDataStore {
                 entries: [],
                 entryPoints: [],
             }
-            entriesAndEntryPoints = this.parseEntrySht(entryRawArr, pidOrder, didOrder);
+            entriesAndEntryPoints = this.parseEntrySht(entryRawArr);
             pdwRef.setEntries(entriesAndEntryPoints.entries);
             pdwRef.setEntryPoints(entriesAndEntryPoints.entryPoints);
             // returnData.entryPoints = this.convertEntryShtToEntryPoints(entryRawArr, columns);
@@ -641,79 +626,13 @@ export class AsyncExcelNatural implements pdw.AsyncDataStore {
         return returnData;
     }
 
-    private parseEntrySht(rawRows: any[][], schemaHeaders: string[], didOrder: string[]):{entries:pdw.EntryLike[],entryPoints: pdw.EntryPointLike[]} {
+    private parseEntrySht(rawRows: any[][]):{entries:pdw.EntryLike[],entryPoints: pdw.EntryPointLike[]} {
         let returnData:{entries:pdw.EntryLike[],entryPoints: pdw.EntryPointLike[]} = {
             entries:[],
             entryPoints: []
         }
         // if(entryRawArr[0].length !== columns.length - 1) throw new Error('Schema sheet should have exactly one more column than the Entries sheet')
-        
-        let positionMap: any = {};
-
-        schemaHeaders.forEach((headerVal, j)=>{
-            positionMap[headerVal] = j
-        })
-
-        rawRows.forEach((row,i)=>{
-            if(i===0) return //skip header row
-            //spin up entry
-            
-            let entry = this.maybeMakeEntryFrom(row, positionMap)
-            //spin up entryPoints
-            row.forEach((col, j)=>{
-                
-                console.log(schemaHeaders, didOrder);
-            })
-            
-        })
-        throw new Error('Method not implemented.');
-    }
-
-    private maybeMakeEntryFrom(row:any[], positionMap: any[]){
-        //@ts-expect-error
-        if(positionMap._period === undefined) return undefined
-        //@ts-expect-error
-        let period = row[positionMap['_period']-1] //gave up on good code
-
-        console.log('h');
-        return {
-            _period: AsyncExcelTabular.makeEpochStrFromExcelDate(period)
-        }
-    }
-
-    private convertSchemaShtDataToPointDefs(shtData: any[]): pdw.PointDefLike[] {
-        // let returnArr: pdw.MinimumPointDef[] = [];
-        const keys = Object.keys(shtData[0]);
-        let map: any = {};
-        keys.forEach(key => map[key] = {})
-        shtData.forEach(row => {
-            Object.keys(row).forEach((key: string) => {
-                if (row.META !== undefined && key !== 'META' && key !== '_period' && key !== '_note' && key !== '_source' && key !== '_eid') {
-                    map[key][row['META']] = row[key] //this is so weird and seemingly prone to breaking
-                }
-            })
-        })
-        let returnArr: any[] = []
-        keys.forEach((key: string) => {
-            if (key !== 'META' && key !== '_period' && key !== '_note' && key !== '_source' && key !== '_eid') {
-                const rawPD = map[key];
-                let parsedPD: pdw.MinimumPointDef = {
-                    _did: rawPD._did
-                }
-
-                parsedPD._pid = key; //guess I'm going this route.
-                parsedPD._created = rawPD._created === undefined ? pdw.makeEpochStr() : AsyncExcelTabular.makeEpochStrFromExcelDate(rawPD._created);
-                parsedPD._updated = rawPD._updated === undefined ? pdw.makeEpochStr() : AsyncExcelTabular.makeEpochStrFromExcelDate(rawPD._updated);
-                parsedPD._deleted = rawPD._deleted === undefined ? false : rawPD._deleted.toString().toUpperCase() === 'TRUE';
-                parsedPD._emoji = rawPD._emoji === undefined ? '🆕' : rawPD._emoji;
-                parsedPD._desc = rawPD._desc === undefined ? '' : rawPD._desc;
-                parsedPD._uid = rawPD._uid === undefined ? pdw.makeUID() : rawPD._uid;
-                parsedPD._type = rawPD._type === undefined ? pdw.PointType.TEXT : rawPD._type;
-                parsedPD._rollup = rawPD._rollup === undefined ? pdw.Rollup.COUNT : rawPD._rollup;
-                returnArr.push(parsedPD as pdw.MinimumPointDef);
-            }
-        })
-        return returnArr as pdw.PointDefLike[]
+        return returnData
     }
 
     static parseExcelDefRow(rawDef: pdw.DefLike): pdw.DefLike {

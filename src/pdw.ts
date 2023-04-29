@@ -1578,7 +1578,10 @@ export class EntryPoint extends Element implements EntryPointLike {
             }
         }
         if (associatedDef === undefined) associatedDef = PointDef.findExistingData(entryPointData, 'PointDef');
-        if (associatedDef === undefined) throw new Error('No definition associated with supplied EntryPoint data')
+        if (associatedDef === undefined) { // throw new Error('No definition associated with supplied EntryPoint data')
+            PointDef.findExistingData(entryPointData, 'PointDef');
+            throw new Error('No definition associated with supplied EntryPoint data')
+        }
 
         //for now, just letting that function throw warnings to the console
         let correctType: any = EntryPoint.ensureValType(entryPointData._val, associatedDef._type);

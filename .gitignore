@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 # I added this
+real-data
 fs-test
 docs
 docs/*

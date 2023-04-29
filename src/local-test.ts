@@ -4,14 +4,19 @@ import {Scope} from './pdw.js'
 import { AsyncExcelNatural, exportToFile } from './dataStores/fileAsyncDataStores.js';
 import { importFromFile } from './dataStores/fileAsyncDataStores.js';
 import { Temporal, toTemporalInstant } from 'temporal-polyfill';
+import {importFirestore} from './onetimeImports.js'
 
 const pdw = PDW.getInstance();
+
+// importFirestore('real-data/in-firestore.json');
+// exportToFile('real-data/out-fromfirestore.xlsx', pdw.getAll({includeDeleted: 'no'}))
+importFromFile('real-data/out-fromfirestore.xlsx');
 
 // createTestFiles();
 
 // importFromFile('data-files/OutJSON.json');
 // importFromFile('data-files/OutExcel2.xlsx');
-let xl = new AsyncExcelNatural().importFrom('data-files/Nightly Review.xlsx')
+// let xl = new AsyncExcelNatural().importFrom('data-files/Excel_Test.xlsx')
 
 // const endOfJan = new Period('2023-01-30')
 // const januaryDateButFirstWeekOfFeb = new Period(endOfJan.zoomOut());
@@ -24,7 +29,7 @@ let xl = new AsyncExcelNatural().importFrom('data-files/Nightly Review.xlsx')
 // })
 
 // importFromFile('data-files/OutYaml.yaml');
-// console.log('yo');
+console.log('yo');
 
 // console.log(pdw.allDataSince());
 
