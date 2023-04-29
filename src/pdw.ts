@@ -2265,4 +2265,25 @@ function maybeGetOnlyResult(arrayOfOneElement: any[]): undefined | Def | Entry |
     return arrayOfOneElement[0]
 }
 
+export const canonicalHeaders = [
+    '_uid',
+    '_created',
+    '_updated',
+    '_deleted',
+    '_did',
+    '_pid',
+    '_eid',
+    '_tid',
+    '_lbl',
+    '_emoji',
+    '_desc',
+    '_scope',
+    '_type',
+    '_rollup',
+    '_period',
+    '_note',
+    '_source',
+    '_val'
+]
+
 //#endregion

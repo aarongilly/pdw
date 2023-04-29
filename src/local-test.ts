@@ -10,7 +10,10 @@ const pdw = PDW.getInstance();
 
 // importFirestore('real-data/in-firestore.json');
 // exportToFile('real-data/out-fromfirestore.xlsx', pdw.getAll({includeDeleted: 'no'}))
+// importFromFile('real-data/out-fromfirestore.xlsx');
+
 importFromFile('real-data/out-fromfirestore.xlsx');
+exportToFile('real-data/out-fromfirestore-CSV.csv',pdw.getAll({}))
 
 // createTestFiles();
 

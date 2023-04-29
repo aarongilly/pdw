@@ -10,6 +10,7 @@ export function exportToFile(filepath: string, data: pdw.CompleteDataset) {
     if (fileType === 'excel') return new AsyncExcelTabular().exportTo(data, filepath);
     if (fileType === 'json') return new AsyncJson().exportTo(data, filepath);
     if (fileType === 'yaml') return new AsyncYaml().exportTo(data, filepath);
+    if (fileType === 'csv') return new AsyncCSV().exportTo(data, filepath);
     throw new Error('Unimplemented export type: ' + fileType)
 }
 
@@ -22,6 +23,58 @@ export function importFromFile(filepath: string) {
 }
 
 //#endregion
+
+export class AsyncCSV implements pdw.AsyncDataStore {
+    importFrom(params: any): pdw.CompleteDataset {
+        throw new Error('Method not implemented.');
+    }
+    exportTo(allData: pdw.CompleteDataset, filename: string) {
+        XLSX.set_fs(fs);
+        const wb = XLSX.utils.book_new();
+        const data: string[][] = []
+        data.push(['Row Type',...pdw.canonicalHeaders])
+
+        if(allData.defs !== undefined) allData.defs.forEach(def=>data.push(makeRowFromElement(def)))
+        if(allData.pointDefs !== undefined) allData.pointDefs.forEach(element=>data.push(makeRowFromElement(element)))
+        if(allData.entries !== undefined) allData.entries.forEach(element=>data.push(makeRowFromElement(element)))
+        if(allData.entryPoints !== undefined) allData.entryPoints.forEach(element=>data.push(makeRowFromElement(element)))
+        if(allData.tagDefs !== undefined) allData.tagDefs.forEach(element=>data.push(makeRowFromElement(element)))
+        if(allData.tags !== undefined) allData.tags.forEach(element=>data.push(makeRowFromElement(element)))
+
+        let exportSht = XLSX.utils.aoa_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb, exportSht, 'PDW Export');
+
+        XLSX.writeFile(wb, filename);
+
+        return
+        throw new Error('Method not implemented.');
+        
+        function makeRowFromElement(data: any) {//pdw.Def | pdw.Entry | pdw.Tag | pdw.TagDef | pdw.PointDef | pdw.EntryPoint): string[]{
+            return [
+                pdw.getElementType(data).slice(0,-4),
+                data._uid,
+                data._created,
+                data._updated,
+                data._deleted.toString().toUpperCase(),
+                data._did === undefined ? '' : data._did!,
+                data._pid === undefined ? '' : data._pid!,
+                data._eid === undefined ? '' : data._eid!,
+                data._tid === undefined ? '' : data._tid!,
+                data._lbl === undefined ? '' : data._lbl!,
+                data._emoji === undefined ? '' : data._emoji!,
+                data._desc === undefined ? '' : data._desc,
+                data._scope === undefined ? '' : data._scope!,
+                data._type === undefined ? '' : data._type!,
+                data._rollup === undefined ? '' : data._rollup!,
+                data._period === undefined ? '' : data._period.toString()!,
+                data._note === undefined ? '' : data._note!,
+                data._source === undefined ? '' : data._source!,
+                data._val === undefined ? '' : data._val.toString()!,
+            ]
+        }
+    }
+    
+}
 
 /**
  * Static Utilities for Importing and Exporting to 

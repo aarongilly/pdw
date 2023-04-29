@@ -1,0 +1,15 @@
+﻿Row Type,_uid,_created,_updated,_deleted,_did,_pid,_eid,_tid,_lbl,_emoji,_desc,_scope,_type,_rollup,_period,_note,_source,_val
+Def,lh0wmwkt-vnhp,lh0wmwkv,lh0wmwkw,FALSE,0m7w,,,,defOne,1️⃣,This is now inerited,SECOND,,,,,,
+Def,lh0wmwky-q0sf,lgvm3a11,lh0wmwky,FALSE,05a8,,,,FREE,3️⃣,Set a description,DAY,,,,,,
+Def,lh0wmwlk-xg1i,lh0wmwkx,lh0wmwll,FALSE,ay7l,,,,Two Relabeled,2️⃣,"Scoped at an **hour**, cause why not have that option?",HOUR,,,,,,
+PointDef,lh0wmwkw-xm25,lh0wmwkw,lh0wmwkx,FALSE,0m7w,8esq,,,Select Test,⛏️,For testing selects,,SELECT,COUNTOFEACH,,,,
+PointDef,lh0wmwky-ckzr,lh0wmwky,lh0wmwky,FALSE,05a8,0f3n,,,Free Item,🆓,Set a description,,TEXT,COUNT,,,,
+PointDef,lh0wmwll-7w4j,lh0wmwkz,lh0wmwll,FALSE,ay7l,0pc6,,,Test Relabel,#️⃣,Set a description,,NUMBER,AVERAGE,,,,
+PointDef,lh0wmwll-pg69,lh0wmwkz,lh0wmwll,FALSE,ay7l,0tb7,,,Boolean Thing,👎,Orig desc,,BOOL,COUNT,,,,
+Entry,lh0wmwl1-y0d3,lh0wmwl1,lh0wmwl2,FALSE,0m7w,,lh0wmwl2-bkai,,,,,,,,2023-04-28T13:46:02,,,
+Entry,lh0wmwlm-sulo,lh0wmwl0,lh0wmwlm,FALSE,ay7l,,lgricx7k-08al,,,,,,,,2023-04-22T06,Updated noted,,
+EntryPoint,lh0wmwlm-84du,lh0wmwl1,lh0wmwlm,FALSE,ay7l,0tb7,lgricx7k-08al,,,,,,,,,,,true
+EntryPoint,lh0wmwln-580r,lh0wmwl1,lh0wmwln,FALSE,ay7l,0pc6,lgricx7k-08al,,,,,,,,,,,6
+Tag,lh0wmwl2-036u,lh0wmwl3,lh0wmwl3,FALSE,,,,plp7,My Tag!,,,,,,,,,
+Tag,lh0wmwl4-0bew,lh0wmwl4,lh0wmwl4,FALSE,,,,0vvi,Select Option Test,,,,,,,,,
+Tag,lh0wmwln-0qmh,lh0wmwl3,lh0wmwln,FALSE,,,,vvct,New Label,,,,,,,,,
