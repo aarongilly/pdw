@@ -85,12 +85,20 @@ export class AsyncCSV implements pdw.AsyncDataStore {
             if(elementData._scope !== undefined) returnObj._scope = elementData._scope;
             if(elementData._type !== undefined) returnObj._type = elementData._type;
             if(elementData._rollup !== undefined) returnObj._rollup = elementData._rollup;
-            if(elementData._period !== undefined) returnObj._period = elementData._period;
+            if(elementData._period !== undefined) returnObj._period = parsePeriod(elementData._period);
             if(elementData._note !== undefined) returnObj._note = elementData._note;
             if(elementData._source !== undefined) returnObj._source = elementData._source;
             if(elementData._val !== undefined) returnObj._val = elementData._val;
 
             return returnObj;
+        }
+
+        function parsePeriod(period: any): string{
+            if(typeof period === 'string') return period
+            if(typeof period === 'number'){
+                return Temporal.Instant.fromEpochMilliseconds((period - (25567 + 1)) * 86400 * 1000).toZonedDateTimeISO(Temporal.Now.timeZone()).toPlainDate().toString();         
+            }
+            throw new Error('Unhandled period val...')
         }
     }
     exportTo(allData: pdw.CompleteDataset, filename: string) {

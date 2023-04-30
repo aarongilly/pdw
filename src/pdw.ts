@@ -759,13 +759,13 @@ export class PDW {
         return combinedDefs;
     }
 
-    getPointDefs(rawParams: StandardParams): Def[] {
+    getPointDefs(rawParams: StandardParams): PointDef[] {
         const params = PDW.sanitizeParams(rawParams)
 
         //if there's only DataStore, bypass the combining stuff to save time
         if (this.dataStores.length == 1) {
-            let defLikes = this.dataStores[0].getPointDefs(params)
-            return defLikes.map(dl => new Def(dl));
+            let pointDefLikes = this.dataStores[0].getPointDefs(params)
+            return pointDefLikes.map(dl => new PointDef(dl));
         }
 
         throw new Error('Multiple stores not implemented yet');

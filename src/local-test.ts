@@ -4,7 +4,7 @@ import { Scope } from './pdw.js'
 import { AsyncExcelNatural, exportToFile } from './dataStores/fileAsyncDataStores.js';
 import { importFromFile } from './dataStores/fileAsyncDataStores.js';
 import { Temporal, toTemporalInstant } from 'temporal-polyfill';
-import { importFirestore, importMongo } from './onetimeImports.js'
+import { importFirestore, importMongo, importOldest } from './onetimeImports.js'
 
 const pdw = PDW.getInstance();
 
@@ -12,6 +12,29 @@ const pdw = PDW.getInstance();
 // importMongo('real-data/in-mongo.json')
 // exportToFile('real-data/out-fromfirestore.xlsx', pdw.getAll({includeDeleted: 'no'}))
 // importFromFile('real-data/out-frommongo.csv');
+
+//the big merge
+// importFromFile('real-data/out-fromfirestore.csv');
+// importFromFile('real-data/out-frommongo-xlated.csv');
+// exportToFile('real-data/merged.csv', pdw.getAll({includeDeleted:'yes'}))
+
+importFromFile('real-data/defs_pointdefs.csv') //#BUG - character encoding on emoji
+importOldest('real-data/Excel_Test.xlsx')
+
+const data = pdw.getAll({includeDeleted: 'yes'});
+exportToFile('real-data/partial-old-dataset.csv',data)
+exportToFile('real-data/partial-old-dataset.yaml',data)
+
+//create all current file types from firestore & mongo data
+// importFromFile('real-data/merged-firestore-mongo.csv')
+const allData = pdw.getAll({includeDeleted:'yes'})
+// exportToFile('real-data/merged.json', allData)
+// exportToFile('real-data/merged.yaml', allData)
+// exportToFile('real-data/merged.xlsx', allData)
+
+// importFromFile('real-data/out-fromfirestore.csv')
+// console.log('yo');
+// exportToFile('real-data/deleteme.csv',pdw.getAll({}))
 
 // createTestFiles();
 
