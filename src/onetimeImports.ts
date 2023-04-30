@@ -187,3 +187,199 @@ export function importFirestore(filepath: string): pdw.CompleteDataset {
 
     return returnData;
 }
+
+export function importMongo(filepath: string): pdw.CompleteDataset{
+    function xlateDate(oldDate: string): pdw.EpochStr{
+        if(typeof oldDate!=='string'){
+            return pdw.makeEpochStr()
+        }
+        oldDate = oldDate.substring(0,19)+'+00:00[UTC]'
+        let temp = Temporal.ZonedDateTime.from(oldDate).withTimeZone('America/Chicago');
+        const epoch = pdw.makeEpochStrFromTemporal(temp);
+        return epoch
+    }
+
+    function xlateScope(oldScope: string): pdw.Scope{
+        if(oldScope === 'time') return pdw.Scope.SECOND
+        if(oldScope === 'day') return pdw.Scope.DAY
+        throw new Error('I guess this did happen?')
+    }
+
+    /**
+     * This function is for firestore, so I declared it in here.
+     * I should do this more.
+     */
+    function parseDef(dataIn: any): pdw.DefLike{
+        dataIn._did = pdw.makeSmallID();//tag for later use
+        let returnDef: pdw.DefLike = {
+            _did: dataIn._did,
+            _lbl: dataIn.label,
+            _desc: dataIn.desc,
+            _emoji: dataIn.emoji,
+            _scope: xlateScope(dataIn.scope),
+            _uid: pdw.makeUID(),
+            _deleted: false,
+            _created: xlateDate(dataIn.first),
+            _updated: xlateDate(dataIn.latest),
+        }
+
+        return returnDef
+    }
+
+    function parsePointDef(dataIn: any, defIn: any): pdw.PointDefLike{
+        dataIn._pid = pdw.makeSmallID(); //tag fr later again
+        let pointDef: pdw.PointDefLike = {
+            _did: defIn._did,
+            _lbl: dataIn.label,
+            _desc: dataIn.desc,
+            _emoji: dataIn.emoji,
+            _uid: pdw.makeUID(),
+            _deleted: false,
+            _created: xlateDate(defIn.first),
+            _updated: xlateDate(defIn.latest),
+            _pid: dataIn._pid,
+            _type: parseType(dataIn.type),
+            _rollup: parseRollup(dataIn.rollup)
+        }
+
+        return pointDef
+
+        function parseType(inData: string): pdw.PointType{
+            if(inData === 'text') return pdw.PointType.TEXT
+            if(inData === 'number') return pdw.PointType.NUMBER
+            if(inData === 'list') return pdw.PointType.SELECT
+            if(inData === 'json') return pdw.PointType.JSON
+            if(inData === 'yes/no') return pdw.PointType.BOOL
+            if(inData === 'Enum') return pdw.PointType.SELECT
+            throw new Error('I guess tehre are more')
+        }
+
+        function parseRollup(rollup: string){
+            if(rollup === 'count') return pdw.Rollup.COUNT
+            if(rollup === 'count yes/no') return pdw.Rollup.COUNTOFEACH
+            if(rollup === 'average') return pdw.Rollup.AVERAGE
+            if(rollup === 'count distinct') return pdw.Rollup.COUNTUNIQUE
+            if(rollup === 'sum') return pdw.Rollup.SUM
+            throw new Error('more here')
+        }
+    }
+
+    function parseEntry(dataIn:any, defIn: any): pdw.EntryLike{
+        //want to update the eid to something for points to reference later
+        dataIn._eid = pdw.makeUID()
+        let entry: pdw.EntryLike = {
+            _eid: pdw.makeUID(),
+            _note: dataIn.note,
+            _period: parsePeriod(dataIn.period),
+            _did: defIn._did,
+            _source: dataIn.source,
+            _uid: pdw.makeUID(),
+            _deleted: dataIn.deleted,
+            _created: xlateDate(dataIn.created),
+            _updated: xlateDate(dataIn.updated),
+        }
+
+        return entry
+
+        function parsePeriod(text: string): pdw.PeriodStr{
+            if(text.length > 11){
+                text = text.substring(0,19)+'+00:00[UTC]'
+                let temp = Temporal.ZonedDateTime.from(text).withTimeZone('America/Chicago');
+                return temp.toPlainDateTime().toString();
+            }
+            if(text.length == 10) return text
+            const parts = text.split('/');
+            return parts[2] + '-' + parts[0].padStart(2,'0') + '-' + parts[1].padStart(2,'0');
+            throw new Error('whatever')
+            
+        }
+    }
+
+    function parseEntryPoint(val: any, entry: any, pointNum: any, defIn: any): pdw.EntryPointLike{
+        const _pid = defIn.points[Number.parseInt(pointNum)-1]._pid
+        let returnPoint: pdw.EntryPointLike ={
+            _eid: entry._eid,
+            _did: defIn._did,
+            _pid: _pid,
+            _val: val,
+            _uid: pdw.makeUID(),
+            _deleted: entry.deleted,
+            _created: xlateDate(entry.created),
+            _updated: xlateDate(entry.updated),
+        }
+        return returnPoint
+    }
+
+    const file = JSON.parse(fs.readFileSync(filepath).toString());
+    const returnData: pdw.CompleteDataset = {
+        defs: [],
+        pointDefs: [],
+        entries: [],
+        entryPoints: []
+    }
+    const pdwRef = pdw.PDW.getInstance();
+
+    let count = 0;
+
+    file.data.forEach((def: any)=>{
+        //parse def main
+        returnData.defs?.push(parseDef(def))
+        if(def.points === undefined) throw new Error('this hppened')
+        def.points.forEach((pd:any)=>{
+            //parse pointDef
+            returnData.pointDefs?.push(parsePointDef(pd, def))
+        })
+
+        if(def.entries === undefined) throw new Error('tat hppened')
+        def.entries.forEach((ent:any)=>{
+            //parse entry
+            returnData.entries?.push(parseEntry(ent, def))
+
+            if(ent.points === undefined) {
+                count = count+1
+                console.warn(ent.mid)
+            }else{
+                Object.keys(ent.points).forEach((ep:any)=>{
+                    //parse entry points
+                    returnData.entryPoints?.push(parseEntryPoint(ent.points[ep], ent, ep, def))
+                })
+            }
+        })        
+    })
+
+    if (returnData.defs !== undefined) pdwRef.setDefs(returnData.defs);
+    if (returnData.pointDefs !== undefined) pdwRef.setPointDefs(returnData.pointDefs);
+    if (returnData.entries !== undefined) pdwRef.setEntries(returnData.entries);
+    if (returnData.entryPoints !== undefined) pdwRef.setEntryPoints(returnData.entryPoints);
+
+    returnData.overview = {
+        storeName: filepath,
+        defs: {
+            current: returnData.defs?.filter(element => element._deleted === false).length,
+            deleted: returnData.defs?.filter(element => element._deleted).length
+        },
+        pointDefs: {
+            current: returnData.pointDefs?.filter(element => element._deleted === false).length,
+            deleted: returnData.pointDefs?.filter(element => element._deleted).length
+        },
+        entries: {
+            current: returnData.entries?.filter(element => element._deleted === false).length,
+            deleted: returnData.entries?.filter(element => element._deleted).length
+        },
+        entryPoints: {
+            current: returnData.entryPoints?.filter(element => element._deleted === false).length,
+            deleted: returnData.entryPoints?.filter(element => element._deleted).length
+        },
+        tagDefs: {
+            current: returnData.tagDefs?.filter(element => element._deleted === false).length,
+            deleted: returnData.tagDefs?.filter(element => element._deleted).length
+        },
+        tags: {
+            current: returnData.tags?.filter(element => element._deleted === false).length,
+            deleted: returnData.tags?.filter(element => element._deleted).length
+        },
+        lastUpdated: pdw.PDW.getDatasetLastUpdate(returnData)
+    }
+
+    return returnData;
+}

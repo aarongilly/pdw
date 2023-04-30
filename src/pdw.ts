@@ -79,6 +79,8 @@ export enum PointType {
      * A url to a photo?
      */
     PHOTO = 'PHOTO', //url?
+
+    JSON = 'JSON'
 }
 
 export enum Scope {
@@ -1432,6 +1434,10 @@ export class PointDef extends Element implements PointDefLike {
             }
         }
         super(newPointDefData)
+
+        if(newPointDefData._type !== undefined && !PointDef.isValidType(newPointDefData._type)) throw new Error('Cannot parse point type ' + newPointDefData._type);
+        if(newPointDefData._rollup !== undefined && !PointDef.isValidRollup(newPointDefData._rollup)) throw new Error('Cannot parse point rollup ' + newPointDefData._rollup);
+
         this._did = newPointDefData._did;
         this._lbl = newPointDefData._lbl ?? 'Label unset';
         this._type = newPointDefData._type ?? PointType.TEXT;
@@ -1439,6 +1445,7 @@ export class PointDef extends Element implements PointDefLike {
         this._desc = newPointDefData._desc ?? 'Set a description';
         this._emoji = newPointDefData._emoji ?? '🆕';
         this._rollup = newPointDefData._rollup ?? Rollup.COUNT;
+        //assigning out o convenience here
         if (def) this._def = def;
     }
 
@@ -1647,6 +1654,8 @@ export class EntryPoint extends Element implements EntryPointLike {
         }
         if (_type === PointType.SELECT) {
             if (typeof _val === 'string') return _val;
+            if (Array.isArray(_val)) return _val.join('|||')
+            if(_val === undefined) return []; //I guess
             console.warn(`Cannot convert this to select:`, _val)
             return undefined;
         }
@@ -1654,6 +1663,7 @@ export class EntryPoint extends Element implements EntryPointLike {
             if (typeof _val === 'boolean') return _val.toString();
             if (typeof _val === 'string') return _val.trim();
             if (typeof _val === "number") return _val.toString();
+            if(_val === undefined) return ''; //I guess
             return _val.toString();
         }
         if (_type === PointType.TIME) {
@@ -1663,6 +1673,12 @@ export class EntryPoint extends Element implements EntryPointLike {
                 return new Temporal.PlainTime(0, 0).add({ seconds: 86400 * _val }).toString();
             }
             console.warn(`Cannot convert this to time:`, _val)
+            return undefined;
+        }
+        if (_type === PointType.JSON) {
+            if (typeof _val === 'string') return _val.trim();
+            if (typeof _val === "object") return JSON.stringify(_val);
+            console.warn(`Cannot convert this to JSON:`, _val)
             return undefined;
         }
         throw new Error("Method not implemented.");
@@ -2248,8 +2264,9 @@ export function parseTemporalFromEpochStr(epochStr: EpochStr): Temporal.ZonedDat
 * of the 
 * @returns string representing the type of element
 */
-export function getElementType(element: ElementLike): 'DefLike' | 'PointDefLike' | 'EntryLike' | 'EntryPointLike' | 'TagLike' {
-    if (element.hasOwnProperty("_tid")) return "TagLike"
+export function getElementType(element: ElementLike): 'DefLike' | 'PointDefLike' | 'EntryLike' | 'EntryPointLike' | 'TagLike' | 'TagDefLike' {
+    if (element.hasOwnProperty("_tid") && element.hasOwnProperty("_did")) return "TagLike"
+    if (element.hasOwnProperty("_tid")) return "TagDefLike"
     if (element.hasOwnProperty("_eid") && element.hasOwnProperty('_pid')) return "EntryPointLike"
     if (element.hasOwnProperty("_eid")) return "EntryLike"
     if (element.hasOwnProperty("_pid")) return "PointDefLike"

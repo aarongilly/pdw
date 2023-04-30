@@ -1,7 +1,0 @@
-Row Type,_uid,_created,_updated,_deleted,_did,_pid,_eid,_tid,_lbl,_emoji,_desc,_scope,_type,_rollup,_period,_note,_source,_val
-Def,,2023-04-25T22:06:45,2023-04-25T22:06:45,FALSE,aaa0,,,,Nightly Review,??,A nightly review,DAY,,,,,,
-PointDef,,2023-04-25T22:06:45,2023-04-25T22:06:45,FALSE,aaa0,aaaa,,,Journal,??,Summary of the day,,MARKDOWN,COUNT,,,,
-PointDef,,2023-04-25T22:06:45,2023-04-25T22:06:45,FALSE,aaa0,aaab,,,Reference,??,Things I wanted to remember,,TEXT,COUNT,,,,
-PointDef,,2023-04-25T22:06:45,2023-04-25T22:06:45,FALSE,aaa0,aaac,,,DayTags,??,Features of the Day,,MULTISELECT,COUNTEACH,,,,
-PointDef,,2023-04-25T22:06:45,2023-04-25T22:06:45,FALSE,aaa0,aaad,,,Satisfaction,??,"A subjective rating of how satisfied I was with the day, from 0 to 10.",,NUMBER,AVERAGE,,,,
-PointDef,,2023-04-25T22:06:45,2023-04-25T22:06:45,FALSE,aaa0,aaae,,,Back Status,??,"A subjective rating of how I felt physically, from 0 to 10",,NUMBER,AVERAGE,,,,
