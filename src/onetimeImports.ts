@@ -394,7 +394,7 @@ export function importOldest(filepath: string) {
     const pdwRef = pdw.PDW.getInstance();
     const rows: any[][] = loadedWb.Sheets[shts[0]]['!data']!;
 
-    const perRow: {defs: pdw.Def[], pointValMap: {[pid:string]: number, pd: any}[]} = {
+    const perRow: { defs: pdw.Def[], pointValMap: { [pid: string]: number, pd: any }[] } = {
         defs: [],
         pointValMap: []
     };
@@ -402,14 +402,14 @@ export function importOldest(filepath: string) {
     let periodCol: any, noteCol: any, sourceCol: any;
 
     rows[0].forEach((cell, i) => {
-        if (cell.c === undefined) return
-        const commentText = cell.c[0].t
-        const commentBits = commentText.split(":")
-        if (commentBits.length == 1) {
-            console.error('Comment found:', cell.c.t)
-            throw new Error('only one line of text in comment')
-        }
-        const columnSignifier = commentBits[1].slice(1);
+        // if (cell.c === undefined) return
+        const commentText = cell.v//.t
+        // const commentBits = commentText.split(":")
+        // if (commentBits.length == 1) {
+        //     console.error('Comment found:', cell.c.t)
+        //     throw new Error('only one line of text in comment')
+        // }
+        const columnSignifier = commentText//commentBits[1].slice(1);
         if (columnSignifier === '_period') {
             if (periodCol !== undefined) throw new Error('two periods');
             periodCol = i;
@@ -433,30 +433,32 @@ export function importOldest(filepath: string) {
             perRow.defs.push(def);
         }
         //@ts-expect-error
-        perRow.pointValMap.push({loc: i, ['pd']: pd});
+        perRow.pointValMap.push({ loc: i, ['pd']: pd });
     })
 
     let entriesMade = 0;
     let entryPointsMade = 0;
 
-    rows.forEach((row, i)=>{
-        if(i===0) return
-        let rowEntries:any = {}
-        perRow.defs.forEach(ent=>{
-            const newEntry = pdwRef.createNewEntry({
-                _did: ent._did,
-                _period: parsePeriod(row[periodCol].v),
-                _note: noteCol === undefined ? '' : row[noteCol],
-                _source: sourceCol === undefined ? '' : row[sourceCol],
-            })
-            entriesMade = entriesMade + 1
-            const eid = newEntry._eid;
-            // console.log(newEntry);
-            rowEntries[newEntry._did] = newEntry._eid
-        })
-        perRow.pointValMap.forEach(pointValMap=>{
+    rows.forEach((row, i) => {
+        if (i === 0) return
+        let rowEntries: any = {}
+        perRow.pointValMap.forEach(pointValMap => {
             // console.log(pointValMap);
-            if(row[pointValMap.loc]!== undefined){
+            if (row[pointValMap.loc] !== undefined) {
+                if (rowEntries[pointValMap.pd._did] === undefined) {
+                    // console.log(i);
+                    
+                    const newEntry = pdwRef.createNewEntry({
+                        _did: pointValMap.pd._did,
+                        _period: parsePeriod(row[periodCol].v),
+                        _note: noteCol === undefined ? '' : row[noteCol],
+                        _source: sourceCol === undefined ? '' : row[sourceCol],
+                    })
+                    entriesMade = entriesMade + 1
+                    const eid = newEntry._eid;
+                    // console.log(newEntry);
+                    rowEntries[newEntry._did] = newEntry._eid
+                }
                 pdwRef.createNewEntryPoint({
                     _did: pointValMap.pd._did,
                     _pid: pointValMap.pd._pid,
@@ -469,11 +471,11 @@ export function importOldest(filepath: string) {
     })
 
     console.log('Made ' + entriesMade + ' entries, with ' + entryPointsMade + ' entryPoints');
-    
-    function parsePeriod(period: any): string{
-        if(typeof period === 'string') return period
-        if(typeof period === 'number'){
-            return Temporal.Instant.fromEpochMilliseconds((period - (25567 + 1)) * 86400 * 1000).toZonedDateTimeISO(Temporal.Now.timeZone()).toPlainDate().toString();         
+
+    function parsePeriod(period: any): string {
+        if (typeof period === 'string') return period
+        if (typeof period === 'number') {
+            return Temporal.Instant.fromEpochMilliseconds((period - (25567 + 1)) * 86400 * 1000).toZonedDateTimeISO(Temporal.Now.timeZone()).toPlainDate().toString();
         }
         throw new Error('Unhandled period val...')
     }

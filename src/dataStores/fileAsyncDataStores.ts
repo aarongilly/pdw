@@ -96,7 +96,13 @@ export class AsyncCSV implements pdw.AsyncDataStore {
         function parsePeriod(period: any): string{
             if(typeof period === 'string') return period
             if(typeof period === 'number'){
-                return Temporal.Instant.fromEpochMilliseconds((period - (25567 + 1)) * 86400 * 1000).toZonedDateTimeISO(Temporal.Now.timeZone()).toPlainDate().toString();         
+                period = Math.round(period * 10000)/10000
+                try{
+                    return Temporal.Instant.fromEpochMilliseconds((period - (25567 + 1)) * 86400 * 1000).toZonedDateTimeISO(Temporal.Now.timeZone()).toPlainDate().toString();         
+                }catch(e){
+                    console.log('shit');
+                    
+                }
             }
             throw new Error('Unhandled period val...')
         }
@@ -608,6 +614,8 @@ export class AsyncYaml implements pdw.AsyncDataStore {
     exportTo(data: pdw.CompleteDataset, filepath: string) {
         //crazy simple implementation
         data = this.convertCompleteDatasetDatesToISO(data);
+        //#TODO - convert all _prefixes to 3-digit keys (e.g. "del","upd","lbl")
+        //to make the YAML file slightly smaller and much easier to parse visually
         const yaml = YAML.stringify(data);
         fs.writeFile(filepath, yaml, 'utf8', () => { });
     }

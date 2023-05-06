@@ -1068,6 +1068,23 @@ export class PDW {
         if (storeName) data.overview!.storeName = storeName
         return data
     }
+
+    static formatCompleteDataset(data: CompleteDataset, by: 'def'|'entry'): any{
+        if(by==='def') return this.formatCompleteDatasetByDef(data)
+        if(by==='entry') return this.formatCompleteDatasetByEntry(data)
+        throw new Error('Unhandled param provided to formatCompleteDataset: ' + by)
+    }
+
+    private static formatCompleteDatasetByDef(data: CompleteDataset){
+        let returnObj: any = {};
+        data.defs?.forEach(def =>{
+            // returnObj[def._did] = //#TODO pick up here
+        })
+    }
+
+    private static formatCompleteDatasetByEntry(data: CompleteDataset){
+
+    }
 }
 
 /**
@@ -1224,6 +1241,8 @@ export abstract class Element implements ElementLike {
         if (params.includeDeleted === 'no' && this._deleted === true) return false;
         if (params.includeDeleted === 'only' && this._deleted === false) return false;
 
+        //#TODO - from & to?
+
         return true;
     }
 
@@ -1349,14 +1368,14 @@ export class Def extends Element implements DefLike {
         }
     }
 
-    setPointDefs(pointInfoIn: [{
+    setPointDefs(pointInfoIn: {
         _lbl: string,
         _type: PointType,
         _emoji?: string,
         _desc?: Markdown,
         _rollup?: Rollup
         _pid?: SmallID
-    }]): PointDef[] {
+    }[]): PointDef[] {
         let pointDefs = pointInfoIn.map(point => {
             return PDW.getInstance().createNewPointDef({
                 _lbl: point._lbl,
@@ -1576,7 +1595,7 @@ export class EntryPoint extends Element implements EntryPointLike {
     _pid: SmallID;
     _val: any;
     _did: SmallID
-    constructor(entryPointData: MinimumEntryPoint, associatedDef?: PointDef) {
+    constructor(entryPointData: MinimumEntryPoint, associatedPointDef?: PointDef) {
         if (entryPointData._eid !== undefined) {
             let existing = Element.findExistingData(entryPointData);
             if (existing !== undefined) {
@@ -1584,21 +1603,20 @@ export class EntryPoint extends Element implements EntryPointLike {
                 if (entryPointData._did === undefined) entryPointData._did = existing._did;
             }
         }
-        if (associatedDef === undefined) associatedDef = PointDef.findExistingData(entryPointData, 'PointDef');
-        if (associatedDef === undefined) { // throw new Error('No definition associated with supplied EntryPoint data')
+        if (associatedPointDef === undefined) associatedPointDef = PointDef.findExistingData(entryPointData, 'PointDef');
+        if (associatedPointDef === undefined) { // throw new Error('No definition associated with supplied EntryPoint data')
             PointDef.findExistingData(entryPointData, 'PointDef');
             throw new Error('No definition associated with supplied EntryPoint data')
         }
 
-        //for now, just letting that function throw warnings to the console
-        let correctType: any = EntryPoint.ensureValType(entryPointData._val, associatedDef._type);
+        let correctType: any = EntryPoint.ensureValType(entryPointData._val, associatedPointDef._type);
         if (correctType === undefined) correctType = entryPointData._val; //for now passing thru bad data
 
         super(entryPointData);
         this._eid = entryPointData._eid;
         this._pid = entryPointData._pid;
         this._val = correctType;
-        this._did = associatedDef._did!; //I *think* this will always be not undefined
+        this._did = associatedPointDef._did!; //I *think* this will always be not undefined
     }
 
     /**
@@ -1619,6 +1637,10 @@ export class EntryPoint extends Element implements EntryPointLike {
         if (_type === PointType.DURATION) {
             if (typeof _val === 'string') return _val;
             //if (typeof _val === "number") return _val !== 0; //number of seconds? millseconds?
+            if(typeof _val === 'number'){
+                // console.warn('Assuming excel portion of day for duration: ', _val)
+                return Temporal.Duration.from({seconds: Math.round(86400 * _val)}).toString()
+            }
             console.warn(`Cannot convert this to duration:`, _val)
             return undefined;
         }
@@ -1670,7 +1692,7 @@ export class EntryPoint extends Element implements EntryPointLike {
             if (typeof _val === 'string') return _val.trim();
             if (typeof _val === "number" && _val >= 0 && _val <= 1) {
                 //attempt to support "proportion of day to time" like Excel would
-                return new Temporal.PlainTime(0, 0).add({ seconds: 86400 * _val }).toString();
+                return new Temporal.PlainTime(0, 0).add({ seconds: Math.round(86400 * _val) }).toString();
             }
             console.warn(`Cannot convert this to time:`, _val)
             return undefined;
@@ -2097,7 +2119,6 @@ export class DefaultDataStore implements DataStore {
     }
 
     getPointDefs(params: SanitizedParams): PointDefLike[] {
-
         const allMatches = this.pointDefs.filter(pd => pd.passesFilters(params));
         let noDupes = new Set(allMatches);
         return Array.from(noDupes);
