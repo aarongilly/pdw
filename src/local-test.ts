@@ -4,7 +4,7 @@ import { Scope } from './pdw.js'
 import { AsyncExcelNatural, exportToFile } from './dataStores/fileAsyncDataStores.js';
 import { importFromFile } from './dataStores/fileAsyncDataStores.js';
 import { Temporal, toTemporalInstant } from 'temporal-polyfill';
-import { importFirestore, importMongo, importOldest } from './onetimeImports.js'
+import { importFirestore, importMongo, importOldV9, importOldest } from './onetimeImports.js'
 
 const pdw = PDW.getInstance();
 
@@ -16,201 +16,13 @@ const pdw = PDW.getInstance();
 // if(false){
 
     
-    // importFromFile('real-data/defs_pointdefs.csv');
+    importFromFile('real-data/workouts.csv');
     // importFromFile('real-data/partial-old-more.csv')
-    importFromFile('real-data/nearly-complete.csv')
-    
-    // pdw.createNewPointDef({
-    //     _did: '0lj1',
-    //     _pid: '63o2',
-    //     _lbl: 'Started',
-    //     _type: PointType.TIME
-    // })
-
-    // pdw.createNewPointDef({
-    //     _did: '0lj1',
-    //     _pid: '0fso',
-    //     _lbl: 'Duration',
-    //     _type: PointType.DURATION
-    // })
-
-    // pdw.createNewPointDef({
-    //     _did: 'k788',
-    //     _pid: 'gryw',
-    //     _lbl: 'Nap Start',
-    //     _type: PointType.TIME
-    // })
-
-    // pdw.createNewDef({
-    //     _did: 'ul32',
-    //     _lbl: '#BackTags',
-    //     _desc: 'Tags stuff about my back',
-    //     _emoji: '🏷️',
-    // }).setPointDefs([{
-    //     _pid: '63sy',
-    //     _lbl: '#BackTags',
-    //     _desc: 'Tags stuff about my back',
-    //     _emoji: '🏷️',
-    //     _type: PointType.TEXT
-    // }])
-
-    // pdw.createNewDef({
-    //     _did: 'slxo',
-    //     _lbl: 'Pedometer',
-    // }).setPointDefs([{
-    //     _pid: 'f39s',
-    //     _lbl: 'Steps',
-    //     _type: PointType.NUMBER
-    // }])
-
-    // pdw.createNewDef({
-    //     _did: 'piea',
-    //     _lbl: 'Sleep',
-    // }).setPointDefs([{
-    //     _pid: 'oher',
-    //     _lbl: 'Bedtime',
-    //     _type: PointType.TIME
-    // },{
-    //     _pid: 't2t3',
-    //     _lbl: 'Waketime',
-    //     _type: PointType.TIME
-    // },{
-    //     _pid: 'shg5',
-    //     _lbl: 'Sleep Durtion',
-    //     _type: PointType.DURATION
-    // }])
-
-    // pdw.createNewDef({
-    //     _did: 'goal',
-    //     _lbl: 'Daily Goals',
-    // }).setPointDefs([{
-    //     _pid: 'ldew',
-    //     _lbl: 'Total',
-    //     _type: PointType.NUMBER
-    // },{
-    //     _pid: 'ftho',
-    //     _lbl: 'Body',
-    //     _type: PointType.NUMBER
-    // },{
-    //     _pid: 'dvjd',
-    //     _lbl: 'Mind',
-    //     _type: PointType.NUMBER
-    // },{
-    //     _pid: 'nckc',
-    //     _lbl: 'Manage',
-    //     _type: PointType.NUMBER
-    // },{
-    //     _pid: 'jucs',
-    //     _lbl: 'Work',
-    //     _type: PointType.NUMBER
-    // },{
-    //     _pid: 'ndws',
-    //     _lbl: 'social',
-    //     _type: PointType.NUMBER
-    // },{
-    //     _pid: 'jsoj',
-    //     _lbl: 'Slept 7.5',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'yhni',
-    //     _lbl: 'Exercised',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'fshr',
-    //     _lbl: 'Ate Well',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'spkc',
-    //     _lbl: 'Drank Water',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'wghl',
-    //     _lbl: 'Groomed Well',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'djcs',
-    //     _lbl: 'Worked on a Project',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'legg',
-    //     _lbl: 'Out of Comfort Zone',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'tvok',
-    //     _lbl: 'Read',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'uafd',
-    //     _lbl: 'Learned Something',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'yurj',
-    //     _lbl: 'Stayed Positive',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'lyeq',
-    //     _lbl: 'Budgeted',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'ybte',
-    //     _lbl: 'Stayed on Appointments',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'gqrq',
-    //     _lbl: 'Kept Place Clean',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'tguw',
-    //     _lbl: 'Used Time Well',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'hhjd',
-    //     _lbl: 'Worked Towards Goals',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'ufix',
-    //     _lbl: 'Took Breaks',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'gohw',
-    //     _lbl: 'Communicated Well',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'etym',
-    //     _lbl: 'Kept Organized',
-    //     _type: PointType.BOOL
-    // }
-    // ,{
-    //     _pid: 'wryh',
-    //     _lbl: 'Meetings Engaged',
-    //     _type: PointType.BOOL
-    // },
-    // {
-    //     _pid: 'yytd',
-    //     _lbl: 'Took Steps to Further Career',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'jcek',
-    //     _lbl: 'Took Care of Relationship',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'otlq',
-    //     _lbl: 'Talked with Family',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'xxdw',
-    //     _lbl: 'Saw a Friend',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'tkfr',
-    //     _lbl: 'Did Something Nice for Someone',
-    //     _type: PointType.BOOL
-    // },{
-    //     _pid: 'gudh',
-    //     _lbl: 'Focused Less on Yourself',
-    //     _type: PointType.BOOL
-    // }])
-
+    // importFromFile('real-data/nearly-complete.csv')
+    // importFromFile('data-files/newYaml.yaml')
+    // importOldV9('real-data/V9-massaged.xlsx')
+    // exportToFile('real-data/final.yaml', pdw.getAll({}))
+    console.log(pdw.getAll({}));
 
     // importOldest('real-data/final-import.xlsx')
 
@@ -224,12 +36,12 @@ const pdw = PDW.getInstance();
     //create all current file types from firestore & mongo data
     // importFromFile('real-data/merged-firestore-mongo.csv')
     // const allData = pdw.getAll({includeDeleted:'yes', did:['hovt']})
-    const entries = pdw.getAll({'includeDeleted': 'yes'})
+    // const entries = pdw.getAll({'includeDeleted': 'yes'})
     // console.log(allData);
-    exportToFile('real-data/combotest.csv', entries)
-    exportToFile('real-data/combotest.xlsx', entries)
-    exportToFile('real-data/combotest.json', entries)
-    exportToFile('real-data/combotest.yaml', entries)
+    // exportToFile('real-data/combotest.csv', entries)
+    // exportToFile('real-data/combotest.xlsx', entries)
+    // exportToFile('real-data/combotest.json', entries)
+    // exportToFile('real-data/combotest.yaml', entries)
 // }
 
 // exportToFile('real-data/merged.json', allData)

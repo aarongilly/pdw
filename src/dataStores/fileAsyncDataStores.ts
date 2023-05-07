@@ -73,8 +73,12 @@ export class AsyncCSV implements pdw.AsyncDataStore {
                 _uid: elementData._uid,
                 _created: elementData._created,
                 _updated: elementData._updated,
-                _deleted: elementData._deleted === 'TRUE' ? true : false
             };
+            if(typeof elementData._deleted === 'boolean'){
+                returnObj._deleted = elementData._deleted
+            }else{
+                returnObj._deleted = elementData._deleted === 'TRUE' ? true : false
+            }
             if(elementData._did !== undefined) returnObj._did = elementData._did;
             if(elementData._pid !== undefined) returnObj._pid = elementData._pid;
             if(elementData._eid !== undefined) returnObj._eid = elementData._eid;
@@ -613,9 +617,7 @@ export class AsyncYaml implements pdw.AsyncDataStore {
 
     exportTo(data: pdw.CompleteDataset, filepath: string) {
         //crazy simple implementation
-        data = this.convertCompleteDatasetDatesToISO(data);
-        //#TODO - convert all _prefixes to 3-digit keys (e.g. "del","upd","lbl")
-        //to make the YAML file slightly smaller and much easier to parse visually
+        data = this.translateToYamlFormat(data);
         const yaml = YAML.stringify(data);
         fs.writeFile(filepath, yaml, 'utf8', () => { });
     }
@@ -630,7 +632,7 @@ export class AsyncYaml implements pdw.AsyncDataStore {
             tagDefs: file.tagDefs,
             tags: file.tags
         }
-        this.convertCompleteDatasetISOToEpoch(returnData);
+        this.translateFromYamlFormat(returnData);
         const pdwRef = pdw.PDW.getInstance();
         if (returnData.defs !== undefined) pdwRef.setDefs(returnData.defs);
         if (returnData.pointDefs !== undefined) pdwRef.setPointDefs(returnData.pointDefs);
@@ -644,36 +646,52 @@ export class AsyncYaml implements pdw.AsyncDataStore {
         return returnData;
     }
 
-    convertCompleteDatasetISOToEpoch(data: pdw.CompleteDataset) {
+    translateFromYamlFormat(data: pdw.CompleteDataset) {
         if (data.overview !== undefined) {
             let temporal = this.makeEpochStrFromISO(data.overview.lastUpdated);
             data.overview.lastUpdated = temporal.toString().split('[')[0]
         }
         if (data.defs !== undefined) {
-            data.defs = data.defs.map(def => this.convertElementISOToEpoch(def)) as unknown as pdw.DefLike[];
+            data.defs = data.defs.map(def => this.translateElementFromYaml(def)) as unknown as pdw.DefLike[];
         }
         if (data.pointDefs !== undefined) {
-            data.pointDefs = data.pointDefs.map(element => this.convertElementISOToEpoch(element)) as unknown as pdw.PointDefLike[];
+            data.pointDefs = data.pointDefs.map(element => this.translateElementFromYaml(element)) as unknown as pdw.PointDefLike[];
         }
         if (data.entries !== undefined) {
-            data.entries = data.entries.map(element => this.convertElementISOToEpoch(element)) as unknown as pdw.EntryLike[];
+            data.entries = data.entries.map(element => this.translateElementFromYaml(element)) as unknown as pdw.EntryLike[];
         }
         if (data.entryPoints !== undefined) {
-            data.entryPoints = data.entryPoints.map(element => this.convertElementISOToEpoch(element)) as unknown as pdw.EntryPointLike[];
+            data.entryPoints = data.entryPoints.map(element => this.translateElementFromYaml(element)) as unknown as pdw.EntryPointLike[];
         }
         if (data.tagDefs !== undefined) {
-            data.tagDefs = data.tagDefs.map(element => this.convertElementISOToEpoch(element)) as unknown as pdw.TagDefLike[];
+            data.tagDefs = data.tagDefs.map(element => this.translateElementFromYaml(element)) as unknown as pdw.TagDefLike[];
         }
         if (data.tags !== undefined) {
-            data.tags = data.tags.map(element => this.convertElementISOToEpoch(element)) as unknown as pdw.TagLike[];
+            data.tags = data.tags.map(element => this.translateElementFromYaml(element)) as unknown as pdw.TagLike[];
         }
         return data;
     }
 
-    convertElementISOToEpoch(element: pdw.ElementLike): pdw.ElementLike {
-        element._created = this.makeEpochStrFromISO(element._created)
-        element._updated = this.makeEpochStrFromISO(element._updated)
-        return element
+    translateElementFromYaml(element: pdw.ElementLike): pdw.ElementLike {
+        let returnObj: pdw.ElementLike = {
+            _uid: element.uid,
+            _created: this.makeEpochStrFromISO(element.cre),
+            _updated: this.makeEpochStrFromISO(element.upd),
+            _deleted: element.del,
+        }
+        if(element.dsc !== undefined) returnObj._desc = element.dsc
+        if(element.did !== undefined) returnObj._did = element.did
+        if(element.eid !== undefined) returnObj._eid = element.eid
+        if(element.pid !== undefined) returnObj._pid = element.pid
+        if(element.tid !== undefined) returnObj._tid = element.tid
+        if(element.emo !== undefined) returnObj._emoji = element.emo
+        if(element.scp !== undefined) returnObj._scope = element.scp
+        if(element.typ !== undefined) returnObj._type = element.typ
+        if(element.rlp !== undefined) returnObj._rollup = element.rlp
+        if(element.per !== undefined) returnObj._period = element.per
+        if(element.nte !== undefined) returnObj._note = element.nte
+        if(element.val !== undefined) returnObj._val = element.val
+        return returnObj
     }
 
     makeEpochStrFromISO(ISOString: string): pdw.EpochStr {
@@ -681,38 +699,54 @@ export class AsyncYaml implements pdw.AsyncDataStore {
         return pdw.makeEpochStrFromTemporal(temp);
     }
 
-    convertCompleteDatasetDatesToISO(data: pdw.CompleteDataset) {
+    translateToYamlFormat(data: pdw.CompleteDataset) {
         if (data.overview !== undefined) {
             let temporal = pdw.parseTemporalFromEpochStr(data.overview.lastUpdated);
             data.overview.lastUpdated = temporal.toString().split('[')[0]
         }
         if (data.defs !== undefined) {
-            data.defs = data.defs.map(def => this.convertElementEpochToISO(def)) as unknown as pdw.DefLike[];
+            data.defs = data.defs.map(def => this.translateElementToYaml(def)) as unknown as pdw.DefLike[];
         }
         if (data.pointDefs !== undefined) {
-            data.pointDefs = data.pointDefs.map(element => this.convertElementEpochToISO(element)) as unknown as pdw.PointDefLike[];
+            data.pointDefs = data.pointDefs.map(element => this.translateElementToYaml(element)) as unknown as pdw.PointDefLike[];
         }
         if (data.entries !== undefined) {
-            data.entries = data.entries.map(element => this.convertElementEpochToISO(element)) as unknown as pdw.EntryLike[];
+            data.entries = data.entries.map(element => this.translateElementToYaml(element)) as unknown as pdw.EntryLike[];
         }
         if (data.entryPoints !== undefined) {
-            data.entryPoints = data.entryPoints.map(element => this.convertElementEpochToISO(element)) as unknown as pdw.EntryPointLike[];
+            data.entryPoints = data.entryPoints.map(element => this.translateElementToYaml(element)) as unknown as pdw.EntryPointLike[];
         }
         if (data.tagDefs !== undefined) {
-            data.tagDefs = data.tagDefs.map(element => this.convertElementEpochToISO(element)) as unknown as pdw.TagDefLike[];
+            data.tagDefs = data.tagDefs.map(element => this.translateElementToYaml(element)) as unknown as pdw.TagDefLike[];
         }
         if (data.tags !== undefined) {
-            data.tags = data.tags.map(element => this.convertElementEpochToISO(element)) as unknown as pdw.TagLike[];
+            data.tags = data.tags.map(element => this.translateElementToYaml(element)) as unknown as pdw.TagLike[];
         }
         return data;
     }
 
-    convertElementEpochToISO(element: any): Element {
+    translateElementToYaml(element: any): any {
         if (element._tempCreated !== undefined) delete element._tempCreated
         if (element._tempUpdated !== undefined) delete element._tempUpdated
-        element._created = pdw.parseTemporalFromEpochStr(element._created).toString().split('[')[0]
-        element._updated = pdw.parseTemporalFromEpochStr(element._updated).toString().split('[')[0]
-        return element as Element
+        let returnObj: any = {
+            uid: element._uid,
+            cre: pdw.parseTemporalFromEpochStr(element._created).toString().split('[')[0],
+            upd: pdw.parseTemporalFromEpochStr(element._updated).toString().split('[')[0],
+            del: element._deleted,
+        }
+        if(element._desc !== undefined) returnObj.dsc = element._desc
+        if(element._did !== undefined) returnObj.did = element._did
+        if(element._eid !== undefined) returnObj.eid = element._eid
+        if(element._pid !== undefined) returnObj.pid = element._pid
+        if(element._tid !== undefined) returnObj.tid = element._tid
+        if(element._emoji !== undefined) returnObj.emo = element._emoji
+        if(element._scope !== undefined) returnObj.scp = element._scope
+        if(element._type !== undefined) returnObj.typ = element._type
+        if(element._rollup !== undefined) returnObj.rlp = element._rollup
+        if(element._period !== undefined) returnObj.per = element._period
+        if(element._note !== undefined) returnObj.nte = element._note
+        if(element._val !== undefined) returnObj.val = element._val
+        return returnObj
     }
 }
 

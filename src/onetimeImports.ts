@@ -447,7 +447,7 @@ export function importOldest(filepath: string) {
             if (row[pointValMap.loc] !== undefined) {
                 if (rowEntries[pointValMap.pd._did] === undefined) {
                     // console.log(i);
-                    
+
                     const newEntry = pdwRef.createNewEntry({
                         _did: pointValMap.pd._did,
                         _period: parsePeriod(row[periodCol].v),
@@ -479,4 +479,57 @@ export function importOldest(filepath: string) {
         }
         throw new Error('Unhandled period val...')
     }
+}
+
+export function importOldV9(filepath: string) {
+    console.log('loading...');
+    let returnData: pdw.CompleteDataset = {}
+    XLSX.set_fs(fs);
+    let loadedWb = XLSX.readFile(filepath, { dense: true });
+    const shts = loadedWb.SheetNames;
+    const pdwRef = pdw.PDW.getInstance();
+    const rows: any[][] = loadedWb.Sheets[shts[0]]['!data']!;
+
+    const perRow: { defs: pdw.Def[], pointValMap: { [pid: string]: number, pd: any }[] } = {
+        defs: [],
+        pointValMap: []
+    };
+
+    let periodCol: any, noteCol: any, sourceCol: any;
+
+    let entriesMade = 0;
+    let entryPointsMade = 0;
+
+    rows.forEach((row, i) => {
+        if (i === 0) return
+        const assPointDef = pdwRef.getPointDefs({pid:row[2].v})[0]
+        const assDef = pdwRef.getDefs({did: [assPointDef._did]})[0]
+        let rowEntries: any = {}
+        const newEntry = pdwRef.createNewEntry({
+            _did: assDef._did,
+            _period: parsePeriod(row[1].v),
+            _note: row[4] === undefined ? '' : row[4].v,
+            _source: row[0].v,
+        })
+        entriesMade = entriesMade + 1
+        const eid = newEntry._eid;
+        pdwRef.createNewEntryPoint({
+            _did: assDef._did,
+            _pid: assPointDef._pid,
+            _eid: newEntry._eid,
+            _val: row[3].v
+        })
+        entryPointsMade = entryPointsMade + 1;
+
+        // console.log('Made ' + entriesMade + ' entries, with ' + entryPointsMade + ' entryPoints');
+
+        function parsePeriod(period: any): string {
+            if (typeof period === 'string') return period
+            if (typeof period === 'number') {
+                period = Math.round(period * 10000)/10000
+                return Temporal.Instant.fromEpochMilliseconds(Math.round((period - (25567 + 1)) * 86400 * 1000)).toZonedDateTimeISO(Temporal.Now.timeZone()).toPlainDate().toString();
+            }
+            throw new Error('Unhandled period val...')
+        }
+    })
 }

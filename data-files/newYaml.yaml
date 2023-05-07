@@ -1,0 +1,231 @@
+defs:
+  - uid: lh2vk0q0-0db6
+    cre: 2023-04-29T22:51:20.233-05:00
+    upd: 2023-04-29T22:51:20.233-05:00
+    del: false
+    dsc: This is now inerited
+    did: 0m7w
+    emo: 1️⃣
+    scp: SECOND
+  - uid: lh2vk0q3-0dtj
+    cre: 2023-04-29T22:51:20.235-05:00
+    upd: 2023-04-29T22:51:24.465-05:00
+    del: true
+    dsc: Scoped at an **hour**, cause why not have that option?
+    did: ay7l
+    emo: 2️⃣
+    scp: HOUR
+  - uid: lh2vk0q4-0a06
+    cre: 2023-04-24T20:51:59.365-05:00
+    upd: 2023-04-29T22:51:20.236-05:00
+    del: false
+    dsc: Set a description
+    did: 05a8
+    emo: 3️⃣
+    scp: DAY
+  - uid: lh2vk3zj-m9d6
+    cre: 2023-04-29T22:51:20.235-05:00
+    upd: 2023-04-29T22:51:24.463-05:00
+    del: false
+    dsc: Scoped at an **hour**, cause why not have that option?
+    did: ay7l
+    emo: 2️⃣
+    scp: HOUR
+pointDefs:
+  - uid: lh2vk0q2-ojke
+    cre: 2023-04-29T22:51:20.234-05:00
+    upd: 2023-04-29T22:51:20.234-05:00
+    del: false
+    dsc: For testing selects
+    did: 0m7w
+    pid: 8esq
+    emo: ⛏️
+    typ: SELECT
+    rlp: COUNTOFEACH
+  - uid: lh2vk0q4-0o48
+    cre: 2023-04-29T22:51:20.236-05:00
+    upd: 2023-04-29T22:51:20.236-05:00
+    del: false
+    dsc: Set a description
+    did: 05a8
+    pid: 0iu2
+    emo: 🆓
+    typ: TEXT
+    rlp: COUNT
+  - uid: lh2vk0q5-klza
+    cre: 2023-04-29T22:51:20.237-05:00
+    upd: 2023-04-29T22:51:24.465-05:00
+    del: true
+    dsc: Set a description
+    did: ay7l
+    pid: 0pc6
+    emo: "#️⃣"
+    typ: NUMBER
+    rlp: AVERAGE
+  - uid: lh2vk0q5-1wpj
+    cre: 2023-04-29T22:51:20.237-05:00
+    upd: 2023-04-29T22:51:24.466-05:00
+    del: true
+    dsc: Orig desc
+    did: ay7l
+    pid: 0tb7
+    emo: 👍
+    typ: BOOL
+    rlp: COUNT
+  - uid: lh2vk3zk-dywe
+    cre: 2023-04-29T22:51:20.237-05:00
+    upd: 2023-04-29T22:51:24.464-05:00
+    del: false
+    dsc: Set a description
+    did: ay7l
+    pid: 0pc6
+    emo: "#️⃣"
+    typ: NUMBER
+    rlp: AVERAGE
+  - uid: lh2vk3zl-r928
+    cre: 2023-04-29T22:51:20.237-05:00
+    upd: 2023-04-29T22:51:24.466-05:00
+    del: false
+    dsc: Orig desc
+    did: ay7l
+    pid: 0tb7
+    emo: 👎
+    typ: BOOL
+    rlp: COUNT
+entries:
+  - uid: lh2vk0q6-0m06
+    cre: 2023-04-29T22:51:20.238-05:00
+    upd: 2023-04-29T22:51:24.469-05:00
+    del: true
+    did: ay7l
+    eid: lgricx7k-08al
+    per: 2023-04-22T06
+    nte: Orig note
+  - uid: lh2vk0q7-0kef
+    cre: 2023-04-29T22:51:20.239-05:00
+    upd: 2023-04-29T22:51:20.24-05:00
+    del: false
+    did: 0m7w
+    eid: lh2vk0q8-3am6
+    per: 2023-04-29T22:51:20
+    nte: ""
+  - uid: lh2vk3zm-097s
+    cre: 2023-04-29T22:51:20.238-05:00
+    upd: 2023-04-29T22:51:24.467-05:00
+    del: false
+    did: ay7l
+    eid: lgricx7k-08al
+    per: 2023-04-22T06
+    nte: Updated noted
+entryPoints:
+  - uid: lh2vk0q6-idb9
+    cre: 2023-04-29T22:51:20.239-05:00
+    upd: 2023-04-29T22:51:24.468-05:00
+    del: true
+    did: ay7l
+    eid: lgricx7k-08al
+    pid: 0tb7
+    val: false
+  - uid: lh2vk0q7-r0s5
+    cre: 2023-04-29T22:51:20.239-05:00
+    upd: 2023-04-29T22:51:24.47-05:00
+    del: true
+    did: ay7l
+    eid: lgricx7k-08al
+    pid: 0pc6
+    val: 5
+  - uid: lh2vk3zo-pwh7
+    cre: 2023-04-29T22:51:20.239-05:00
+    upd: 2023-04-29T22:51:24.468-05:00
+    del: false
+    did: ay7l
+    eid: lgricx7k-08al
+    pid: 0tb7
+    val: true
+  - uid: lh2vk3zp-0p2f
+    cre: 2023-04-29T22:51:20.239-05:00
+    upd: 2023-04-29T22:51:24.469-05:00
+    del: false
+    did: ay7l
+    eid: lgricx7k-08al
+    pid: 0pc6
+    val: 6
+tagDefs:
+  - uid: lh2vk0q9-0iha
+    cre: 2023-04-29T22:51:20.241-05:00
+    upd: 2023-04-29T22:51:20.241-05:00
+    del: false
+    tid: 0x2q
+  - uid: lh2vk0q9-5k8p
+    cre: 2023-04-29T22:51:20.241-05:00
+    upd: 2023-04-29T22:51:24.471-05:00
+    del: true
+    tid: vvct
+  - uid: lh2vk0qa-qbib
+    cre: 2023-04-29T22:51:20.242-05:00
+    upd: 2023-04-29T22:51:20.242-05:00
+    del: false
+    tid: 0vvi
+  - uid: lh2vk0qa-4x8q
+    cre: 2023-04-29T22:51:20.242-05:00
+    upd: 2023-04-29T22:51:20.242-05:00
+    del: false
+    tid: 0vva
+  - uid: lh2vk0qb-gn9e
+    cre: 2023-04-29T22:51:20.243-05:00
+    upd: 2023-04-29T22:51:20.243-05:00
+    del: false
+    tid: 0vvb
+  - uid: lh2vk3zq-j8yj
+    cre: 2023-04-29T22:51:20.241-05:00
+    upd: 2023-04-29T22:51:24.47-05:00
+    del: false
+    tid: vvct
+tags:
+  - uid: lh2vk0qb-bq3o
+    cre: 2023-04-29T22:51:20.243-05:00
+    upd: 2023-04-29T22:51:24.472-05:00
+    del: true
+    did: ay7l
+    tid: vvct
+  - uid: lh2vk0qc-98am
+    cre: 2023-04-29T22:51:20.244-05:00
+    upd: 2023-04-29T22:51:24.471-05:00
+    del: true
+    did: 0m7w
+    pid: 8esq
+    tid: 0vvi
+  - uid: lh2vk0qc-qss9
+    cre: 2023-04-29T22:51:20.244-05:00
+    upd: 2023-04-29T22:51:20.244-05:00
+    del: false
+    did: 0m7w
+    pid: 8esq
+    tid: 0vva
+  - uid: lh2vk0qd-95rs
+    cre: 2023-04-29T22:51:20.245-05:00
+    upd: 2023-04-29T22:51:20.245-05:00
+    del: false
+    did: 0m7w
+    pid: 8esq
+    tid: 0vvb
+overview:
+  defs:
+    current: 3
+    deleted: 1
+  pointDefs:
+    current: 4
+    deleted: 2
+  entries:
+    current: 2
+    deleted: 1
+  entryPoints:
+    current: 2
+    deleted: 2
+  tagDefs:
+    current: 5
+    deleted: 1
+  tags:
+    current: 2
+    deleted: 2
+  lastUpdated: 2023-04-29T22:51:24.472-05:00
