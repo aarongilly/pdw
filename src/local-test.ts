@@ -16,13 +16,14 @@ const pdw = PDW.getInstance();
 // if(false){
 
     
-    importFromFile('real-data/workouts.csv');
+    // importFromFile('real-data/workouts.csv');
     // importFromFile('real-data/partial-old-more.csv')
     // importFromFile('real-data/nearly-complete.csv')
-    // importFromFile('data-files/newYaml.yaml')
+    importFromFile('data-files/newYaml.yaml')
     // importOldV9('real-data/V9-massaged.xlsx')
     // exportToFile('real-data/final.yaml', pdw.getAll({}))
-    console.log(pdw.getAll({}));
+    const allData = pdw.getAll({});
+    console.log(allData);
 
     // importOldest('real-data/final-import.xlsx')
 
@@ -56,7 +57,7 @@ const pdw = PDW.getInstance();
 
 // this worked. Old data, updated, import of new data merge behaved as expected
 // importFromFile('data-files/OutExcel1.xlsx');
-// pdw.createNewEntry({
+// pdw.newEntry({
 //     _did: '0m7w',
 //     '8esq': '0vvb'
 // })
@@ -90,8 +91,8 @@ const pdw = PDW.getInstance();
 // console.log(pdw.allDataSince());
 
 function createTestFiles() {
-    //Testing createNewDef && Def.setPointDefs
-    pdw.createNewDef({
+    //Testing newDef && Def.setPointDefs
+    pdw.newDef({
         _did: '0m7w',
         _lbl: 'defOne',
         _emoji: '1️⃣',
@@ -105,27 +106,27 @@ function createTestFiles() {
         _pid: '8esq',
         _rollup: Rollup.COUNTOFEACH
     }])
-    pdw.createNewDef({
+    pdw.newDef({
         _did: 'ay7l',
         _lbl: 'TWO',
         _emoji: '2️⃣',
         _scope: Scope.HOUR,
         _desc: 'Scoped at an **hour**, cause why not have that option?'
     })
-    pdw.createNewDef({
+    pdw.newDef({
         _did: '05a8',
         _lbl: 'FREE',
         _emoji: '3️⃣',
         _scope: Scope.DAY,
         _created: 'lgvm3a11'
     })
-    pdw.createNewPointDef({
+    pdw.newPointDef({
         _did: '05a8',
         _type: PointType.TEXT,
         _lbl: 'Free Item',
         _emoji: '🆓'
     })
-    pdw.createNewPointDef({
+    pdw.newPointDef({
         _did: 'ay7l',
         _pid: '0pc6',
         _type: PointType.NUMBER,
@@ -133,7 +134,7 @@ function createTestFiles() {
         _emoji: '#️⃣',
         _rollup: Rollup.AVERAGE
     })
-    pdw.createNewPointDef({
+    pdw.newPointDef({
         _did: 'ay7l',
         _pid: '0tb7',
         _type: PointType.BOOL,
@@ -141,7 +142,7 @@ function createTestFiles() {
         _emoji: '👍',
         _desc: 'Orig desc'
     })
-    pdw.createNewEntry({
+    pdw.newEntry({
         _eid: 'lgricx7k-08al',
         _did: 'ay7l',
         _note: 'Orig note',
@@ -149,43 +150,43 @@ function createTestFiles() {
         'Boolean Thing': false, //key by _lbl
         '0pc6': 5 //key by _pid
     })
-    pdw.createNewEntry({
+    pdw.newEntry({
         _did: '0m7w',
     })
-    pdw.createNewTagDef({
+    pdw.newTagDef({
         _lbl: 'My Tag!',
     })
-    pdw.createNewTagDef({
+    pdw.newTagDef({
         _lbl: 'Orig Tag Label',
         _tid: 'vvct'
     })
-    pdw.createNewTagDef({
+    pdw.newTagDef({
         _lbl: 'Select Option To Delete',
         _tid: '0vvi'
     })
-    pdw.createNewTagDef({
+    pdw.newTagDef({
         _lbl: 'Select Option 1',
         _tid: '0vva'
     })
-    pdw.createNewTagDef({
+    pdw.newTagDef({
         _lbl: 'Select Option 2',
         _tid: '0vvb'
     })
-    pdw.createNewTag({
+    pdw.newTag({
         _did: 'ay7l',
         _tid: 'vvct'
     })
-    pdw.createNewTag({
+    pdw.newTag({
         _did: '0m7w',
         _tid: '0vvi',
         _pid: '8esq'
     })
-    pdw.createNewTag({
+    pdw.newTag({
         _did: '0m7w',
         _tid: '0vva',
         _pid: '8esq'
     })
-    pdw.createNewTag({
+    pdw.newTag({
         _did: '0m7w',
         _tid: '0vvb',
         _pid: '8esq'

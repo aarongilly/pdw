@@ -457,7 +457,7 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
     /**
      * Parses a row from Excel into a PointDefLike structure.
      * @param pointDefRow row created by an Excel export 
-     * Ying & Yang with {@link makeExcelDefRow}
+     * Yin & Yang with {@link makeExcelDefRow}
      * @returns 
      */
     static parseExcelPointDefRow(pointDefRow: any): pdw.PointDefLike {

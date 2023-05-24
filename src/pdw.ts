@@ -80,6 +80,9 @@ export enum PointType {
      */
     PHOTO = 'PHOTO', //url?
 
+    /**
+     * Literally JSON
+     */
     JSON = 'JSON'
 }
 
@@ -179,6 +182,23 @@ export interface AsyncDataStore {
 }
 
 /**
+ * Manifest is a lazy-loaded Map of **undeleted** Definitions
+ * keyed by their `did`, each containing a complete map of 
+ * their associated _points and _tags
+ */
+export interface Manifest {
+    [did: string]: Def & {_points: PointDefMap, _tags: TagMap}
+}
+
+interface PointDefMap{
+    [pid: string]: PointDef
+}
+
+interface TagMap{
+    [tid: string]: Tag & {_tagDef: TagDef}
+}
+
+/**
  * Basic data filtering parameters, supported by the {@link DataStore} methods for
  * {@link getDefs} & the 5 other element "getters".
  * Not all parameters are considered for each getter, but it should make
@@ -201,14 +221,14 @@ export interface StandardParams {
     createdBefore?: Temporal.ZonedDateTime | EpochStr,
     updatedAfter?: Temporal.ZonedDateTime | EpochStr,
     updatedBefore?: Temporal.ZonedDateTime | EpochStr,
-    uid?: UID[],
-    did?: SmallID[],
-    pid?: SmallID[],
-    eid?: UID[],
-    tid?: SmallID[],
-    defLbl?: string[],
-    pointLbl?: string[],
-    tagLbl?: string[],
+    uid?: UID[] | UID,
+    did?: SmallID[] | SmallID,
+    pid?: SmallID[] | SmallID,
+    eid?: UID[] | UID,
+    tid?: SmallID[] | SmallID,
+    defLbl?: string[] | string,
+    pointLbl?: string[] | string,
+    tagLbl?: string[] | string,
     limit?: number,
     allOnPurpose?: boolean
 }
@@ -655,8 +675,6 @@ export interface QueryParams {
      * MyPeriod - Periods with _entries: [ByEntry]
      */
     shape?: 'MoA' | 'NestPoints'
-
-    //#TODO - more query params?
 }
 
 export interface QueryResponse {
@@ -688,20 +706,48 @@ export interface DataStoreOverview {
     tags: CurrentAndDeletedCounts;
     lastUpdated: EpochStr;
 }
+
+// export interface NestedByDef {
+//     //#UNTESTED
+//     [did: string]: Def & {points: PointDef[], entries: (Entry & {points: EntryPoint[]})[]}
+// }
+
+export interface AssociatedElementMap{
+    existing: Def | PointDef | Entry | EntryPoint | Tag | TagDef;
+    def: Def;
+    pointDef: PointDef;
+    entry: Entry;
+    //entryPoint --- don't think I want these
+    //tag --- don't think I want these
+    //tagDef --- don't think I want these
+}
 //#endregion
 
 //#region ### CLASSES ###
 
 export class PDW {
     dataStores: DataStore[];
+    manifest: Manifest;
     private static instance: PDW;
-    constructor(store?: DataStore) {
+    private constructor(store?: DataStore) {
         if (store !== undefined) {
             this.dataStores = [store];
         } else {
             this.dataStores = [new DefaultDataStore(this)]
         }
+        this.manifest = {};
         PDW.instance = this; //for singleton
+    }
+
+    /**
+     * Singleton pattern.
+     * @returns the PDW
+     */
+    public static getInstance(): PDW {
+        if (!PDW.instance) {
+            PDW.instance = new PDW();
+        }
+        return PDW.instance;
     }
 
     registerConnection(storeInstance: DataStore) {
@@ -723,9 +769,10 @@ export class PDW {
         return PDW.addOverviewToCompleteDataset(data);
     }
 
-    getDefs(rawParams: StandardParams): Def[] {
-        const params = PDW.sanitizeParams(rawParams)
-
+    getDefs(rawParams?: StandardParams): Def[] {
+        if(rawParams === undefined) rawParams = {};
+        const params = PDW.sanitizeParams(rawParams);
+        
         //if there's only DataStore, bypass the combining stuff to save time
         if (this.dataStores.length == 1) {
             let defLikes = this.dataStores[0].getDefs(params)
@@ -785,7 +832,8 @@ export class PDW {
         //                 combinedDefs.splice(ind);
         //                 //add replacement
         //                 combinedDefs.push(def);
-        //             }
+        //             
+
         //             //else{ignore it. don't do anything}
         //         } else {
         //             combinedDefs.push(def);
@@ -882,7 +930,7 @@ export class PDW {
      * @param defInfo 
      * @returns the newly created Definition
     */
-    createNewDef(defInfo: MinimumDef): Def {
+    newDef(defInfo: MinimumDef): Def {
         let newDef = new Def(defInfo);
         this.dataStores.forEach(connection => {
             connection.setDefs([newDef])
@@ -896,7 +944,7 @@ export class PDW {
      * @param pointDefInfo 
      * @returns the newly created Point Definition
     */
-    createNewPointDef(pointDefInfo: MinimumPointDef): PointDef {
+    newPointDef(pointDefInfo: MinimumPointDef): PointDef {
         let newPointDef = new PointDef(pointDefInfo);
         this.dataStores.forEach(connection => {
             connection.setPointDefs([newPointDef])
@@ -904,7 +952,7 @@ export class PDW {
         return newPointDef;
     }
 
-    createNewEntry(entryInfo: MinimumEntry): Entry {
+    newEntry(entryInfo: MinimumEntry): Entry {
         let newEntry = new Entry(entryInfo);
         this.dataStores.forEach(connection => {
             connection.setEntries([newEntry])
@@ -912,7 +960,7 @@ export class PDW {
         return newEntry;
     }
 
-    createNewEntryPoint(entryPointInfo: MinimumEntryPoint): EntryPoint {
+    newEntryPoint(entryPointInfo: MinimumEntryPoint): EntryPoint {
         let newEntryPoint = new EntryPoint(entryPointInfo);
         this.dataStores.forEach(connection => {
             connection.setEntryPoints([newEntryPoint])
@@ -920,7 +968,7 @@ export class PDW {
         return newEntryPoint;
     }
 
-    createNewTagDef(tagDefInfo: MinimumTagDef): TagDef {
+    newTagDef(tagDefInfo: MinimumTagDef): TagDef {
         let newTagDef = new TagDef(tagDefInfo);
         this.dataStores.forEach(connection => {
             connection.setTagDefs([newTagDef])
@@ -928,25 +976,13 @@ export class PDW {
         return newTagDef;
     }
 
-    createNewTag(tagInfo: MinimumTag): Tag {
+    newTag(tagInfo: MinimumTag): Tag {
         let newTag = new Tag(tagInfo);
         this.dataStores.forEach(connection => {
             connection.setTags([newTag])
         })
         return newTag;
     }
-
-    /**
-     * Singleton pattern.
-     * @returns the PDW
-     */
-    public static getInstance(): PDW {
-        if (!PDW.instance) {
-            PDW.instance = new PDW();
-        }
-        return PDW.instance;
-    }
-
 
     /**
      * Enforces defaults. Sanity check some types.
@@ -957,6 +993,7 @@ export class PDW {
     static sanitizeParams(params: StandardParams | SanitizedParams): SanitizedParams {
         //ensure default
         if (params.includeDeleted === undefined) params.includeDeleted = 'no';
+        
         //make periods from period srings
         if (params.from !== undefined) {
             if (typeof params.from === 'string') params.from = new Period(params.from);
@@ -966,6 +1003,7 @@ export class PDW {
             if (typeof params.to === 'string') params.to = new Period(params.to);
             //otherwise I guess I'll assume it's okay
         }
+
         //make Temporal & EpochStr options
         if (params.createdAfter !== undefined) {
             if (typeof params.createdAfter === 'string') {
@@ -1003,6 +1041,7 @@ export class PDW {
                 params.updatedBefore = parseTemporalFromEpochStr((<SanitizedParams>params).updatedBeforeEpochStr!);
             }
         }
+
         //ensure arrays
         if (params.uid !== undefined && typeof params.uid == 'string') params.uid = [params.uid]
         if (params.did !== undefined && typeof params.did == 'string') params.did = [params.did]
@@ -1069,22 +1108,23 @@ export class PDW {
         return data
     }
 
-    static formatCompleteDataset(data: CompleteDataset, by: 'def'|'entry'): any{
-        if(by==='def') return this.formatCompleteDatasetByDef(data)
-        if(by==='entry') return this.formatCompleteDatasetByEntry(data)
-        throw new Error('Unhandled param provided to formatCompleteDataset: ' + by)
-    }
+    //#TODO --- NestByWhatever functions
+    // static formatCompleteDataset(data: CompleteDataset, by: 'def'|'entry'): any{
+    //     if(by==='def') return this.formatCompleteDatasetByDef(data)
+    //     if(by==='entry') return this.formatCompleteDatasetByEntry(data)
+    //     throw new Error('Unhandled param provided to formatCompleteDataset: ' + by)
+    // }
 
-    private static formatCompleteDatasetByDef(data: CompleteDataset){
-        let returnObj: any = {};
-        data.defs?.forEach(def =>{
-            // returnObj[def._did] = //#TODO pick up here
-        })
-    }
+    // private static formatCompleteDatasetByDef(data: CompleteDataset){
+    //     let returnObj: any = {};
+    //     data.defs?.forEach(def =>{
+    //         // returnObj[def._did] = 
+    //     })
+    // }
 
-    private static formatCompleteDatasetByEntry(data: CompleteDataset){
+    // private static formatCompleteDatasetByEntry(data: CompleteDataset){
 
-    }
+    // }
 }
 
 /**
@@ -1097,13 +1137,13 @@ export abstract class Element implements ElementLike {
     _updated: EpochStr;
     _tempCreated: Temporal.ZonedDateTime;
     _tempUpdated: Temporal.ZonedDateTime;
-    constructor(inputData: MinimumElement) {
+    constructor(inputData: MinimumElement){//, associatedElements: AssociatedElementMap) {
         this._uid = inputData._uid ?? makeUID();
         this._deleted = this.handleDeletedInputVariability(inputData._deleted);
         this._created = this.handleEpochStrInputVariability(inputData._created);
         this._updated = this.handleEpochStrInputVariability(inputData._updated);
-        this._tempCreated = parseTemporalFromEpochStr(this._created)
-        this._tempUpdated = parseTemporalFromEpochStr(this._updated)
+        this._tempCreated = parseTemporalFromEpochStr(this._created);
+        this._tempUpdated = parseTemporalFromEpochStr(this._updated);
     }
 
     // extraction & "never nesting" really made this code way more readable... huh
@@ -1335,7 +1375,7 @@ export abstract class Element implements ElementLike {
 export class Def extends Element implements DefLike {
     _did: SmallID;
     _lbl: string;
-    _desc: string;
+    readonly _desc: string;
     _emoji: string;
     _scope: Scope;
     constructor(newDefData: MinimumDef) {
@@ -1367,7 +1407,6 @@ export class Def extends Element implements DefLike {
             PDW.getInstance().setPointDefs(pointDefs);
         }
     }
-
     setPointDefs(pointInfoIn: {
         _lbl: string,
         _type: PointType,
@@ -1377,7 +1416,7 @@ export class Def extends Element implements DefLike {
         _pid?: SmallID
     }[]): PointDef[] {
         let pointDefs = pointInfoIn.map(point => {
-            return PDW.getInstance().createNewPointDef({
+            return PDW.getInstance().newPointDef({
                 _lbl: point._lbl,
                 _did: this._did,
                 _type: point._type,
@@ -1389,7 +1428,7 @@ export class Def extends Element implements DefLike {
         })
         return pointDefs
     }
-
+    
     getPoints(includeDeleted = false): PointDef[] {
         const pdwRef = PDW.getInstance();
 
