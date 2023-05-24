@@ -54,15 +54,18 @@ export enum PointType {
      * A string, assumed to be long-ish, to run through 'marked' if possible
      */
     MARKDOWN = 'MARKDOWN',
-    SELECT = 'SELECT', //_tid
+    /**
+     * Essentially an enumeration
+     */
+    SELECT = 'SELECT',
     /**
      * true or false
      */
     BOOL = 'BOOL', //true false
     /**
-     * A Temporal Duration string
+     * A Temporal Duration string, starting with the 'P' to really ensure no ambiguity
      */
-    DURATION = 'DURATION', //Temporal.duration
+    DURATION = 'DURATION',
     /**
      * A Temporal PlainTime string (no timezone)
      */
@@ -115,9 +118,9 @@ export enum Rollup {
  * hook up a new database. It is what sits between the data store of choice and the PDW.
  * It's designed to be as simple-to-implement as possible.
  * 
- * It's very much a work in progress. I have a semi-functional
- * one for Firebase, but would like to create ones for Excel (for pragmatics) and 
- * SQL (for learning)
+ * The parameter sanitization & merge logic are handled by the PDW.
+ * 
+ * It's *very much* a work in progress.
  */
 export interface DataStore {
 
@@ -199,8 +202,10 @@ interface TagMap{
 }
 
 /**
- * Basic data filtering parameters, supported by the {@link DataStore} methods for
- * {@link getDefs} & the 5 other element "getters".
+ * Basic data filtering parameters, supported by the {@link PDW} methods for
+ * {@link getDefs} & the 5 other element "getters". The {@link DataStore} methods
+ * will get {@link SanitizedParams} passed to them by the PDW methods, which will
+ * perform the sanitization.
  * Not all parameters are considered for each getter, but it should make
  * things a bit simpler to standardize the params
  */
@@ -233,10 +238,21 @@ export interface StandardParams {
     allOnPurpose?: boolean
 }
 
+/**
+ * A more tightly-controlled version of the {@link StandardParams}, meant to make
+ * development of any new {@link DataStore} easier to implement. SanitizedParams are
+ * what DataStore versions of the main setter/getter functions respond to.  
+ */
 export interface SanitizedParams {
-    includeDeleted: 'yes' | 'no' | 'only',
     /**
-     * For entries and entryPoints only
+     * yes - excludes deleted stuff
+     * no - returns deleted & undeleted stuff
+     * only - returns **only** deleted stuff
+     */
+    includeDeleted: 'yes' | 'no' | 'only',
+    
+    /**
+     * For entries and entryPoints only.
      */
     from?: Period,
     to?: Period,
@@ -993,7 +1009,7 @@ export class PDW {
     static sanitizeParams(params: StandardParams | SanitizedParams): SanitizedParams {
         //ensure default
         if (params.includeDeleted === undefined) params.includeDeleted = 'no';
-        
+
         //make periods from period srings
         if (params.from !== undefined) {
             if (typeof params.from === 'string') params.from = new Period(params.from);
@@ -1131,12 +1147,20 @@ export class PDW {
  * Base class 
  */
 export abstract class Element implements ElementLike {
-    _uid: string;
+    /**
+     * Do not update me directly!
+     * Call method {@link markDeleted} or {@link markUndeleted}
+     */
     _deleted: boolean;
-    _created: EpochStr;
+    /**
+     * Do not update me directly!
+     * Call method markDeleted or markUndeleted
+     */
     _updated: EpochStr;
-    _tempCreated: Temporal.ZonedDateTime;
-    _tempUpdated: Temporal.ZonedDateTime;
+    readonly _uid: string;
+    readonly _created: EpochStr;
+    readonly _tempCreated: Temporal.ZonedDateTime;
+    readonly _tempUpdated: Temporal.ZonedDateTime;
     constructor(inputData: MinimumElement){//, associatedElements: AssociatedElementMap) {
         this._uid = inputData._uid ?? makeUID();
         this._deleted = this.handleDeletedInputVariability(inputData._deleted);
@@ -1145,6 +1169,14 @@ export abstract class Element implements ElementLike {
         this._tempCreated = parseTemporalFromEpochStr(this._created);
         this._tempUpdated = parseTemporalFromEpochStr(this._updated);
     }
+
+    /**
+     * this syntax exposes private variables to the outside world
+     * in read-only manner
+     */
+    // get _deleted(){
+    //     return this._deleted_
+    // }
 
     // extraction & "never nesting" really made this code way more readable... huh
     private handleDeletedInputVariability(deletedVal: any): boolean {
@@ -1373,11 +1405,11 @@ export abstract class Element implements ElementLike {
 }
 
 export class Def extends Element implements DefLike {
-    _did: SmallID;
-    _lbl: string;
+    readonly _did: SmallID;
+    readonly _lbl: string;
     readonly _desc: string;
-    _emoji: string;
-    _scope: Scope;
+    readonly _emoji: string;
+    readonly _scope: Scope;
     constructor(newDefData: MinimumDef) {
         if (newDefData._did !== undefined) {
             let existing = Element.findExistingData(newDefData);
@@ -1407,6 +1439,7 @@ export class Def extends Element implements DefLike {
             PDW.getInstance().setPointDefs(pointDefs);
         }
     }
+
     setPointDefs(pointInfoIn: {
         _lbl: string,
         _type: PointType,
@@ -1427,6 +1460,15 @@ export class Def extends Element implements DefLike {
             })
         })
         return pointDefs
+    }
+
+    /**
+     * Will call the PDW setDefs method and pass
+     * in the `this` as the existing data
+     * @param newDefData a Map of Def attributes
+     */
+    updateTo(newDefData: MinimumDef){
+        //#TODO - 
     }
     
     getPoints(includeDeleted = false): PointDef[] {
@@ -1817,7 +1859,20 @@ export class Tag extends Element implements TagLike {
  * They are basically wrappers around a string.
  */
 export class Period {
-    periodStr: string;
+
+    /**
+     * The Period itself, represented in a {@link PeriodStr} format.  
+     * 
+     * **Examples**:
+     * - '2020'
+     * - '2020-Q1'
+     * - '2020-03'
+     * - '2020-03-19'
+     * - '2020-03-19T18'
+     * - '2020-03-19T18:59'
+     * - '2020-03-19T18:59:25'
+     */
+    periodStr: PeriodStr;
     scope: Scope;
     private _zoomLevel: number
 
@@ -2342,6 +2397,10 @@ function maybeGetOnlyResult(arrayOfOneElement: any[]): undefined | Def | Entry |
     return arrayOfOneElement[0]
 }
 
+/**
+ * Used for .csv outputs, and probably SQL when I get around to that.
+ * This is the order of all the headers.
+ */
 export const canonicalHeaders = [
     '_uid',
     '_created',

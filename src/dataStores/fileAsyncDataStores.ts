@@ -111,6 +111,7 @@ export class AsyncCSV implements pdw.AsyncDataStore {
             throw new Error('Unhandled period val...')
         }
     }
+    
     exportTo(allData: pdw.CompleteDataset, filename: string) {
         XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();

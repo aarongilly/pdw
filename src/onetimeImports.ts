@@ -1,3 +1,4 @@
+//@ts-nocheck
 import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as pdw from './pdw.js';

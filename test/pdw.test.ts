@@ -1,24 +1,10 @@
 import { expect, test } from 'vitest'
 import * as pdw from '../src/pdw';
 import { Temporal } from 'temporal-polyfill';
-// Edit an assertion and save to see HMR in action
-
-// test('JSON', () => {
-//   const input = {
-//     foo: 'hello',
-//     bar: 'world',
-//   }
-
-//   const output = JSON.stringify(input)
-
-//   expect(output).eq('{"foo":"hello","bar":"world"}')
-//   assert.deepEqual(JSON.parse(output), input, 'matches original')
-// })
 
 const pdwRef = pdw.PDW.getInstance();
 
 test('Def Basics', () => {
-
     /**
      * Most Basic Def Creation
     */
@@ -26,6 +12,10 @@ test('Def Basics', () => {
         _lbl: 'First Def' 
     });
     expect(firstDef._lbl).toBe('First Def'); //return value
+    expect(firstDef._scope).toBe(pdw.Scope.SECOND); //default scope
+    expect(firstDef._emoji).toBe('🆕') //default emoji
+    expect(firstDef._tempCreated.epochMilliseconds).toBeGreaterThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString()) - 5000) //created not long ago...
+    expect(firstDef._tempCreated.epochMilliseconds).toBeLessThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString())) //...but not in the future
 
     /**
      * Fully specified Def Creation
@@ -61,67 +51,35 @@ test('Def Basics', () => {
     defs = pdwRef.getDefs({did:['gggg']});
     expect(defs[0]._desc).toBe('Test Desc');
 
+    /**
+     * Update a Def
+     */
     pdwRef.setDefs([{
         _did: 'gggg',
-        _lbl: 'Upated First Def'
-    }])
+        _lbl: 'Updated Second Def'
+    }]);
 
-    firstDef.setPointDefs([
-        {
-            _lbl: "First Def Point Def", 
-            _type: pdw.PointType.TEXT,
-            _desc: "A Point",
-            _emoji: "🍕",
-            _pid: 'uuuu',
-            _rollup: pdw.Rollup.COUNT
-        }
-        ])
+    /**
+     * Check current def is the update
+     */
+    defs = pdwRef.getDefs({did: 'gggg', includeDeleted: 'no'});
+    expect(defs[0]._lbl).toBe('Updated Second Def');
+    
+    /**
+     * Check that out of date def was marked deleted
+     */
+    defs = pdwRef.getDefs({did: 'gggg', includeDeleted: 'only'});
+    expect(defs[0]._lbl).toBe('Second Def');
 
-    // //getDefs
-    // defs = pdwRef.getDefs({ includeDeleted: 'yes' });
-    // expect(defs.length).toBe(3);
-    // defs = pdwRef.getDefs({ includeDeleted: 'no' });
-    // expect(defs.length).toBe(2);
-    // defs = pdwRef.getDefs({ includeDeleted: 'only' });
-    // expect(defs.length).toBe(1);
-    // defs = pdwRef.getDefs({ did: ['gggg'] });
-    // expect(defs.length).toBe(1);
-
-
-    // firstDef.setPointDefs([{
-    //     _lbl: 'Point 1',
-    //     _pid: 'hhhh',
-    //     _type: pdw.PointType.BOOL,
-    //     _desc: 'set via Def.setPointDefs()'
-    // }])
-    // let pointTwo = pdwRef.setPointDefs([{
-    //     _did: 'gggg',
-    //     _pid: 'iiii',
-    //     _lbl: 'Point 2',
-    //     _desc: 'set via PDW.setPointDefs'
-    // }])[0]
-
-    // let pointDefs = firstDef.getPoints();
-    // expect(pointDefs.length).toBe(2);
-
-    // pointTwo.markDeleted();
-
-    // pointDefs = firstDef.getPoints();
-    // expect(pointDefs.length).toBe(1);
-
-    //new entry for non-existant def
-    // expect(() => pdwRef.newEntry({ _did: 'should err' })).toThrowError()
-    // //write to a deleted PointDef
-    // expect(() => pdwRef.newEntryPoint({ _eid: 'silent error', _did: 'gggg', _pid: 'iiii', _val: false })).toThrowError()
-
-    // pdwRef.setEntries([{
-    //     _did: 'gggg',
-    //     hhhh: true
-    // }]);
+    /**
+     * Check simple deletion
+     */
+    firstDef.markDeleted();
+    defs = pdwRef.getDefs({includeDeleted: 'only', did: firstDef._did});
+    expect(defs[0]._lbl).toBe('First Def')
 })
 
 test('Entry Basics', () => {
-
 
 })
 
