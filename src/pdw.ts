@@ -1161,6 +1161,12 @@ export abstract class Element implements ElementLike {
     readonly _created: EpochStr;
     readonly _tempCreated: Temporal.ZonedDateTime;
     readonly _tempUpdated: Temporal.ZonedDateTime;
+
+    /**
+     * Meta-property - not stored
+     */
+    __isNew?: boolean;
+
     constructor(inputData: MinimumElement){//, associatedElements: AssociatedElementMap) {
         this._uid = inputData._uid ?? makeUID();
         this._deleted = this.handleDeletedInputVariability(inputData._deleted);
@@ -1168,6 +1174,7 @@ export abstract class Element implements ElementLike {
         this._updated = this.handleEpochStrInputVariability(inputData._updated);
         this._tempCreated = parseTemporalFromEpochStr(this._created);
         this._tempUpdated = parseTemporalFromEpochStr(this._updated);
+        if(inputData.__isNew !== undefined) this.__isNew = inputData.__isNew;
     }
 
     /**
