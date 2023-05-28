@@ -1,4 +1,5 @@
 import { Temporal } from "temporal-polyfill";
+import { DefaultDataStore } from "./DefaultDataStore";
 
 //#region ### TYPES ###
 
@@ -190,15 +191,15 @@ export interface AsyncDataStore {
  * their associated _points and _tags
  */
 export interface Manifest {
-    [did: string]: Def & {_points: PointDefMap, _tags: TagMap}
+    [did: string]: Def & { _points: PointDefMap, _tags: TagMap }
 }
 
-interface PointDefMap{
+interface PointDefMap {
     [pid: string]: PointDef
 }
 
-interface TagMap{
-    [tid: string]: Tag & {_tagDef: TagDef}
+interface TagMap {
+    [tid: string]: Tag & { _tagDef: TagDef }
 }
 
 /**
@@ -250,7 +251,7 @@ export interface SanitizedParams {
      * only - returns **only** deleted stuff
      */
     includeDeleted: 'yes' | 'no' | 'only',
-    
+
     /**
      * For entries and entryPoints only.
      */
@@ -501,7 +502,7 @@ export interface MinimumDef extends MinimumElement {
      * To create a brand new definition, this is the **only** required field.
      * All other fields *can* be provided, but will set to default if not provided.
      */
-    _lbl: string;
+    _lbl?: string;
     /**
      * Definition ID
      * Defaults to a new smallID
@@ -681,8 +682,8 @@ export interface QueryParams {
     includeDeleted?: boolean;
     limit?: number;
     today?: any;
-    thisWeek: any;
-    thisMonth: any;
+    thisWeek?: any;
+    thisMonth?: any;
     /**
      * MoA - map of Arrays
      * NestPoints - Entrys with _points: [EntryPoints], Defs with _points: [PointDefs]
@@ -728,7 +729,7 @@ export interface DataStoreOverview {
 //     [did: string]: Def & {points: PointDef[], entries: (Entry & {points: EntryPoint[]})[]}
 // }
 
-export interface AssociatedElementMap{
+export interface AssociatedElementMap {
     existing: Def | PointDef | Entry | EntryPoint | Tag | TagDef;
     def: Def;
     pointDef: PointDef;
@@ -786,9 +787,9 @@ export class PDW {
     }
 
     getDefs(rawParams?: StandardParams): Def[] {
-        if(rawParams === undefined) rawParams = {};
+        if (rawParams === undefined) rawParams = {};
         const params = PDW.sanitizeParams(rawParams);
-        
+
         //if there's only DataStore, bypass the combining stuff to save time
         if (this.dataStores.length == 1) {
             let defLikes = this.dataStores[0].getDefs(params)
@@ -822,7 +823,8 @@ export class PDW {
         return combinedDefs;
     }
 
-    getPointDefs(rawParams: StandardParams): PointDef[] {
+    getPointDefs(rawParams?: StandardParams): PointDef[] {
+        if (rawParams === undefined) rawParams = {};
         const params = PDW.sanitizeParams(rawParams)
 
         //if there's only DataStore, bypass the combining stuff to save time
@@ -859,7 +861,8 @@ export class PDW {
         // return combinedDefs;
     }
 
-    getEntries(rawParams: StandardParams): Entry[] {
+    getEntries(rawParams?: StandardParams): Entry[] {
+        if (rawParams === undefined) rawParams = {};
         const params = PDW.sanitizeParams(rawParams)
 
         if (this.dataStores.length == 1) {
@@ -875,7 +878,8 @@ export class PDW {
     }
 
 
-    getTagDefs(rawParams: StandardParams): TagDef[] {
+    getTagDefs(rawParams?: StandardParams): TagDef[] {
+        if (rawParams === undefined) rawParams = {};
         const params = PDW.sanitizeParams(rawParams)
 
         //if there's only DataStore, bypass the combining stuff to save time
@@ -887,6 +891,20 @@ export class PDW {
         throw new Error('Multiple datastores not yet implemented');
     }
 
+    getTags(rawParams?: StandardParams): Tag[] {
+        if (rawParams === undefined) rawParams = {};
+        const params = PDW.sanitizeParams(rawParams)
+
+        //if there's only DataStore, bypass the combining stuff to save time
+        if (this.dataStores.length == 1) {
+            let tagLikes = this.dataStores[0].getTags(params)
+            return tagLikes.map(tdl => new Tag(tdl));
+        }
+
+        throw new Error('Multiple datastores not yet implemented');
+    }
+
+    
     setDefs(defsIn: MinimumDef[]): Def[] {
         let defs: Def[] = defsIn.map(defLike => new Def(defLike));
         this.dataStores.forEach(connection => {
@@ -1167,14 +1185,14 @@ export abstract class Element implements ElementLike {
      */
     __isNew?: boolean;
 
-    constructor(inputData: MinimumElement){//, associatedElements: AssociatedElementMap) {
+    constructor(inputData: MinimumElement) {//, associatedElements: AssociatedElementMap) {
         this._uid = inputData._uid ?? makeUID();
         this._deleted = this.handleDeletedInputVariability(inputData._deleted);
         this._created = this.handleEpochStrInputVariability(inputData._created);
         this._updated = this.handleEpochStrInputVariability(inputData._updated);
         this._tempCreated = parseTemporalFromEpochStr(this._created);
         this._tempUpdated = parseTemporalFromEpochStr(this._updated);
-        if(inputData.__isNew !== undefined) this.__isNew = inputData.__isNew;
+        if (inputData.__isNew !== undefined) this.__isNew = inputData.__isNew;
     }
 
     /**
@@ -1418,6 +1436,7 @@ export class Def extends Element implements DefLike {
     readonly _emoji: string;
     readonly _scope: Scope;
     constructor(newDefData: MinimumDef) {
+        if (newDefData._scope !== undefined && !Def.isValidScope(newDefData._scope)) throw new Error('Invalid scope supplied when creating Def: ' + newDefData._scope);
         if (newDefData._did !== undefined) {
             let existing = Element.findExistingData(newDefData);
             if (existing !== undefined) {
@@ -1430,7 +1449,7 @@ export class Def extends Element implements DefLike {
             }
         }
         super(newDefData)
-        this._lbl = newDefData._lbl;
+        this._lbl = newDefData._lbl ?? 'Unlabeled Default Text';
         this._did = newDefData._did ?? makeSmallID();
         this._desc = newDefData._desc ?? 'Set a description';
         this._emoji = newDefData._emoji ?? '🆕';
@@ -1441,10 +1460,12 @@ export class Def extends Element implements DefLike {
             let pointDefs: MinimumPointDef[] = pids.map(pid => {
                 newDefData[pid]._pid = pid;
                 newDefData[pid]._did = this._did;
+                newDefData[pid]._def = this
                 return newDefData[pid]
             });
             PDW.getInstance().setPointDefs(pointDefs);
         }
+        if(!Def.isDefLike(this)) throw new Error('Def was mal-formed.')
     }
 
     setPointDefs(pointInfoIn: {
@@ -1472,12 +1493,44 @@ export class Def extends Element implements DefLike {
     /**
      * Will call the PDW setDefs method and pass
      * in the `this` as the existing data
-     * @param newDefData a Map of Def attributes
+     * @param dataIn a Map of Def attributes
      */
-    updateTo(newDefData: MinimumDef){
-        //#TODO - 
+    updateTo(dataIn: MinimumDef) {
+        if (Array.isArray(dataIn)) throw new Error("cannot updateTo an array, you probably passed one in on accident")
+        //ensure this isn't overwriting newer data
+        if (dataIn._updated !== undefined && dataIn._updated < this._updated) {
+            console.warn('Called update on Def using data that was older than the def itself');
+            throw new Error('Do you want this to error? Or just return null?')
+        }
+
+        if (dataIn._did !== undefined && dataIn._did !== this._did) {
+            console.warn("You decided you dont wnat to enable chaging of _did");
+            throw new Error('You cannot change _did on an existing def');
+        }
+
+        let newDefData: DefLike = {
+            _did: this._did,
+            _lbl: dataIn._lbl ?? this._lbl,
+            _desc: dataIn._desc ?? this._desc,
+            _emoji: dataIn._emoji ?? this._emoji,
+            _scope: dataIn._scope ?? this._scope,
+            _uid: makeUID(),
+            _deleted: false,
+            _created: dataIn._created ?? this._created,
+            _updated: makeEpochStr(),
+            __isNew: true, //no need to look for existing for this
+        }
+
+        // PDW
+        this._deleted = true;
+        this._updated = makeEpochStr();
+
+        PDW.getInstance().setDefs([
+            this, //writing the deletes to the dbs
+            newDefData
+        ])
     }
-    
+
     getPoints(includeDeleted = false): PointDef[] {
         const pdwRef = PDW.getInstance();
 
@@ -1488,6 +1541,10 @@ export class Def extends Element implements DefLike {
         }
 
         throw new Error('Multiple Data Stores are #TODO') //#TODO - for multiple data stores
+    }
+
+    addTag(tag: TagDef) {
+
     }
 
     /**
@@ -1501,7 +1558,7 @@ export class Def extends Element implements DefLike {
         if (typeof data._lbl !== 'string') return false
         if (typeof data._desc !== 'string') return false
         if (typeof data._emoji !== 'string') return false
-        if (data._scope == undefined || !this.isValidScope(data._scope)) return false
+        if (data._scope == undefined || !Def.isValidScope(data._scope)) return false
         if (typeof data._uid !== 'string') return false
         if (typeof data._created !== 'string') return false
         if (typeof data._deleted !== 'boolean') return false
@@ -1513,9 +1570,6 @@ export class Def extends Element implements DefLike {
         const values = Object.values(Scope);
         return values.includes(typeStr as unknown as Scope)
     }
-
-    //#TODO - implement an 'addTag() method
-    //#TODO - and a 'removeTag() method, for that matter
 }
 
 export class PointDef extends Element implements PointDefLike {
@@ -1527,7 +1581,7 @@ export class PointDef extends Element implements PointDefLike {
     _type: PointType;
     _rollup: Rollup;
     _def?: Def;
-    constructor(newPointDefData: MinimumPointDef, def?: Def) {
+    constructor(newPointDefData: MinimumPointDef) {
         if (newPointDefData._did !== undefined && newPointDefData._pid !== undefined) {
             let existing = Element.findExistingData(newPointDefData);
             if (existing !== undefined) {
@@ -1542,8 +1596,8 @@ export class PointDef extends Element implements PointDefLike {
         }
         super(newPointDefData)
 
-        if(newPointDefData._type !== undefined && !PointDef.isValidType(newPointDefData._type)) throw new Error('Cannot parse point type ' + newPointDefData._type);
-        if(newPointDefData._rollup !== undefined && !PointDef.isValidRollup(newPointDefData._rollup)) throw new Error('Cannot parse point rollup ' + newPointDefData._rollup);
+        if (newPointDefData._type !== undefined && !PointDef.isValidType(newPointDefData._type)) throw new Error('Cannot parse point type ' + newPointDefData._type);
+        if (newPointDefData._rollup !== undefined && !PointDef.isValidRollup(newPointDefData._rollup)) throw new Error('Cannot parse point rollup ' + newPointDefData._rollup);
 
         this._did = newPointDefData._did;
         this._lbl = newPointDefData._lbl ?? 'Label unset';
@@ -1552,8 +1606,12 @@ export class PointDef extends Element implements PointDefLike {
         this._desc = newPointDefData._desc ?? 'Set a description';
         this._emoji = newPointDefData._emoji ?? '🆕';
         this._rollup = newPointDefData._rollup ?? Rollup.COUNT;
+        //ensure there is ANY def with the same DID
+        if (newPointDefData._def === undefined && PDW.getInstance().getDefs({ did: this._did }).length === 0) throw new Error('No associated Def for PointDef')
         //assigning out o convenience here
-        if (def) this._def = def;
+        if (newPointDefData._def) this._def = newPointDefData._def;
+
+        if(!PointDef.isPointDefLike(this)) throw new Error('Mal-formed PointDef')
     }
 
     /**
@@ -1582,8 +1640,9 @@ export class PointDef extends Element implements PointDefLike {
         const values = Object.values(PointType);
         return values.includes(typeStr as unknown as PointType)
     }
-
+    
     static isValidRollup(typeStr: string): boolean {
+        //Handy bit of Enum functionality here for ref
         const values = Object.values(Rollup);
         return values.includes(typeStr as unknown as Rollup)
     }
@@ -1623,6 +1682,7 @@ export class Entry extends Element implements EntryLike {
         this._eid = entryData._eid ?? makeUID();
         this._note = entryData._note ?? '';
         this._source = entryData._source ?? '';
+        if(!Entry.isEntryLike(this)) throw new Error('An error occurred in the Entry creation');
         //spawn new EntryPoints for any non-underscore-prefixed keys
         let pointKey = Object.keys(entryData).filter(key => key.substring(0, 1) !== '_');
         if (pointKey.length > 0) {
@@ -1647,6 +1707,33 @@ export class Entry extends Element implements EntryLike {
             });
             PDW.getInstance().setEntryPoints(entryPoints);
         }
+    }
+
+    getPoints(includeDeleted = false): EntryPoint[]{
+        const pdwRef = PDW.getInstance();
+
+        //if there's only DataStore, bypass the combining stuff to save time
+        if (pdwRef.dataStores.length == 1) {
+            let pds = pdwRef.dataStores[0].getEntryPoints({ eid: [this._eid], includeDeleted: includeDeleted ? 'yes' : 'no' })
+            return pds.map(ep => new EntryPoint(ep));
+        }
+
+        throw new Error('Multiple Data Stores are #TODO') //#TODO - for multiple data stores
+    }
+
+    getPoint(pidLbl: string, includeDeleted = false): EntryPoint{
+        const pdwRef = PDW.getInstance();
+
+        //if there's only DataStore, bypass the combining stuff to save time
+        if (pdwRef.dataStores.length == 1) {
+            let pds = pdwRef.dataStores[0].getEntryPoints({ eid: [this._eid], includeDeleted: includeDeleted ? 'yes' : 'no' });
+            let point = pds.filter(p=>p._pid===pidLbl);
+            if(point===undefined) point = pds.filter(p=>p._lbl === pidLbl);
+            if(point===undefined) throw new Error('No point found on Entry with label or pid: ' + pidLbl);
+            return new EntryPoint(point[0]);
+        }
+
+        throw new Error('Multiple Data Stores are #TODO') //#TODO - for multiple data stores
     }
 
     getPeriod(): Period {
@@ -1725,9 +1812,9 @@ export class EntryPoint extends Element implements EntryPointLike {
         if (_type === PointType.DURATION) {
             if (typeof _val === 'string') return _val;
             //if (typeof _val === "number") return _val !== 0; //number of seconds? millseconds?
-            if(typeof _val === 'number'){
+            if (typeof _val === 'number') {
                 // console.warn('Assuming excel portion of day for duration: ', _val)
-                return Temporal.Duration.from({seconds: Math.round(86400 * _val)}).toString()
+                return Temporal.Duration.from({ seconds: Math.round(86400 * _val) }).toString()
             }
             console.warn(`Cannot convert this to duration:`, _val)
             return undefined;
@@ -1765,7 +1852,7 @@ export class EntryPoint extends Element implements EntryPointLike {
         if (_type === PointType.SELECT) {
             if (typeof _val === 'string') return _val;
             if (Array.isArray(_val)) return _val.join('|||')
-            if(_val === undefined) return []; //I guess
+            if (_val === undefined) return []; //I guess
             console.warn(`Cannot convert this to select:`, _val)
             return undefined;
         }
@@ -1773,7 +1860,7 @@ export class EntryPoint extends Element implements EntryPointLike {
             if (typeof _val === 'boolean') return _val.toString();
             if (typeof _val === 'string') return _val.trim();
             if (typeof _val === "number") return _val.toString();
-            if(_val === undefined) return ''; //I guess
+            if (_val === undefined) return ''; //I guess
             return _val.toString();
         }
         if (_type === PointType.TIME) {
@@ -1923,26 +2010,26 @@ export class Period {
         if (this.scope === Scope.DAY) return new Period(this.periodStr + 'T23:59:59');
 
         if (this.scope === Scope.WEEK) {
-            let numWks = Number.parseInt(this.periodStr.split('W')[1])-1;
+            let numWks = Number.parseInt(this.periodStr.split('W')[1]) - 1;
             //if the previous year had 53 weeks, this is necessary
-            if(Period.prevYearHas53Weeks(this.periodStr.substring(0,4))) numWks = numWks + 1
+            if (Period.prevYearHas53Weeks(this.periodStr.substring(0, 4))) numWks = numWks + 1
             let init = Temporal.PlainDate.from(this.periodStr.split('-')[0] + '01-01')
-            
+
             let sun = init.add({ days: 7 - init.dayOfWeek })
             sun = sun.add({ days: numWks * 7 });
             return new Period(sun.toString() + 'T23:59:59')
-            
+
         }
-        if (this.scope === Scope.MONTH){
-            let lastDay = Temporal.PlainDate.from(this.periodStr+'-01').daysInMonth;
+        if (this.scope === Scope.MONTH) {
+            let lastDay = Temporal.PlainDate.from(this.periodStr + '-01').daysInMonth;
             return new Period(this.periodStr + '-' + lastDay.toString() + 'T23:59:59')
         }
-        if (this.scope === Scope.QUARTER){
-            const year = this.periodStr.substring(0,4)
+        if (this.scope === Scope.QUARTER) {
+            const year = this.periodStr.substring(0, 4)
             const q = Number.parseInt(this.periodStr.slice(-1));
             const month = q * 3
-            const d =  Temporal.PlainDate.from(year+'-'+month.toString().padStart(2,'0')+'-01').daysInMonth;
-            return new Period(year+'-'+month.toString().padStart(2,'0')+'-'+d+'T23:59:59')
+            const d = Temporal.PlainDate.from(year + '-' + month.toString().padStart(2, '0') + '-01').daysInMonth;
+            return new Period(year + '-' + month.toString().padStart(2, '0') + '-' + d + 'T23:59:59')
         }
         return new Period(this.periodStr + "-12-31T23:59:59")
     }
@@ -1951,15 +2038,15 @@ export class Period {
      * 
      * @returns the first second of the period (e.g. 2020-01-01T00:00:00)
      */
-    getStart(): Period{
-        if(this._zoomLevel === 0) return new Period(this);
-        if(this.scope === Scope.YEAR) return new Period(this.toString() + '-01-01T00:00:00')
-        if(this.scope === Scope.QUARTER) return new Period(this.zoomIn() + '-01T00:00:00')
-        if(this.scope === Scope.MONTH) return new Period(this.toString() + '-01T00:00:00')
+    getStart(): Period {
+        if (this._zoomLevel === 0) return new Period(this);
+        if (this.scope === Scope.YEAR) return new Period(this.toString() + '-01-01T00:00:00')
+        if (this.scope === Scope.QUARTER) return new Period(this.zoomIn() + '-01T00:00:00')
+        if (this.scope === Scope.MONTH) return new Period(this.toString() + '-01T00:00:00')
         //above preempts week, cause it's not purely hierarchical,
         //from here you can just "zoomIn" to the beginning of the period
         let per = this.zoomIn();
-        while(per._zoomLevel !== 0){
+        while (per._zoomLevel !== 0) {
             per = per.zoomIn()
         }
         return per;
@@ -1970,28 +2057,28 @@ export class Period {
      */
     zoomTo(desiredScope: Scope): Period {
         const desiredLevel = Period.zoomLevel(desiredScope);
-        if(this._zoomLevel === desiredLevel) return new Period(this);
-        if(this._zoomLevel < desiredLevel){
+        if (this._zoomLevel === desiredLevel) return new Period(this);
+        if (this._zoomLevel < desiredLevel) {
             let zoomOut = this.zoomOut()
-            while(zoomOut._zoomLevel < desiredLevel){
+            while (zoomOut._zoomLevel < desiredLevel) {
                 //need to bypass weeks
-                if(desiredLevel !== 4 && zoomOut._zoomLevel === 3){
-                    zoomOut = new Period(zoomOut.periodStr.substring(0,7))
-                }else{
+                if (desiredLevel !== 4 && zoomOut._zoomLevel === 3) {
+                    zoomOut = new Period(zoomOut.periodStr.substring(0, 7))
+                } else {
                     zoomOut = zoomOut.zoomOut()
                 }
             }
             return zoomOut;
         }
-            let zoomIn = this.zoomIn()
-            while(zoomIn._zoomLevel > desiredLevel){
-                if(desiredLevel !== 4 && zoomIn._zoomLevel === 5){
-                    zoomIn = new Period(zoomIn.periodStr+'-01')
-                }else{
-                    zoomIn = zoomIn.zoomIn()
-                }
+        let zoomIn = this.zoomIn()
+        while (zoomIn._zoomLevel > desiredLevel) {
+            if (desiredLevel !== 4 && zoomIn._zoomLevel === 5) {
+                zoomIn = new Period(zoomIn.periodStr + '-01')
+            } else {
+                zoomIn = zoomIn.zoomIn()
             }
-            return zoomIn;
+        }
+        return zoomIn;
     }
 
     /**
@@ -2014,9 +2101,9 @@ export class Period {
             return new Period(year + "-W" + weekNum.toString().padStart(2, '0'));
         }
         if (this.scope === Scope.WEEK) {
-            let numWks = Number.parseInt(this.periodStr.split('W')[1])-1;
+            let numWks = Number.parseInt(this.periodStr.split('W')[1]) - 1;
             //if the previous year had 53 weeks, this is necessary
-            if(Period.prevYearHas53Weeks(this.periodStr.substring(0,4))) numWks = numWks + 1
+            if (Period.prevYearHas53Weeks(this.periodStr.substring(0, 4))) numWks = numWks + 1
             let init = Temporal.PlainDate.from(this.periodStr.split('-')[0] + '01-01')
             let mon = init.add({ days: 1 - init.dayOfWeek }).add({ days: numWks * 7 })
             return new Period(mon.toString());
@@ -2042,9 +2129,9 @@ export class Period {
         }
         if (this.scope === Scope.WEEK) {
             //weeks zooming out resolve to whichever month contains the THURSDAY of the week
-            let numWks = Number.parseInt(this.periodStr.split('W')[1])-1;
+            let numWks = Number.parseInt(this.periodStr.split('W')[1]) - 1;
             //if the previous year had 53 weeks, this is necessary
-            if(Period.prevYearHas53Weeks(this.periodStr.substring(0,4))) numWks = numWks + 1
+            if (Period.prevYearHas53Weeks(this.periodStr.substring(0, 4))) numWks = numWks + 1
             let init = Temporal.PlainDate.from(this.periodStr.split('-')[0] + '01-01')
             let thur = init.add({ days: 4 - init.dayOfWeek }).add({ days: numWks * 7 })
             return new Period(thur.toPlainYearMonth().toString());
@@ -2059,47 +2146,47 @@ export class Period {
         return new Period(this.periodStr.substring(0, 4))
     }
 
-    addDuration(temporalDurationStr: string): Period{
+    addDuration(temporalDurationStr: string): Period {
         const startTemp = Temporal.PlainDateTime.from(this.getStart().periodStr);
         const endTemp = startTemp.add(temporalDurationStr);
         return new Period(endTemp.toString()).zoomTo(this.scope);
     }
 
-    contains(period: Period): boolean{
+    contains(period: Period): boolean {
         const inBegin = Temporal.PlainDateTime.from(period.getStart().periodStr)
         const inEnd = Temporal.PlainDateTime.from(period.getEnd().periodStr)
         const thisBegin = Temporal.PlainDateTime.from(this.getStart().periodStr);
         const thisEnd = Temporal.PlainDateTime.from(this.getEnd().periodStr);
         const start = Temporal.PlainDateTime.compare(inBegin, thisBegin);
-        const end = Temporal.PlainDateTime.compare(thisEnd,inEnd);
+        const end = Temporal.PlainDateTime.compare(thisEnd, inEnd);
         return start !== -1 && end !== -1
     }
-        
+
     // I can't believe I was able to reduce these to a 1 liner
-    getNext(): Period{
+    getNext(): Period {
         let start = this.getStart();
         let end = this.getEnd();
         let plusOne = end.addDuration('PT1S');
         let zoomed = plusOne.zoomTo(this.scope);
         return this.getEnd().addDuration('PT1S').zoomTo(this.scope);
-        
+
     }
-    getPrev(): Period{
+    getPrev(): Period {
         return this.getStart().addDuration('-PT1S').zoomTo(this.scope);
     }
 
-    private static prevYearHas53Weeks(yearStr: string):boolean{
-        const prevYear = Number.parseInt(yearStr)-1;
+    private static prevYearHas53Weeks(yearStr: string): boolean {
+        const prevYear = Number.parseInt(yearStr) - 1;
         return Temporal.PlainDate.from(prevYear + '-12-31').weekOfYear == 53;
-        
+
     }
 
-    static allPeriodsBetween(start: Period, end: Period, scope: Scope, asStrings = false): Period[] | string[]{
-        if(Temporal.PlainDateTime.compare(Temporal.PlainDateTime.from(start.getStart().periodStr), Temporal.PlainDateTime.from(end.getStart().periodStr)) === 1){
+    static allPeriodsBetween(start: Period, end: Period, scope: Scope, asStrings = false): Period[] | string[] {
+        if (Temporal.PlainDateTime.compare(Temporal.PlainDateTime.from(start.getStart().periodStr), Temporal.PlainDateTime.from(end.getStart().periodStr)) === 1) {
             console.warn('You may have flipped your start and end dates accidentally... or something')
-            const temp = start; 
+            const temp = start;
             start = end;
-            end = temp;            
+            end = temp;
         }
         const startOfStart = start.getStart().periodStr;
         const endOfEnd = end.getEnd().periodStr;
@@ -2109,19 +2196,19 @@ export class Period {
 
         let member = first;
         list = [];
-        if(asStrings){
-            do{
+        if (asStrings) {
+            do {
                 // list.push({[member.periodStr]: {from: member.getStart().toString(), to: member.getEnd().toString()}});
                 list.push(member.periodStr);
                 member = member.getNext();
-            }while(member.periodStr <= last.periodStr)
+            } while (member.periodStr <= last.periodStr)
             return list as string[]
-        }else{
-            do{
+        } else {
+            do {
                 list.push(member);
                 member = member.getNext();
-                
-            }while(member.periodStr <= last.periodStr)
+
+            } while (member.periodStr <= last.periodStr)
             return list as Period[]
         }
     }
@@ -2174,165 +2261,6 @@ export class Query {
     run(): QueryResponse {
         throw new Error('Query.run not yet implemented')
     }
-}
-
-export class DefaultDataStore implements DataStore {
-    serviceName: string;
-    pdw: PDW;
-    defs: Def[];
-    pointDefs: PointDef[];
-    entries: Entry[];
-    entryPoints: EntryPoint[];
-    tagDefs: TagDef[];
-    tags: Tag[];
-
-    constructor(pdwRef: PDW) {
-        this.serviceName = 'In memory dataset';
-        this.pdw = pdwRef;
-        this.defs = [];
-        this.pointDefs = [];
-        this.entries = [];
-        this.entryPoints = [];
-        this.tagDefs = [];
-        this.tags = [];
-    }
-
-    query(params: QueryParams): QueryResponse {
-
-        throw new Error("Method not implemented.");
-    }
-
-    getAll(params: SanitizedParams): CompleteDataset {
-        return {
-            defs: this.getDefs(params),
-            pointDefs: this.getPointDefs(params),
-            entries: this.getEntries(params),
-            entryPoints: this.getEntryPoints(params),
-            tagDefs: this.getTagDefs(params),
-            tags: this.getTags(params),
-        }
-    }
-
-    getDefs(params: SanitizedParams): DefLike[] {
-        const allMatches = this.defs.filter(def => def.passesFilters(params));
-        let noDupes = new Set(allMatches);
-        return Array.from(noDupes)
-    }
-
-    getPointDefs(params: SanitizedParams): PointDefLike[] {
-        const allMatches = this.pointDefs.filter(pd => pd.passesFilters(params));
-        let noDupes = new Set(allMatches);
-        return Array.from(noDupes);
-    }
-
-    /**
-     * For pulling entries that you know the eid of
-     * @param eids 
-     * @param includeDeleted 
-     * @returns an array of all entries matching the criteria
-     */
-    getEntries(params: SanitizedParams): EntryLike[] {
-        const allMatches = this.entries.filter(entry => entry.passesFilters(params));
-        let noDupes = new Set(allMatches);
-        return Array.from(noDupes);
-    }
-
-    getEntryPoints(params: SanitizedParams): EntryPointLike[] {
-        const allMatches = this.entryPoints.filter(entryPoint => entryPoint.passesFilters(params));
-        let noDupes = new Set(allMatches);
-        return Array.from(noDupes);
-    }
-
-    getTags(params: SanitizedParams): TagLike[] {
-        const allMatches = this.tags.filter(tag => tag.passesFilters(params));
-        let noDupes = new Set(allMatches);
-        return Array.from(noDupes);
-    }
-
-    getTagDefs(params: SanitizedParams): TagDefLike[] {
-
-        const allMatches = this.tagDefs.filter(tagDef => tagDef.passesFilters(params));
-        let noDupes = new Set(allMatches);
-        return Array.from(noDupes);
-    }
-
-    /**
-     * This function is a bit strange, but was extracted from
-     * the 6 functions below, which were duplicates code-wise
-     * @param elementsIn list of Elements (Defs, Entries, etc) to set
-     * @param elementRepo the existing set of Elements in the DataStore (this.defs, this.entries, etc)
-     */
-    setElementsInRepo(elementsIn: Element[], elementRepo: Element[]) {
-        let newElements: Element[] = [];
-        elementsIn.forEach(el => {
-            let existing = elementRepo.find(existingElement => existingElement._deleted === false && existingElement.sameIdAs(el))
-            if (existing !== undefined) {
-                //only replace if the setDefs def is newer, necessary for StorageConnector merges
-                if (existing.shouldBeReplacedWith(el)) {
-                    existing.markDeleted();
-                    if (!el._deleted) newElements.push(el) //don't duplicate in case of calling setElement purely to delete
-                }
-            } else {
-                newElements.push(el)
-            }
-        })
-        elementRepo.push(...newElements)
-        return elementsIn;
-    }
-
-    setDefs(defsIn: Def[]): Def[] {
-        return this.setElementsInRepo(defsIn, this.defs) as Def[]
-        // let newDefs: Def[] = [];
-        // //mark any old defs as deleted
-        // defsIn.forEach(def => {
-        //     let existingDef = this.defs.find(existing => existing.sameIdAs(def) && existing._deleted === false);
-        //     if (existingDef !== undefined) {
-        //         //only replace if the setDefs def is newer, necessary for StorageConnector merges
-        //         if (existingDef.shouldBeReplacedWith(def)) {
-        //             existingDef.markDeleted();
-        //             if (!def._deleted) newDefs.push(def) //don't duplicate in case of calling setDefs purely to delete
-        //         }
-        //     } else {
-        //         newDefs.push(def);
-        //     }
-        // })
-        // //merge newDefs with defs in the DataStore
-        // this.defs.push(...newDefs);
-        // return defsIn;
-    }
-
-    setPointDefs(pointDefsIn: PointDef[]) {
-        return this.setElementsInRepo(pointDefsIn, this.pointDefs) as PointDef[]
-    }
-
-    setEntries(entriesIn: Entry[]): Entry[] {
-        return this.setElementsInRepo(entriesIn, this.entries) as Entry[]
-    }
-
-    setEntryPoints(entryPointData: EntryPoint[]): EntryPoint[] {
-        return this.setElementsInRepo(entryPointData, this.entryPoints) as EntryPoint[]
-    }
-
-    setTags(tagData: Tag[]): TagLike[] {
-        return this.setElementsInRepo(tagData, this.tags) as Tag[]
-    }
-
-    setTagDefs(tagDefsIn: TagDef[]): TagDefLike[] {
-        return this.setElementsInRepo(tagDefsIn, this.tagDefs) as TagDef[]
-    }
-
-    getOverview(): DataStoreOverview {
-        throw new Error("Method not implemented.");
-    }
-
-    setAll(completeData: CompleteDataset): CompleteDataset {
-        throw new Error("Method not implemented.");
-    }
-
-    connect(..._params: any): boolean {
-        throw new Error("Method not implemented.");
-    }
-
 }
 
 //#endregion

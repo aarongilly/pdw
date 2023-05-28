@@ -229,3 +229,47 @@ overview:
     current: 2
     deleted: 2
   lastUpdated: 2023-04-29T22:51:24.472-05:00
+
+
+
+
+
+/**
+     * Will call the PDW setDefs method and pass
+     * in the `this` as the existing data
+     * @param dataIn a Map of Def attributes
+     */
+    updateTo(dataIn: MinimumDef){
+        //ensure this isn't overwriting newer data
+        if(dataIn._updated !== undefined && dataIn._updated < this._updated){
+            console.warn('Called update on Def using data that was older than the def itself');
+            throw new Error('Do you want this to error? Or just return null?')
+        }
+
+        if(dataIn._did !== undefined && dataIn._did !== this._did){
+            console.warn("You decided you dont wnat to enable chaging of _did");
+            throw new Error('You cannot change _did on an existing def');
+        }
+
+        let newDefData: DefLike = {
+            _did: this._did,
+            _lbl: dataIn._lbl ?? this._lbl,
+            _desc: dataIn._desc ?? this._desc,
+            _emoji: dataIn._emoji ?? this._emoji,
+            _scope: dataIn._scope ?? this._scope,
+            _uid: makeUID(),
+            _deleted: false,
+            _created: dataIn._created ?? this._created,
+            _updated: makeEpochStr(),
+            __isNew: true, //no need to look for existing for this
+        }
+
+        // PDW
+        this._deleted = true;
+        this._updated = makeEpochStr();
+
+        PDW.getInstance().setDefs([
+            this, //writing the deletes to the dbs
+            newDefData
+        ])
+    }
