@@ -22,8 +22,20 @@ export class DefaultDataStore implements pdw.DataStore {
         this.tags = [];
     }
 
-    query(params: pdw.QueryParams): pdw.QueryResponse {
+    /**
+     * Reset all the arrays to nil.
+     * Right now only used for **testing**
+     */
+    clearAllStoreArrays() {
+        this.defs = [];
+        this.pointDefs = [];
+        this.entries = [];
+        this.entryPoints = [];
+        this.tagDefs = [];
+        this.tags = [];
+    }
 
+    query(params: pdw.QueryParams): pdw.QueryResponse {
         throw new Error("Method not implemented.");
     }
 
@@ -90,7 +102,7 @@ export class DefaultDataStore implements pdw.DataStore {
     setElementsInRepo(elementsIn: pdw.Element[], elementRepo: pdw.Element[]) {
         let newElements: pdw.Element[] = [];
         elementsIn.forEach(el => {
-            if(el.__isNew){
+            if (el.__isNew) {
                 newElements.push(el);
                 return;
             }
