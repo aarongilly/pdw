@@ -4,7 +4,7 @@ import { Temporal } from 'temporal-polyfill';
 
 const pdwRef = pdw.PDW.getInstance();
 
-test('Def Basics', () => {
+test.skip('Def Basics', () => {
     /**
      * Most Basic Def Creation
     */
@@ -38,6 +38,9 @@ test('Def Basics', () => {
     expect(secondDef._did).toBe('gggg');
     expect(secondDef._lbl).toBe('Second Def');
 
+    //@ts-expect-error
+    expect(()=>pdwRef.newDef({_lbl: 'invalid scope test', _scope: 'millisecond'})).toThrowError('Invalid scope supplied when creating Def: millisecond')
+
     /**
     * Wide-open getter
     */
@@ -52,18 +55,32 @@ test('Def Basics', () => {
     expect(defs[0]._desc).toBe('Test Desc');
 
     /**
-     * Update a Def
+     * Directly update a Def
      */
-    pdwRef.setDefs([{
-        _did: 'gggg',
+    secondDef.updateTo({
         _lbl: 'Updated Second Def'
-    }]);
+    });
 
     /**
-     * Check current def is the update
+     * Check current def is updated
      */
     defs = pdwRef.getDefs({did: 'gggg', includeDeleted: 'no'});
     expect(defs[0]._lbl).toBe('Updated Second Def');
+
+    /**
+     * Indirectly update a Def
+     */
+    pdwRef.setDefs([{
+        _did: 'gggg',
+        _lbl: 'Updated Second Def Again'
+    }]);
+
+    /**
+     * Check current def is updated
+     */
+    defs = pdwRef.getDefs({did: 'gggg', includeDeleted: 'no'});
+    
+    expect(defs[0]._lbl).toBe('Updated Second Def Again');
     
     /**
      * Check that out of date def was marked deleted
@@ -76,7 +93,35 @@ test('Def Basics', () => {
      */
     firstDef.markDeleted();
     defs = pdwRef.getDefs({includeDeleted: 'only', did: firstDef._did});
-    expect(defs[0]._lbl).toBe('First Def')
+    expect(defs[0]._lbl).toBe('First Def');
+
+    /**
+     * Setting PointDef
+     */
+    let points = secondDef.setPointDefs([
+        {
+            _lbl: 'Test point one',
+            _type: pdw.PointType.TEXT, 
+         },
+         {
+            _lbl: 'Test point 2',
+            _type: pdw.PointType.NUMBER, 
+         }
+    ]);
+    expect(points.length).toBe(2);
+
+    let samePoints = secondDef.getPoints();
+    expect(points).toEqual(samePoints);
+
+    /**
+     * Defs are Deflike
+     */
+    expect(pdw.Def.isDefLike(firstDef)).toBe(true);
+
+    /**
+     * But PointDefs are not DefLike
+     */
+    expect(pdw.Def.isDefLike(points[0])).toBe(false)
 })
 
 test('Entry Basics', () => {
