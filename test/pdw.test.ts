@@ -139,13 +139,13 @@ test.skip('Def Basics', () => {
             _type: pdw.PointType.NUMBER
         }
     });
-    defs = pdwRef.getDefs({did:'thre'});
+    defs = pdwRef.getDefs({ did: 'thre' });
     expect(defs[0]).toEqual(thirdDef);
-    points = pdwRef.getPointDefs({did: 'thre'});
+    points = pdwRef.getPointDefs({ did: 'thre' });
     expect(thirdDef.getPoints()).toEqual(points);
-    points = pdwRef.getPointDefs({pid:'aheo'});
+    points = pdwRef.getPointDefs({ pid: 'aheo' });
     expect(points.length).toBe(1);
-    points = pdwRef.getPointDefs({pid:'thqe'});
+    points = pdwRef.getPointDefs({ pid: 'thqe' });
     expect(points.length).toBe(1);
 })
 
@@ -185,7 +185,7 @@ test.skip('PointDef Basics', () => {
     /**
      * Test bad point type
      */
-    expect(()=>pdwRef.newPointDef({
+    expect(() => pdwRef.newPointDef({
         _did: 'thre',
         //@ts-expect-error
         _type: 'should error'
@@ -194,7 +194,7 @@ test.skip('PointDef Basics', () => {
     /**
      * Test bad rollup
      */
-    expect(()=>pdwRef.newPointDef({
+    expect(() => pdwRef.newPointDef({
         _did: 'thre',
         //@ts-expect-error
         _rollup: 'should error'
@@ -207,10 +207,10 @@ test('Entry Basics', () => {
     const testDef = pdwRef.newDef({
         _did: 'aaaa',
         _lbl: 'Default Scope test',
-        'yyyy':{
+        'yyyy': {
             _lbl: 'Point A'
         },
-        'zzzz':{
+        'zzzz': {
             _lbl: 'Point B',
             _type: pdw.PointType.BOOL
         }
@@ -219,24 +219,23 @@ test('Entry Basics', () => {
     /**
      * Basic Entry Creation
      */
-    const epochStrBefore = pdw.makeEpochStr();
     const sameSecond = pdw.Period.now(pdw.Scope.SECOND);
     pdwRef.newEntry({
         _did: 'aaaa',
-    })
+    });
     let entries = pdwRef.getEntries();
     expect(entries.length).toBe(1);
     expect(entries[0]._tempCreated.epochMilliseconds).toBeGreaterThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString()) - 5000) //created not long ago...
     expect(entries[0]._tempCreated.epochMilliseconds).toBeLessThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString())) //...but not in the future
-    expect(entries[0]._period).toBe(sameSecond);
-    
+    expect(entries[0]._period).toBe(sameSecond); //technically could fail every 1000 or so runs
+
     /**
      * Create Entry with Points
     */
-   const testEntry = pdwRef.newEntry({
-       _did: 'aaaa',
-       'yyyy': 'Text value', //by _pid
-       'Point B': true //by _lbl
+    let testEntry = pdwRef.newEntry({
+        _did: 'aaaa',
+        'yyyy': 'Text value', //by _pid
+        'Point B': true //by _lbl
     })
     entries = pdwRef.getEntries();
     expect(entries.length).toBe(2);
@@ -244,12 +243,108 @@ test('Entry Basics', () => {
     let points = entries[1].getPoints();
     expect(points.length).toBe(2);
     let point = testEntry.getPoint('yyyy');
-    expect(point._val).toBe('Text value');
+    expect(point!._val).toBe('Text value');
     point = testEntry.getPoint('zzzz');
-    expect(point._val).toBe(true);
+    expect(point!._val).toBe(true);
 
+    /**
+    * Direct Entry Creation    
+    */
+    let epochStr = pdw.makeEpochStr();
+    testEntry = pdwRef.setEntries([{
+        _did: 'aaaa',
+        _created: epochStr,
+        _deleted: false,
+        _eid: 'hand-jammed',
+        _note: 'Direct set all values',
+        _period: '2023-06-03T11:29:08',
+        _source: "Testing code",
+        _uid: 'also-hand-jammed',
+        _updated: epochStr
+    }])[0]
+    entries = pdwRef.getEntries();
+    expect(entries.length).toBe(3);
+    expect(entries[2]).toEqual(testEntry);
+    expect(testEntry._created).toBe(epochStr);
+    expect(testEntry._updated).toBe(epochStr);
+    expect(testEntry._period).toBe('2023-06-03T11:29:08');
+    expect(testEntry._source).toBe("Testing code");
+    expect(testEntry._uid).toBe("also-hand-jammed");
+    expect(testEntry._note).toBe("Direct set all values");
+    expect(testEntry._eid).toBe("hand-jammed");
+    expect(testEntry._deleted).toBe(false);
+    expect(testEntry._did).toBe('aaaa');
 
+    /**
+     * Get Specified entry
+     */
+    entries = pdwRef.getEntries({eid: 'hand-jammed'});
+    expect(entries.length).toBe(1);
 
+    /**
+     * Entry.getDef
+     */
+    expect(testEntry.getDef()).toEqual(testDef)
+
+    /**
+     * Def.newEntry method
+     */
+    testEntry = testDef.newEntry({});
+    expect(testEntry._did).toBe('aaaa');
+
+    /**
+     * Entry.getPoints for an Entry with no EntryPoints
+     */
+    points = testEntry.getPoints();
+    expect(points.length).toBe(0);
+
+    /**
+     * Entry.getPoint for an Entry without that DataPoint
+     */
+    expect(testEntry.getPoint('zzzz')).toBe(null);
+    
+    /**
+     * Entry.setPoint method for EntryPoint creation
+     */
+    testEntry.setPoint('zzzz', false);
+    let testPoint = testEntry.getPoint('zzzz');
+    expect(testPoint!._val).toBe(false);
+
+    /**
+     * Entry.setPoint for EntryPoint overwrite
+     */
+    testEntry.setPoint('zzzz', true);
+    testPoint = testEntry.getPoint('zzzz');
+    expect(testPoint!._val).toBe(true);
+
+    /**
+     * Ensure the overwritten EntryPoint wasn't erased
+     */
+    expect(testEntry.getPoints().length).toBe(1);
+    expect(testEntry.getPoints(true).length).toBe(2);
+
+    /**
+     * Create entry with bad point value types
+     */
+    expect(() => pdwRef.newEntry({
+        _did: 'aaaa',
+        'yyyy': { 'an': 'Object can be converted to strings but...' },
+        'zzzz': { '...this bool': 'should fail' }
+    })).toThrowError();
+
+    /**
+     * Create entry with bad EntryPoint ID
+     */
+    expect(() => {
+        pdwRef.newEntry({
+            _did: 'aaaa',
+            'bbbb': { 'a': 'non-existant pointDef value' },
+            'yyyy': 'Testing failure given an extra point supplied (bbbb)',
+            'zzzz': true
+        })
+    }).toThrowError()
+
+    //setting up further tests
     const dayScopeDef = pdwRef.newDef({
         _did: 'bbbb',
         _scope: pdw.Scope.DAY,
@@ -259,6 +354,54 @@ test('Entry Basics', () => {
             _type: pdw.PointType.NUMBER
         }
     })
+
+    /**
+     * Scope default inheritance
+     */
+    let testDayEntry = dayScopeDef.newEntry({
+        //period not specified, should inhereit scope from Def
+    });
+    expect(pdw.Period.inferScope(testDayEntry._period)).toBe(pdw.Scope.DAY);
+    
+    /**
+     * Specified period with correct scope
+     */
+    testDayEntry = dayScopeDef.newEntry({
+        _period: '2023-06-03'
+    })
+    expect(testDayEntry._period).toBe('2023-06-03');
+
+    /**
+     * Scope too granular
+     */
+    testDayEntry = dayScopeDef.newEntry({
+        _period: '2023-06-03T12:24:49'
+    })
+    expect(testDayEntry._period).toBe('2023-06-03');
+
+    /**
+     * Scope too broad, defaults to beginning of period
+     */
+    testEntry = testDef.newEntry({
+        _period: '2023-06-03'
+    });
+    expect(testEntry._period).toBe('2023-06-03T00:00:00');
+
+    /**
+     * Entry.setPeriod
+     */
+    let updatedTestDayEntry = testDayEntry.setPeriod('2023-06-04');
+    expect(updatedTestDayEntry._period).toBe('2023-06-04');
+    expect(testDayEntry._period).toBe('2023-06-03'); //original isn't changed
+    expect(testDayEntry._deleted).toBe(true); //...but is marked deleted
+    expect(testDayEntry._eid).toBe(updatedTestDayEntry._eid);
+    
+    /**
+     * Entry.setNote
+     */
+    updatedTestDayEntry = updatedTestDayEntry.setNote('Now with note');
+    expect(updatedTestDayEntry._note).toBe('Now with note');
+    
 })
 
 test.skip('Bleedover test', () => {

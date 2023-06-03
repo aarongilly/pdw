@@ -904,7 +904,7 @@ export class PDW {
         throw new Error('Multiple datastores not yet implemented');
     }
 
-    
+
     setDefs(defsIn: MinimumDef[]): Def[] {
         let defs: Def[] = defsIn.map(defLike => new Def(defLike));
         this.dataStores.forEach(connection => {
@@ -1227,11 +1227,19 @@ export abstract class Element implements ElementLike {
         return makeEpochStr();
     }
 
+    /**
+     * Sets _deleted & _updated.
+     * Does **NOT** write to DataStores
+     */
     markDeleted() {
         this._deleted = true;
         this._updated = makeEpochStr();
     }
 
+    /**
+     * Sets _deleted & _updated.
+     * Does **NOT** write to DataStores
+     */
     markUndeleted() {
         this._deleted = false;
         this._updated = makeEpochStr();
@@ -1465,7 +1473,7 @@ export class Def extends Element implements DefLike {
             });
             PDW.getInstance().setPointDefs(pointDefs);
         }
-        if(!Def.isDefLike(this)) throw new Error('Def was mal-formed.')
+        if (!Def.isDefLike(this)) throw new Error('Def was mal-formed.')
     }
 
     setPointDefs(pointInfoIn: {
@@ -1547,6 +1555,12 @@ export class Def extends Element implements DefLike {
 
     }
 
+    newEntry(entryData: any): Entry {
+        //not tesitng the 'any' right here
+        entryData._did = this._did;
+        return PDW.getInstance().setEntries([entryData])[0];
+    }
+
     /**
     * Predicate to check if an object has all {@link DefLike} properties
     * AND they are the right type.
@@ -1611,7 +1625,7 @@ export class PointDef extends Element implements PointDefLike {
         //assigning out o convenience here
         if (newPointDefData._def) this._def = newPointDefData._def;
 
-        if(!PointDef.isPointDefLike(this)) throw new Error('Mal-formed PointDef')
+        if (!PointDef.isPointDefLike(this)) throw new Error('Mal-formed PointDef')
     }
 
     /**
@@ -1640,7 +1654,7 @@ export class PointDef extends Element implements PointDefLike {
         const values = Object.values(PointType);
         return values.includes(typeStr as unknown as PointType)
     }
-    
+
     static isValidRollup(typeStr: string): boolean {
         //Handy bit of Enum functionality here for ref
         const values = Object.values(Rollup);
@@ -1654,6 +1668,7 @@ export class Entry extends Element implements EntryLike {
     _did: string;
     _period: PeriodStr;
     _source: string;
+    __def?: Def;
     constructor(entryData: MinimumEntry) {
         if (entryData._eid === undefined && entryData._did === undefined)
             throw new Error('Not enough info to determine Entry type')
@@ -1668,21 +1683,22 @@ export class Entry extends Element implements EntryLike {
             }
         }
         super(entryData);
-        let relatedDef: Def | undefined;
-        if (entryData._did !== undefined) relatedDef = maybeGetOnlyResult(PDW.getInstance().getDefs({ did: [entryData._did!], includeDeleted: 'no' })) as Def;
-        if (entryData._did === undefined) true == true
-        if (relatedDef === undefined)
+        if(entryData._def !== undefined) this.__def = entryData._def;
+        if (this.__def === undefined && entryData._did !== undefined) this.__def = maybeGetOnlyResult(PDW.getInstance().getDefs({ did: [entryData._did!], includeDeleted: 'no' })) as Def;
+        // if (entryData._did === undefined) true == true
+        if (this.__def === undefined)
             throw new Error('No def found for ' + entryData._did);
-        this._did = entryData._did!;
+        this._did = this.__def._did;
         if (entryData._period !== undefined) {
-            this._period = entryData._period;
+            //force period scope compatibility
+            this._period = new Period(entryData._period, this.__def._scope).toString();
         } else {
-            this._period = Period.now((<Def>relatedDef)._scope);
+            this._period = Period.now(this.__def._scope);
         }
         this._eid = entryData._eid ?? makeUID();
         this._note = entryData._note ?? '';
         this._source = entryData._source ?? '';
-        if(!Entry.isEntryLike(this)) throw new Error('An error occurred in the Entry creation');
+        if (!Entry.isEntryLike(this)) throw new Error('An error occurred in the Entry creation');
         //spawn new EntryPoints for any non-underscore-prefixed keys
         let pointKey = Object.keys(entryData).filter(key => key.substring(0, 1) !== '_');
         if (pointKey.length > 0) {
@@ -1702,14 +1718,15 @@ export class Entry extends Element implements EntryLike {
                     _pid: assPointDef._pid,
                     _val: entryData[pid],
                     _eid: this._eid,
-                    _did: this._did
+                    _did: this._did,
+                    _pointDef: assPointDef
                 }
             });
             PDW.getInstance().setEntryPoints(entryPoints);
         }
     }
 
-    getPoints(includeDeleted = false): EntryPoint[]{
+    getPoints(includeDeleted = false): EntryPoint[] {
         const pdwRef = PDW.getInstance();
 
         //if there's only DataStore, bypass the combining stuff to save time
@@ -1721,23 +1738,87 @@ export class Entry extends Element implements EntryLike {
         throw new Error('Multiple Data Stores are #TODO') //#TODO - for multiple data stores
     }
 
-    getPoint(pidLbl: string, includeDeleted = false): EntryPoint{
+    getPoint(pidLbl: string, includeDeleted = false): EntryPoint | null {
         const pdwRef = PDW.getInstance();
 
         //if there's only DataStore, bypass the combining stuff to save time
         if (pdwRef.dataStores.length == 1) {
             let pds = pdwRef.dataStores[0].getEntryPoints({ eid: [this._eid], includeDeleted: includeDeleted ? 'yes' : 'no' });
-            let point = pds.filter(p=>p._pid===pidLbl);
-            if(point===undefined) point = pds.filter(p=>p._lbl === pidLbl);
-            if(point===undefined) throw new Error('No point found on Entry with label or pid: ' + pidLbl);
+            let point = pds.filter(p => p._pid === pidLbl);
+            if (point.length === 0) point = pds.filter(p => p._lbl === pidLbl);
+            if (point.length === 0){
+                // console.warn('No point found on Entry with label or pid: ' + pidLbl);
+                return null;
+            }
             return new EntryPoint(point[0]);
         }
 
         throw new Error('Multiple Data Stores are #TODO') //#TODO - for multiple data stores
     }
 
+    getDef(): Def{
+        if(this.__def) return this.__def;
+        return PDW.getInstance().getDefs({did:this._did})[0]
+    }
+
     getPeriod(): Period {
         return new Period(this._period);
+    }
+
+    setPeriod(periodStr: PeriodStr): Entry{
+        if(periodStr === this._period){
+            console.warn('Attempted to set period to what it already is');
+            return this
+        }
+        let deepCopy = JSON.parse(JSON.stringify(this));
+        deepCopy._period = new Period(periodStr, this.getDef()._scope).toString();
+        this.markDeleted();
+        return PDW.getInstance().setEntries([
+            deepCopy,
+            this
+        ])[0]
+    }
+
+    setPoint(pidOrLbl: string, val: any, created?: EpochStr): EntryPoint {
+        const pdwRef = PDW.getInstance()
+        let pointDefArr = pdwRef.getPointDefs({did: this._did, pid: pidOrLbl});
+        if(pointDefArr.length === 0) pointDefArr = pdwRef.getPointDefs({did: this._did, pointLbl: pidOrLbl});
+        if(pointDefArr.length === 0) throw new Error("Could'nt find associated pointDef for setPoint data");
+        const pointDef = pointDefArr[0];
+
+        let existing = this.getPoint(pidOrLbl);
+        if(existing){
+            existing.markDeleted();
+            created = created ?? existing._created;
+            return pdwRef.setEntryPoints([{
+                _created: created,
+                _eid: this._eid,
+                _pid: pointDef._pid,
+                _val: val
+            }])[0]
+        }
+        // const assDef = pdwRef.getPointDefs([])
+        return pdwRef.setEntryPoints([{
+            _did: pointDef._did,
+            _created: created,
+            _eid: this._eid,
+            _pid: pointDef._pid,
+            _val: val
+        }])[0]
+    }
+
+    setNote(noteText: string): Entry{
+        if(noteText === this._note){
+            console.warn('Attempted to set note text to what it already is');
+            return this
+        }
+        let deepCopy = JSON.parse(JSON.stringify(this));
+        deepCopy._note = noteText;
+        this.markDeleted();
+        return PDW.getInstance().setEntries([
+            deepCopy,
+            this
+        ])[0]
     }
 
     /**
@@ -1769,7 +1850,8 @@ export class EntryPoint extends Element implements EntryPointLike {
     _eid: UID;
     _pid: SmallID;
     _val: any;
-    _did: SmallID
+    _did: SmallID;
+    _pointDef?: PointDef;
     constructor(entryPointData: MinimumEntryPoint, associatedPointDef?: PointDef) {
         if (entryPointData._eid !== undefined) {
             let existing = Element.findExistingData(entryPointData);
@@ -1778,6 +1860,7 @@ export class EntryPoint extends Element implements EntryPointLike {
                 if (entryPointData._did === undefined) entryPointData._did = existing._did;
             }
         }
+        if (entryPointData._pointDef !== undefined) associatedPointDef = entryPointData._pointDef;
         if (associatedPointDef === undefined) associatedPointDef = PointDef.findExistingData(entryPointData, 'PointDef');
         if (associatedPointDef === undefined) { // throw new Error('No definition associated with supplied EntryPoint data')
             PointDef.findExistingData(entryPointData, 'PointDef');
@@ -1806,8 +1889,7 @@ export class EntryPoint extends Element implements EntryPointLike {
             if (typeof _val === 'boolean') return _val;
             if (typeof _val === 'string') return _val.toUpperCase() === 'TRUE';
             if (typeof _val === "number") return _val !== 0;
-            console.warn(`Cannot convert this to boolean:`, _val)
-            return undefined;
+            throw new Error(`Cannot convert this to boolean:` + _val)
         }
         if (_type === PointType.DURATION) {
             if (typeof _val === 'string') return _val;
@@ -1816,45 +1898,38 @@ export class EntryPoint extends Element implements EntryPointLike {
                 // console.warn('Assuming excel portion of day for duration: ', _val)
                 return Temporal.Duration.from({ seconds: Math.round(86400 * _val) }).toString()
             }
-            console.warn(`Cannot convert this to duration:`, _val)
-            return undefined;
+            throw new Error(`Cannot convert this to duration:` + _val)
         }
         if (_type === PointType.FILE) {
             if (typeof _val === 'string') return _val;
-            console.warn(`Cannot convert this to file:`, _val)
-            return undefined;
+            throw new Error(`Cannot convert this to file:` + _val)
         }
         if (_type === PointType.MARKDOWN) {
             if (typeof _val === 'boolean') return _val.toString();
             if (typeof _val === 'string') return _val;
             if (typeof _val === "number") return _val.toString();
-            console.warn(`Cannot convert this to markdown:`, _val)
-            return undefined;
+            throw new Error(`Cannot convert this to markdown:` + _val)
         }
         if (_type === PointType.MULTISELECT) {
             if (Array.isArray(_val)) return _val.join(', ');
             if (typeof _val === 'string') return _val;
-            console.warn(`Cannot convert this to multiselect:`, _val)
-            return undefined;
+            throw new Error(`Cannot convert this to multiselect:` + _val)
         }
         if (_type === PointType.NUMBER) {
             if (typeof _val === 'boolean') return _val ? 1 : 0;
             if (typeof _val === 'string') return Number.parseInt(_val);
             if (typeof _val === "number") return _val;
-            console.warn(`Cannot convert this to number:`, _val)
-            return undefined;
+            throw new Error(`Cannot convert this to number:` + _val)
         }
         if (_type === PointType.PHOTO) {
             if (typeof _val === 'string') return _val;
-            console.warn(`Cannot convert this to PHOTO:`, _val)
-            return undefined;
+            throw new Error(`Cannot convert this to PHOTO:` + _val)
         }
         if (_type === PointType.SELECT) {
             if (typeof _val === 'string') return _val;
             if (Array.isArray(_val)) return _val.join('|||')
             if (_val === undefined) return []; //I guess
-            console.warn(`Cannot convert this to select:`, _val)
-            return undefined;
+            throw new Error(`Cannot convert this to select:` + _val);
         }
         if (_type === PointType.TEXT) {
             if (typeof _val === 'boolean') return _val.toString();
@@ -1869,16 +1944,15 @@ export class EntryPoint extends Element implements EntryPointLike {
                 //attempt to support "proportion of day to time" like Excel would
                 return new Temporal.PlainTime(0, 0).add({ seconds: Math.round(86400 * _val) }).toString();
             }
-            console.warn(`Cannot convert this to time:`, _val)
-            return undefined;
+            throw new Error(`Cannot convert this to time:` + _val)
+
         }
         if (_type === PointType.JSON) {
             if (typeof _val === 'string') return _val.trim();
             if (typeof _val === "object") return JSON.stringify(_val);
-            console.warn(`Cannot convert this to JSON:`, _val)
-            return undefined;
+            throw new Error(`Cannot convert this to JSON:` + _val)
         }
-        throw new Error("Method not implemented.");
+        throw new Error("Type not supported: " + _type);
     }
 
     static isEntryPointLike(data: any): boolean {
