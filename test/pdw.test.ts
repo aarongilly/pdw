@@ -242,9 +242,17 @@ test('Entry Basics', () => {
     expect(testEntry._did).toBe('aaaa');
     let points = entries[1].getPoints();
     expect(points.length).toBe(2);
+
+    /**
+     * Entry.getPoint with pid
+     */
     let point = testEntry.getPoint('yyyy');
     expect(point!._val).toBe('Text value');
-    point = testEntry.getPoint('zzzz');
+
+    /**
+     * Entry.getPoint with pointLbl
+     */
+    point = testEntry.getPoint('Point B');
     expect(point!._val).toBe(true);
 
     /**
@@ -360,8 +368,10 @@ test('Entry Basics', () => {
      */
     let testDayEntry = dayScopeDef.newEntry({
         //period not specified, should inhereit scope from Def
+        'rvew': 10
     });
     expect(pdw.Period.inferScope(testDayEntry._period)).toBe(pdw.Scope.DAY);
+    expect(testDayEntry.getPoint('rvew')!._val).toBe(10)
     
     /**
      * Specified period with correct scope
