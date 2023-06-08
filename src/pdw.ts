@@ -873,8 +873,14 @@ export class PDW {
         throw new Error('Multiple datastores not yet implemented');
     }
 
-    getEntryPoints() {
-        //#TODO - yes.
+    getEntryPoints(rawParams?: StandardParams): EntryPoint[] {
+        if (rawParams === undefined) rawParams = {};
+        const params = PDW.sanitizeParams(rawParams)
+
+        if (this.dataStores.length == 1) {
+            let entryPoints = this.dataStores[0].getEntryPoints(params);
+            return entryPoints.map(entry => new EntryPoint(entry));
+        }
         throw new Error('You did not build this, do you need it?')
     }
 
@@ -1552,8 +1558,16 @@ export class Def extends Element implements DefLike {
         throw new Error('Multiple Data Stores are #TODO') //#TODO - for multiple data stores
     }
 
-    addTag(tag: TagDef) {
-
+    addTag(tidOrLbl: string) : Tag {
+        let pdwRef = PDW.getInstance();
+        let tagArr = pdwRef.getTagDefs({tid: tidOrLbl});
+        if(tagArr.length === 0 ) tagArr = pdwRef.getTagDefs({tagLbl: tidOrLbl});
+        if(tagArr.length === 0 ) throw new Error('No tag def found for ' + tidOrLbl);
+        let tagDef = tagArr[0];
+        return pdwRef.setTags([{
+            _did: this._did,
+            _tid: tagDef._tid
+        }])[0]
     }
 
     newEntry(entryData: any): Entry {
@@ -1664,11 +1678,11 @@ export class PointDef extends Element implements PointDefLike {
 }
 
 export class Entry extends Element implements EntryLike {
-    _eid: string;
-    _note: Markdown;
-    _did: string;
-    _period: PeriodStr;
-    _source: string;
+    readonly _eid: string;
+    readonly _note: Markdown;
+    readonly _did: string;
+    readonly _period: PeriodStr;
+    readonly _source: string;
     __def?: Def;
     constructor(entryData: MinimumEntry) {
         if (entryData._eid === undefined && entryData._did === undefined)
@@ -1684,7 +1698,7 @@ export class Entry extends Element implements EntryLike {
             }
         }
         super(entryData);
-        if(entryData._def !== undefined) this.__def = entryData._def;
+        if (entryData._def !== undefined) this.__def = entryData._def;
         if (this.__def === undefined && entryData._did !== undefined) this.__def = maybeGetOnlyResult(PDW.getInstance().getDefs({ did: [entryData._did!], includeDeleted: 'no' })) as Def;
         // if (entryData._did === undefined) true == true
         if (this.__def === undefined)
@@ -1729,45 +1743,36 @@ export class Entry extends Element implements EntryLike {
 
     getPoints(includeDeleted = false): EntryPoint[] {
         const pdwRef = PDW.getInstance();
-
-        //if there's only DataStore, bypass the combining stuff to save time
-        if (pdwRef.dataStores.length == 1) {
-            let pds = pdwRef.dataStores[0].getEntryPoints({ eid: [this._eid], includeDeleted: includeDeleted ? 'yes' : 'no' })
-            return pds.map(ep => new EntryPoint(ep));
-        }
-
-        throw new Error('Multiple Data Stores are #TODO') //#TODO - for multiple data stores
+        return pdwRef.getEntryPoints({ eid: [this._eid], includeDeleted: includeDeleted ? 'yes' : 'no' })
     }
 
     getPoint(pidLbl: string, includeDeleted = false): EntryPoint | null {
-        const pdwRef = PDW.getInstance();
-
-        //if there's only DataStore, bypass the combining stuff to save time
-        if (pdwRef.dataStores.length == 1) {
-            let pds = pdwRef.dataStores[0].getEntryPoints({ eid: [this._eid], includeDeleted: includeDeleted ? 'yes' : 'no' });
-            let point = pds.filter(p => p._pid === pidLbl);
-            if (point.length === 0) point = pds.filter(p => p._lbl === pidLbl);
-            if (point.length === 0){
-                // console.warn('No point found on Entry with label or pid: ' + pidLbl);
-                return null;
-            }
-            return new EntryPoint(point[0]);
+        let pds = this.getPoints(includeDeleted);
+        let point = pds.filter(p => p._pid === pidLbl);
+        if (point.length !== 0) return new EntryPoint(point[0])
+        let pointDefs = this.getDef().getPoints();
+        let pointDef = pointDefs.filter(pd=>pd._lbl === pidLbl);
+        console.log(pointDef.length + ' for ' + pidLbl);
+        if(pointDef.length !== 1) return null
+        point = pds.filter(p => p._pid === pointDef[0]._pid);
+        if (point.length === 0) {
+            // console.warn('No point found on Entry with label or pid: ' + pidLbl);
+            return null;
         }
-
-        throw new Error('Multiple Data Stores are #TODO') //#TODO - for multiple data stores
+        return new EntryPoint(point[0]);
     }
 
-    getDef(): Def{
-        if(this.__def) return this.__def;
-        return PDW.getInstance().getDefs({did:this._did})[0]
+    getDef(): Def {
+        if (this.__def) return this.__def;
+        return PDW.getInstance().getDefs({ did: this._did })[0]
     }
 
     getPeriod(): Period {
         return new Period(this._period);
     }
 
-    setPeriod(periodStr: PeriodStr): Entry{
-        if(periodStr === this._period){
+    setPeriod(periodStr: PeriodStr): Entry {
+        if (periodStr === this._period) {
             console.warn('Attempted to set period to what it already is');
             return this
         }
@@ -1782,13 +1787,13 @@ export class Entry extends Element implements EntryLike {
 
     setPoint(pidOrLbl: string, val: any, created?: EpochStr): EntryPoint {
         const pdwRef = PDW.getInstance()
-        let pointDefArr = pdwRef.getPointDefs({did: this._did, pid: pidOrLbl});
-        if(pointDefArr.length === 0) pointDefArr = pdwRef.getPointDefs({did: this._did, pointLbl: pidOrLbl});
-        if(pointDefArr.length === 0) throw new Error("Could'nt find associated pointDef for setPoint data");
+        let pointDefArr = pdwRef.getPointDefs({ did: this._did, pid: pidOrLbl });
+        if (pointDefArr.length === 0) pointDefArr = pdwRef.getPointDefs({ did: this._did, pointLbl: pidOrLbl });
+        if (pointDefArr.length === 0) throw new Error("Could'nt find associated pointDef for setPoint data");
         const pointDef = pointDefArr[0];
 
         let existing = this.getPoint(pidOrLbl);
-        if(existing){
+        if (existing) {
             existing.markDeleted();
             created = created ?? existing._created;
             return pdwRef.setEntryPoints([{
@@ -1808,8 +1813,8 @@ export class Entry extends Element implements EntryLike {
         }])[0]
     }
 
-    setNote(noteText: string): Entry{
-        if(noteText === this._note){
+    setNote(noteText: string): Entry {
+        if (noteText === this._note) {
             console.warn('Attempted to set note text to what it already is');
             return this
         }
@@ -1982,6 +1987,7 @@ export class TagDef extends Element implements TagDefLike {
         super(tagDefData);
         this._tid = tagDefData._tid ?? makeSmallID();
         this._lbl = tagDefData._lbl;
+        if(!TagDef.isTagDefLike(this)) throw new Error('TagDef created is not TagDefLike');
     }
 
     static isTagDefLike(data: any): boolean {
@@ -1993,12 +1999,38 @@ export class TagDef extends Element implements TagDefLike {
         if (typeof data._lbl !== 'string') return false
         return true;
     }
+
+    getTagsAndDefs(includeDeleted = false): {tag: Tag, def: Def}[]{
+        const pdwRef = PDW.getInstance();
+        let tags = pdwRef.getTags({tid: this._tid});
+        let defs: Def[] = [];
+        tags.forEach(tag=>{
+            let result = pdwRef.getDefs({did: tag._did});
+            result.forEach(inner=>{
+                if(!defs.some(d=>d._uid === inner._uid)) defs.push(inner)
+            })
+        })
+        return defs
+    }
+
+    addTag(didOrLbl: string): Tag{
+        let pdwRef = PDW.getInstance();
+        let defArr = pdwRef.getDefs({did: didOrLbl});
+        if(defArr.length === 0) defArr = pdwRef.getDefs({defLbl: didOrLbl});
+        if(defArr.length === 0) throw new Error('Found no Def with _lbl or _did ' + didOrLbl);
+        let def = defArr[0];
+        return pdwRef.newTag({
+            _did: def._did,
+            _tid: this._tid,
+        })
+    }
 }
 
 export class Tag extends Element implements TagLike {
     _tid: string;
     _did: string;
     _pid?: string | undefined;
+    __tag?: Tag
     constructor(tagData: MinimumTag) {
         if (tagData._tid !== undefined) {
             let existing = Element.findExistingData(tagData);
@@ -2010,6 +2042,7 @@ export class Tag extends Element implements TagLike {
         this._tid = tagData._tid;
         this._did = tagData._did;
         this._pid = tagData._pid;
+        if(!Tag.isTagLike(this)) throw new Error('Tag created is not TagLike');
     }
 
     static isTagLike(data: any): boolean {

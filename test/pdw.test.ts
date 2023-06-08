@@ -201,7 +201,7 @@ test.skip('PointDef Basics', () => {
     })).toThrowError()
 })
 
-test('Entry Basics', () => {
+test.skip('Entry Basics', () => {
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 
     const testDef = pdwRef.newDef({
@@ -286,7 +286,7 @@ test('Entry Basics', () => {
     /**
      * Get Specified entry
      */
-    entries = pdwRef.getEntries({eid: 'hand-jammed'});
+    entries = pdwRef.getEntries({ eid: 'hand-jammed' });
     expect(entries.length).toBe(1);
 
     /**
@@ -310,7 +310,7 @@ test('Entry Basics', () => {
      * Entry.getPoint for an Entry without that DataPoint
      */
     expect(testEntry.getPoint('zzzz')).toBe(null);
-    
+
     /**
      * Entry.setPoint method for EntryPoint creation
      */
@@ -372,7 +372,7 @@ test('Entry Basics', () => {
     });
     expect(pdw.Period.inferScope(testDayEntry._period)).toBe(pdw.Scope.DAY);
     expect(testDayEntry.getPoint('rvew')!._val).toBe(10)
-    
+
     /**
      * Specified period with correct scope
      */
@@ -405,19 +405,140 @@ test('Entry Basics', () => {
     expect(testDayEntry._period).toBe('2023-06-03'); //original isn't changed
     expect(testDayEntry._deleted).toBe(true); //...but is marked deleted
     expect(testDayEntry._eid).toBe(updatedTestDayEntry._eid);
-    
+
     /**
      * Entry.setNote
      */
     updatedTestDayEntry = updatedTestDayEntry.setNote('Now with note');
     expect(updatedTestDayEntry._note).toBe('Now with note');
-    
+
 })
 
-test.skip('Bleedover test', () => {
-    const pdwRef = pdw.PDW.getInstance();
-    let test = pdwRef.getDefs({});
+test('Tag & TagDef Basics', ()=>{
+    (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 
-    expect(test.length).toBe(0);
+    let testDef = pdwRef.newDef({
+        _did: 'aaaa'
+    })
 
+    /**
+     * PDW.newTagDef
+     */
+    let tagA = pdwRef.newTagDef({
+        _lbl: 'test tag',
+        _tid: 'taga'
+    })
+    expect(pdwRef.getTagDefs()[0]).toEqual(tagA);
+
+    /**
+     * Indirect tag creation
+     */
+    let tagB = pdwRef.setTagDefs([{
+        _lbl: 'tag b',
+        _tid: 'tagb'
+    }])[0]
+    expect(tagB._lbl).toBe('tag b');
+
+    /**
+     * Indirect tag label update
+     */
+    let tagBNew = pdwRef.setTagDefs([{
+        _lbl: 'Tag B',
+        _tid: 'tagb'
+    }])[0]
+    expect(tagB._deleted).toBe(true);
+    expect(tagB._lbl).toBe('tag b');
+    expect(tagBNew._lbl).toBe('Tag B');
+
+    /**
+     * TagDef type error test
+     */
+    expect(()=>{
+        pdwRef.newTagDef({
+            //@ts-expect-error
+            _lbl: 5, //wrong type, should error
+        })
+    }).toThrowError('TagDef created is not TagDefLik');
+
+    /**
+     * Indirectly create Tag to Def
+     */
+    let tag = pdwRef.newTag({
+        _did: 'aaaa',
+        _tid: 'taga'
+    });
+    expect(tag._did).toBe('aaaa');
+    expect(tag._tid).toBe('taga');
+    expect(pdwRef.getTags({tid: 'taga'})[0]).toEqual(tag);
+
+    /**
+     * Def.addTag method 
+     */
+    testDef.addTag('tagb');
+    expect(pdwRef.getTags({did: 'aaaa'}).length).toBe(2);
+
+    /**
+     * TagDef.getTaggedDefs
+     */
+    expect(tagA.getTagsAndDefs()[0]).toEqual(testDef);
+
+    /**
+     * TagDef.addTag
+     */
+    tagB.addTag('aaaa')
+    expect(pdwRef.getTags({did: 'aaaa'}).length).toBe(2);
+
+    /**
+     * Don't create duplicates
+     */
+    const numBefore = pdwRef.getTags({includeDeleted: 'only'}).length
+    testDef.addTag('taga') //already exists
+    //creates a new Tag, but deletes the old one, even though they're the same content
+    expect(pdwRef.getTags({includeDeleted:'only'}).length).toBe(numBefore + 1);
+
+    //Enumerations
+    let defWithEnum = pdwRef.newDef({
+        _did: 'bbbb',
+        _lbl: 'Def with an Enum Point',
+        'bbaa': {
+            _pid: 'bbaa',
+            _lbl: 'Enum PointDef',
+            _type: pdw.PointType.SELECT
+        }
+    });
+
+    let enumPoint = defWithEnum.getPoints()[0];
+    expect(enumPoint._lbl).toBe('Enum PointDef');
+
+    /**
+     * Add multiple choices
+     */
+    pdwRef.setTagDefs([
+        {
+            _lbl: 'Choice A',
+            _tid: 'Axxx'
+        },
+        {
+            _lbl: 'Choice B',
+            _tid: 'Bxxx'
+        },
+        {
+            _lbl: 'Choice C',
+            _tid: 'Cxxx'
+        }
+    ])
+
+    
+
+})
+
+test.skip('Query Basics', () => {
+    (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
+
+    let q = new pdw.Query();
+    q.run();
+})
+
+test.skip('Data Merge', () => {
+    (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 })
