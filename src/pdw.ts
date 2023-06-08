@@ -1602,13 +1602,13 @@ export class Def extends Element implements DefLike {
 }
 
 export class PointDef extends Element implements PointDefLike {
-    _did: string;
-    _pid: string;
-    _lbl: string;
-    _desc: string;
-    _emoji: string;
-    _type: PointType;
-    _rollup: Rollup;
+    readonly _did: string;
+    readonly _pid: string;
+    readonly _lbl: string;
+    readonly _desc: string;
+    readonly _emoji: string;
+    readonly _type: PointType;
+    readonly _rollup: Rollup;
     _def?: Def;
     constructor(newPointDefData: MinimumPointDef) {
         if (newPointDefData._did !== undefined && newPointDefData._pid !== undefined) {
@@ -1653,10 +1653,18 @@ export class PointDef extends Element implements PointDefLike {
      * Creates a new TagDef and a Tag assigning it to this point
      */
     addEnumOption(lbl: string): Tag {
-
-        return PDW.getInstance().setTags([{
+        if(this._type !== PointType.SELECT && this._type !== PointType.MULTISELECT) throw new Error('Attempted to add an enum option to a point of type: ' + this._type);
+        const pdwRef = PDW.getInstance();
+        const newTid = makeSmallID();
+        pdwRef.setTagDefs([{
             _did: this._did,
-            _tid: makeSmallID(),
+            _lbl: lbl,
+            _pid: this._pid,
+            _tid: newTid,
+        }])
+        return pdwRef.setTags([{
+            _did: this._did,
+            _tid: newTid,
             _pid: this._pid
         }])[0]
     };
@@ -1893,10 +1901,10 @@ export class Entry extends Element implements EntryLike {
  * be attached. But I guess it's an easy way to build an EntryLike obj
  */
 export class EntryPoint extends Element implements EntryPointLike {
-    _eid: UID;
-    _pid: SmallID;
-    _val: any;
-    _did: SmallID;
+    readonly _eid: UID;
+    readonly _pid: SmallID;
+    readonly _val: any;
+    readonly _did: SmallID;
     _pointDef?: PointDef;
     constructor(entryPointData: MinimumEntryPoint, associatedPointDef?: PointDef) {
         if (entryPointData._eid !== undefined) {
@@ -2015,8 +2023,8 @@ export class EntryPoint extends Element implements EntryPointLike {
 }
 
 export class TagDef extends Element implements TagDefLike {
-    _tid: string;
-    _lbl: string;
+    readonly _tid: string;
+    readonly _lbl: string;
     constructor(tagDefData: MinimumTagDef) {
         if (tagDefData._tid !== undefined) {
             let existing = Element.findExistingData(tagDefData);
@@ -2070,9 +2078,9 @@ export class TagDef extends Element implements TagDefLike {
 }
 
 export class Tag extends Element implements TagLike {
-    _tid: string;
-    _did: string;
-    _pid?: string | undefined;
+    readonly _tid: string;
+    readonly _did: string;
+    readonly _pid?: string | undefined;
     __tagDef?: TagDef
     constructor(tagData: MinimumTag) {
         if (tagData._tid !== undefined) {
@@ -2082,10 +2090,44 @@ export class Tag extends Element implements TagLike {
             }
         }
         super(tagData);
+        this.__tagDef = Element.findExistingData({_tid: tagData._tid, _deleted: false}, 'TagDef');
+        if(this.__tagDef === undefined) throw new Error('Couldnt find a TagDef for supplied Tag info')
         this._tid = tagData._tid;
         this._did = tagData._did;
         this._pid = tagData._pid;
         if (!Tag.isTagLike(this)) throw new Error('Tag created is not TagLike');
+    }
+
+    getDef(): TagDef{
+        if(this.__tagDef !== undefined) return this.__tagDef;
+        return Element.findExistingData({_tid: this._tid, _deleted: false}, 'TagDef');
+    }
+
+    /**
+     * To get the _lbl of the TagDef for this tag
+     * @returns the _lbl of the current TagDef for this Tag
+     */
+    getLbl(): string{
+        return this.getDef()._lbl;
+    }
+
+    /**
+     * Updates the `_lbl` property of the current TagDef for this tag
+     * @param newLbl the new _lbl for the TagDef
+     * @returns the newly created {@link TagDef}
+     */
+    setLbl(newLbl: string): TagDef{
+        let existing = this.getDef();
+        existing.markDeleted();
+        this.__tagDef = PDW.getInstance().setTagDefs([
+            existing,
+            {
+                _lbl: newLbl,
+                _tid: existing._tid,
+                _created: existing._created,
+            }
+        ])[1];
+        return this.__tagDef
     }
 
     static isTagLike(data: any): boolean {

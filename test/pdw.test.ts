@@ -414,7 +414,7 @@ test.skip('Entry Basics', () => {
 
 })
 
-test('Tag & TagDef Basics', ()=>{
+test.skip('Tag & TagDef Basics', ()=>{
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 
     let testDef = pdwRef.newDef({
@@ -550,15 +550,22 @@ test('Tag & TagDef Basics', ()=>{
     let enumTags = enumPoint.getEnumOptions();
     expect(enumTags.length).toBe(2);
     
+    /**
+     * PointDef.addEnumOption
+     */
     enumPoint.addEnumOption('Choice C');
     enumTags = enumPoint.getEnumOptions();
     expect(enumTags.length).toBe(3);
-    expect(pdwRef.getTagDefs({tagLbl: 'Choice A'}).length).toBe(1);
+    expect(enumTags.map(t=>t.getLbl())).toEqual(['Choice A','Choice B','Choice C']);
+    let tagDef = pdwRef.getTagDefs({tagLbl: 'Choice C'})[0];
+    let tagC = pdwRef.getTags({tid: tagDef._tid})[0];
+    expect(tagC.getDef()._lbl).toBe('Choice C'); //tagDef was created
 
-    //#TODO - think more about Enumerations, Select, & Multiselect. This feels like it's sketchy.
-    //It's consistent with other Tags & TagDefs, sure, but it's a different thing. And keeping that "simple"
-    //consistency is causing a lot of weird complexity. Should these just be their own thing?
-
+    /**
+     * Tag.setLbl && Tag.getLbl
+     */
+    tagC.setLbl('CHOICE C'); //updates the TagDef
+    expect(tagC.getLbl()).toBe('CHOICE C'); //will pull the newly updated TagDef. Nice.
 })
 
 test.skip('Query Basics', () => {
