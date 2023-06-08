@@ -424,20 +424,20 @@ test('Tag & TagDef Basics', ()=>{
     /**
      * PDW.newTagDef
      */
-    let tagA = pdwRef.newTagDef({
+    let tagDefA = pdwRef.newTagDef({
         _lbl: 'test tag',
         _tid: 'taga'
     })
-    expect(pdwRef.getTagDefs()[0]).toEqual(tagA);
+    expect(pdwRef.getTagDefs()[0]).toEqual(tagDefA);
 
     /**
      * Indirect tag creation
      */
-    let tagB = pdwRef.setTagDefs([{
+    let tagDefB = pdwRef.setTagDefs([{
         _lbl: 'tag b',
         _tid: 'tagb'
     }])[0]
-    expect(tagB._lbl).toBe('tag b');
+    expect(tagDefB._lbl).toBe('tag b');
 
     /**
      * Indirect tag label update
@@ -446,8 +446,8 @@ test('Tag & TagDef Basics', ()=>{
         _lbl: 'Tag B',
         _tid: 'tagb'
     }])[0]
-    expect(tagB._deleted).toBe(true);
-    expect(tagB._lbl).toBe('tag b');
+    expect(tagDefB._deleted).toBe(true);
+    expect(tagDefB._lbl).toBe('tag b');
     expect(tagBNew._lbl).toBe('Tag B');
 
     /**
@@ -461,42 +461,46 @@ test('Tag & TagDef Basics', ()=>{
     }).toThrowError('TagDef created is not TagDefLik');
 
     /**
-     * Indirectly create Tag to Def
+     * Indirectly create Tag on a Def
      */
-    let tag = pdwRef.newTag({
+    let tagA = pdwRef.newTag({
         _did: 'aaaa',
         _tid: 'taga'
     });
-    expect(tag._did).toBe('aaaa');
-    expect(tag._tid).toBe('taga');
-    expect(pdwRef.getTags({tid: 'taga'})[0]).toEqual(tag);
+    expect(tagA._did).toBe('aaaa');
+    expect(tagA._tid).toBe('taga');
+    expect(pdwRef.getTags({tid: 'taga'})[0]).toEqual(tagA);
 
     /**
      * Def.addTag method 
      */
-    testDef.addTag('tagb');
+    let tagB = testDef.addTag('tagb');
     expect(pdwRef.getTags({did: 'aaaa'}).length).toBe(2);
+    expect(pdwRef.getTags({did: 'aaaa', tid: 'tagb'})[0]).toEqual(tagB);
 
     /**
      * TagDef.getTaggedDefs
      */
-    expect(tagA.getTagsAndDefs()[0]).toEqual(testDef);
+    let tAndD = tagDefA.getTagsAndDefs();
+    expect(tAndD.defs[0]).toEqual(testDef);
+    expect(tAndD.tags[0]).toEqual(tagA);
 
     /**
      * TagDef.addTag
      */
-    tagB.addTag('aaaa')
+    tagDefB.addTag('aaaa')
     expect(pdwRef.getTags({did: 'aaaa'}).length).toBe(2);
 
     /**
      * Don't create duplicates
      */
-    const numBefore = pdwRef.getTags({includeDeleted: 'only'}).length
+    let numBefore = pdwRef.getTags({includeDeleted: 'only'}).length
     testDef.addTag('taga') //already exists
     //creates a new Tag, but deletes the old one, even though they're the same content
     expect(pdwRef.getTags({includeDeleted:'only'}).length).toBe(numBefore + 1);
 
     //Enumerations
+    //Create Definition with a Select type
     let defWithEnum = pdwRef.newDef({
         _did: 'bbbb',
         _lbl: 'Def with an Enum Point',
@@ -511,8 +515,9 @@ test('Tag & TagDef Basics', ()=>{
     expect(enumPoint._lbl).toBe('Enum PointDef');
 
     /**
-     * Add multiple choices
+     * Indirectly add 2 choices
      */
+    numBefore = pdwRef.getTagDefs().length;
     pdwRef.setTagDefs([
         {
             _lbl: 'Choice A',
@@ -521,14 +526,38 @@ test('Tag & TagDef Basics', ()=>{
         {
             _lbl: 'Choice B',
             _tid: 'Bxxx'
-        },
-        {
-            _lbl: 'Choice C',
-            _tid: 'Cxxx'
         }
     ])
-
+    expect(pdwRef.getTagDefs().length).toBe(numBefore + 2);
+    numBefore = pdwRef.getTags().length;
+    pdwRef.setTags([
+        {
+            _tid: 'Axxx',
+            _did: 'bbbb',
+            _pid: 'bbaa'
+        },
+        {
+            _tid: 'Bxxx',
+            _did: 'bbbb',
+            _pid: 'bbaa'
+        }
+    ])
+    expect(pdwRef.getTags().length).toBe(numBefore + 2);
     
+    /**
+     * PointDef.getEnumOptions
+     */
+    let enumTags = enumPoint.getEnumOptions();
+    expect(enumTags.length).toBe(2);
+    
+    enumPoint.addEnumOption('Choice C');
+    enumTags = enumPoint.getEnumOptions();
+    expect(enumTags.length).toBe(3);
+    expect(pdwRef.getTagDefs({tagLbl: 'Choice A'}).length).toBe(1);
+
+    //#TODO - think more about Enumerations, Select, & Multiselect. This feels like it's sketchy.
+    //It's consistent with other Tags & TagDefs, sure, but it's a different thing. And keeping that "simple"
+    //consistency is causing a lot of weird complexity. Should these just be their own thing?
 
 })
 

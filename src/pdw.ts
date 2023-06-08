@@ -1558,11 +1558,11 @@ export class Def extends Element implements DefLike {
         throw new Error('Multiple Data Stores are #TODO') //#TODO - for multiple data stores
     }
 
-    addTag(tidOrLbl: string) : Tag {
+    addTag(tidOrLbl: string): Tag {
         let pdwRef = PDW.getInstance();
-        let tagArr = pdwRef.getTagDefs({tid: tidOrLbl});
-        if(tagArr.length === 0 ) tagArr = pdwRef.getTagDefs({tagLbl: tidOrLbl});
-        if(tagArr.length === 0 ) throw new Error('No tag def found for ' + tidOrLbl);
+        let tagArr = pdwRef.getTagDefs({ tid: tidOrLbl });
+        if (tagArr.length === 0) tagArr = pdwRef.getTagDefs({ tagLbl: tidOrLbl });
+        if (tagArr.length === 0) throw new Error('No tag def found for ' + tidOrLbl);
         let tagDef = tagArr[0];
         return pdwRef.setTags([{
             _did: this._did,
@@ -1641,6 +1641,46 @@ export class PointDef extends Element implements PointDefLike {
         if (newPointDefData._def) this._def = newPointDefData._def;
 
         if (!PointDef.isPointDefLike(this)) throw new Error('Mal-formed PointDef')
+    }
+
+    getEnumOptions(includeDeleted = false): Tag[] {
+        const pdwRef = PDW.getInstance();
+        if (includeDeleted) return pdwRef.getTags({ pid: this._pid, did: this._did, includeDeleted: 'yes' });
+        return pdwRef.getTags({ pid: this._pid, did: this._did });
+    }
+
+    /**
+     * Creates a new TagDef and a Tag assigning it to this point
+     */
+    addEnumOption(lbl: string): Tag {
+
+        return PDW.getInstance().setTags([{
+            _did: this._did,
+            _tid: makeSmallID(),
+            _pid: this._pid
+        }])[0]
+    };
+
+    editEnumOption(tid: string, newLbl: string): Tag {
+        let pdwRef = PDW.getInstance();
+        const existingArr = pdwRef.getTags({
+            did: this._did,
+            pid: this._pid,
+            tid: tid,
+            includeDeleted: 'no'
+        })
+        if(existingArr.length !== 1) throw new Error('Found no existing Enum with tid = ' + tid);
+        const existing = existingArr[0];
+        existing.markDeleted();
+        return pdwRef.setTags([{
+            _did: this._did,
+            _tid: tid,
+            _created: existing._created,
+            _pid: this._pid,
+        }, 
+        existing //now marked as deleted, but for now that's not writing to the database
+    ])[0]
+
     }
 
     /**
@@ -1751,9 +1791,9 @@ export class Entry extends Element implements EntryLike {
         let point = pds.filter(p => p._pid === pidLbl);
         if (point.length !== 0) return new EntryPoint(point[0])
         let pointDefs = this.getDef().getPoints();
-        let pointDef = pointDefs.filter(pd=>pd._lbl === pidLbl);
+        let pointDef = pointDefs.filter(pd => pd._lbl === pidLbl);
         console.log(pointDef.length + ' for ' + pidLbl);
-        if(pointDef.length !== 1) return null
+        if (pointDef.length !== 1) return null
         point = pds.filter(p => p._pid === pointDef[0]._pid);
         if (point.length === 0) {
             // console.warn('No point found on Entry with label or pid: ' + pidLbl);
@@ -1987,7 +2027,7 @@ export class TagDef extends Element implements TagDefLike {
         super(tagDefData);
         this._tid = tagDefData._tid ?? makeSmallID();
         this._lbl = tagDefData._lbl;
-        if(!TagDef.isTagDefLike(this)) throw new Error('TagDef created is not TagDefLike');
+        if (!TagDef.isTagDefLike(this)) throw new Error('TagDef created is not TagDefLike');
     }
 
     static isTagDefLike(data: any): boolean {
@@ -2000,24 +2040,27 @@ export class TagDef extends Element implements TagDefLike {
         return true;
     }
 
-    getTagsAndDefs(includeDeleted = false): {tag: Tag, def: Def}[]{
+    getTagsAndDefs(includeDeleted = false): { tags: Tag[], defs: Def[] } {
         const pdwRef = PDW.getInstance();
-        let tags = pdwRef.getTags({tid: this._tid});
-        let defs: Def[] = [];
-        tags.forEach(tag=>{
-            let result = pdwRef.getDefs({did: tag._did});
-            result.forEach(inner=>{
-                if(!defs.some(d=>d._uid === inner._uid)) defs.push(inner)
+        let tags = pdwRef.getTags({ tid: this._tid });
+        let tagsAndDefs: any = { tags: [], defs: [] };
+        tags.forEach(tag => {
+            let result = pdwRef.getDefs({ did: tag._did });
+            result.forEach(inner => {
+                if (!tagsAndDefs.defs.some((d: any) => d._uid === inner._uid)) {
+                    tagsAndDefs.defs.push(inner);
+                    tagsAndDefs.tags.push(tag);
+                }
             })
         })
-        return defs
+        return tagsAndDefs
     }
 
-    addTag(didOrLbl: string): Tag{
+    addTag(didOrLbl: string): Tag {
         let pdwRef = PDW.getInstance();
-        let defArr = pdwRef.getDefs({did: didOrLbl});
-        if(defArr.length === 0) defArr = pdwRef.getDefs({defLbl: didOrLbl});
-        if(defArr.length === 0) throw new Error('Found no Def with _lbl or _did ' + didOrLbl);
+        let defArr = pdwRef.getDefs({ did: didOrLbl });
+        if (defArr.length === 0) defArr = pdwRef.getDefs({ defLbl: didOrLbl });
+        if (defArr.length === 0) throw new Error('Found no Def with _lbl or _did ' + didOrLbl);
         let def = defArr[0];
         return pdwRef.newTag({
             _did: def._did,
@@ -2030,7 +2073,7 @@ export class Tag extends Element implements TagLike {
     _tid: string;
     _did: string;
     _pid?: string | undefined;
-    __tag?: Tag
+    __tagDef?: TagDef
     constructor(tagData: MinimumTag) {
         if (tagData._tid !== undefined) {
             let existing = Element.findExistingData(tagData);
@@ -2042,7 +2085,7 @@ export class Tag extends Element implements TagLike {
         this._tid = tagData._tid;
         this._did = tagData._did;
         this._pid = tagData._pid;
-        if(!Tag.isTagLike(this)) throw new Error('Tag created is not TagLike');
+        if (!Tag.isTagLike(this)) throw new Error('Tag created is not TagLike');
     }
 
     static isTagLike(data: any): boolean {
