@@ -1,92 +1,41 @@
 //// @ts-nocheck
 import * as pdw from './pdw.js'
 import { Scope } from './pdw.js'
-import { AsyncExcelNatural, exportToFile } from './dataStores/fileAsyncDataStores.js';
-import { importFromFile } from './dataStores/fileAsyncDataStores.js';
+import { AsyncExcelNatural, altTempExport, exportToFile } from './dataStores/fileAsyncDataStores.js';
+import { importFromFile, altTempImport } from './dataStores/fileAsyncDataStores.js';
 import { Temporal, toTemporalInstant } from 'temporal-polyfill';
 import { importFirestore, importMongo, importOldV9, importOldest } from './onetimeImports.js'
 
 const pdwRef = pdw.PDW.getInstance();
 
-/**
- * Most Basic Def Creation
-*/
-let firstDef = pdwRef.newDef({
-    _lbl: 'First Def'
-});
+// importFromFile('data-files/OutJSON.json');
+// altTempImport('data-files/SmallNested.yaml');
 
-/**
- * Fully specified Def Creation
- */
-let secondDef = pdwRef.newDef({
-    _created: '2023-05-19T16:13:30',
-    _updated: '2023-05-19T16:13:30',
-    _deleted: false,
-    _emoji: '🌭',
-    _scope: pdw.Scope.DAY,
-    _uid: 'handjammed-30so',
-    _did: 'gggg',
-    _lbl: 'Second Def',
-    _desc: 'Test Desc'
-});
+createTestFilesDataElements();
 
-/**
-* Wide-open getter
-*/
-let defs = pdwRef.getDefs();
+// const defOne = pdwRef.getDefs({ did: '0m7w' })[0]
+// const defTwo = pdwRef.getDefs({ did: '05a8' })[0]
 
-/**
- * Specified getter
- */
-defs = pdwRef.getDefs({ did: ['gggg'] });
+// defOne.newEntry({
+//     '8esq': 'Entry value'
+// })
+let all = pdwRef.getAll({includeDeleted: 'yes'});
 
-/**
- * Directly update a Def
- */
-secondDef.updateTo({
-    _lbl: 'Updated Second Def'
-});
+console.log(all);
 
-/**
- * Check current def is updated
- */
-defs = pdwRef.getDefs({ did: 'gggg', includeDeleted: 'no' });
+altTempExport(all, 'data-files/TestNest.yaml')
 
-/**
- * Indirectly update a Def
- */
-pdwRef.setDefs([{
-    _did: 'gggg',
-    _lbl: 'Updated Second Def Again'
-}]);
+//Write to file before any updates
+// let outFileOneame = 'data-files/TesterDataset.yaml';
+// exportToFile(outFileOneame, pdwRef.getAll({ includeDeleted: 'yes' }));
 
-/**
- * Check current def is updated
- */
-defs = pdwRef.getDefs({ did: 'gggg', includeDeleted: 'no' });
-
-/**
- * Check that out of date def was marked deleted
- */
-defs = pdwRef.getDefs({ did: 'gggg', includeDeleted: 'only' });
-
-/**
- * Check simple deletion
- */
-firstDef.markDeleted();
-defs = pdwRef.getDefs({ includeDeleted: 'only', did: firstDef._did });
-
-
-
-// const pdw = PDW.getInstance();
-
+/* old stuff
 //the firestore/mongo big merge
 // importFromFile('real-data/out-fromfirestore.csv');
 // importFromFile('real-data/out-frommongo-xlated.csv');
 // exportToFile('real-data/merged.csv', pdw.getAll({includeDeleted:'yes'}))
 
 // if(false){
-
 
 // importFromFile('real-data/workouts.csv');
 // importFromFile('real-data/partial-old-more.csv')
@@ -161,15 +110,16 @@ defs = pdwRef.getDefs({ includeDeleted: 'only', did: firstDef._did });
 // importFromFile('data-files/OutYaml.yaml');
 
 // console.log(pdw.allDataSince());
+*/
 
-function createTestFiles() {
+function createTestFilesDataElements() {
     //Testing newDef && Def.setPointDefs
     pdwRef.newDef({
         _did: '0m7w',
         _lbl: 'defOne',
         _emoji: '1️⃣',
         _scope: Scope.SECOND,
-        _desc: 'This is now inerited'
+        _desc: 'A definition with a select Point'
     }).setPointDefs([{
         _lbl: 'Select Test',
         _type: pdw.PointType.SELECT,
@@ -178,13 +128,57 @@ function createTestFiles() {
         _pid: '8esq',
         _rollup: pdw.Rollup.COUNTOFEACH
     }])
+
     pdwRef.newDef({
         _did: 'ay7l',
         _lbl: 'TWO',
         _emoji: '2️⃣',
         _scope: Scope.HOUR,
-        _desc: 'Scoped at an **hour**, cause why not have that option?'
-    })
+        _desc: 'Scoped at an **hour**. With two points'
+    }).setPointDefs([{
+        _pid: '0pc6',
+        _type: pdw.PointType.NUMBER,
+        _lbl: 'Numeric Thing',
+        _emoji: '#️⃣',
+        _rollup: pdw.Rollup.AVERAGE
+    },
+    {
+        _pid: '0tb7',
+        _type: pdw.PointType.BOOL,
+        _lbl: 'Boolean Thing',
+        _emoji: '👍',
+        _desc: 'Boolean Point'
+    }])
+
+    /*
+    #THINK - how to treat PointDefs, EntryPoints, and Tags when their associated Defs & Entries & TagDefs are deleted
+    pdwRef.newDef({
+        _did: 'dltd',
+        _lbl: 'Def for deletion test',
+        _desc: 'This is created, then marked deleted',
+        _emoji: '❌',
+        _scope: pdw.Scope.DAY
+    }).setPointDefs([{
+        _lbl: 'PointDef for Deleted Def',
+        _type: pdw.PointType.TEXT,
+        _desc: 'Testing points not being marked deleted if a Def is',
+        _pid: 'dlt1',
+        _emoji: '🐈‍⬛',
+        _rollup: pdw.Rollup.COUNT
+    }])
+
+    pdwRef.setDefs([{
+        _did: 'dltd',
+        _deleted: true
+    }])
+    //tested that not having this does throw errors for now, so, adding it back
+    pdwRef.setPointDefs([{
+        _did: 'dltd',
+        _pid: 'dlt1',
+        _deleted: true
+    }])
+    */
+
     pdwRef.newDef({
         _did: '05a8',
         _lbl: 'FREE',
@@ -198,22 +192,7 @@ function createTestFiles() {
         _lbl: 'Free Item',
         _emoji: '🆓'
     })
-    pdwRef.newPointDef({
-        _did: 'ay7l',
-        _pid: '0pc6',
-        _type: pdw.PointType.NUMBER,
-        _lbl: 'Numeric Thing',
-        _emoji: '#️⃣',
-        _rollup: pdw.Rollup.AVERAGE
-    })
-    pdwRef.newPointDef({
-        _did: 'ay7l',
-        _pid: '0tb7',
-        _type: pdw.PointType.BOOL,
-        _lbl: 'Boolean Thing',
-        _emoji: '👍',
-        _desc: 'Orig desc'
-    })
+    
     pdwRef.newEntry({
         _eid: 'lgricx7k-08al',
         _did: 'ay7l',
@@ -264,10 +243,11 @@ function createTestFiles() {
         _pid: '8esq'
     })
 
-    //Write to file before any updates
-    let outFileOneame = 'data-files/OutExcel1.xlsx';
-    exportToFile(outFileOneame, pdwRef.getAll({ includeDeleted: 'yes' }));
+    // //Write to file before any updates
+    // let outFileOneame = 'data-files/OutExcel1.xlsx';
+    // exportToFile(outFileOneame, pdwRef.getAll({ includeDeleted: 'yes' }));
 
+    /*
     setTimeout(() => {
 
         //update def (and pointdef)
@@ -325,4 +305,5 @@ function createTestFiles() {
         let outCSVName = 'data-files/OutCSV.csv';
         exportToFile(outCSVName, data);
     }, 1500)
+    */
 }

@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import * as pdw from '../src/pdw';
 import { Temporal } from 'temporal-polyfill';
 import { DefaultDataStore } from '../src/DefaultDataStore';
+import { importFromFile } from '../src/dataStores/fileAsyncDataStores';
 
 const pdwRef = pdw.PDW.getInstance();
 
@@ -568,13 +569,22 @@ test.skip('Tag & TagDef Basics', ()=>{
     expect(tagC.getLbl()).toBe('CHOICE C'); //will pull the newly updated TagDef. Nice.
 })
 
-test.skip('Query Basics', () => {
+test('Query Basics', () => {
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 
     let q = new pdw.Query();
-    q.run();
+    loadFullTestDatasetFromFile();
+    //#TODO - build a better test file, then build Query out
+
+    // q.run();
 })
 
 test.skip('Data Merge', () => {
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 })
+
+function loadFullTestDatasetFromFile(){
+    importFromFile('data-files/OutExcel1.xlsx');
+    console.log(pdwRef.getAll({}));
+    
+}

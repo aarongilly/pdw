@@ -1,5 +1,5 @@
 import { Temporal } from "temporal-polyfill";
-import { DefaultDataStore } from "./DefaultDataStore";
+import { DefaultDataStore } from "./DefaultDataStore.js";
 
 //#region ### TYPES ###
 
@@ -2035,7 +2035,9 @@ export class TagDef extends Element implements TagDefLike {
         super(tagDefData);
         this._tid = tagDefData._tid ?? makeSmallID();
         this._lbl = tagDefData._lbl;
-        if (!TagDef.isTagDefLike(this)) throw new Error('TagDef created is not TagDefLike');
+        if (!TagDef.isTagDefLike(this)) {
+            throw new Error('TagDef created is not TagDefLike');
+        }
     }
 
     static isTagDefLike(data: any): boolean {

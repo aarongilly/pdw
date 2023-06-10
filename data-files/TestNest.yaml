@@ -1,0 +1,88 @@
+active:
+  0m7w:
+    cre: 2023-04-29T22:51:20.233-05:00
+    upd: 2023-04-29T22:51:20.233-05:00
+    uid: lh2vk0q0-0db6
+    dsc: This is now inerited
+    lbl: defOne
+    scp: SECOND
+    emo: 1️⃣
+    points:
+      8esq:
+        uid: lh2vk0q2-ojke
+        dsc: For testing selects
+        lbl: Select Test
+        typ: SELECT
+        rlp: COUNTOFEACH
+        emo: ⛏️
+        opts: {}
+    entries:
+      - cre: 2023-04-29T22:51:20.239-05:00
+        upd: 2023-04-29T22:51:20.24-05:00
+        uid: lh2vk0q7-0kef
+        eid: lh2vk0q8-3am6
+        per: 2023-04-29T22:51:20
+        nte: ""
+        points: {}
+    tags:
+      0vva:
+        cre: 2023-04-29T22:51:20.244-05:00
+        upd: 2023-04-29T22:51:20.244-05:00
+        uid: lh2vk0qc-qss9
+      0vvb:
+        cre: 2023-04-29T22:51:20.245-05:00
+        upd: 2023-04-29T22:51:20.245-05:00
+        uid: lh2vk0qd-95rs
+  05a8:
+    cre: 2023-04-24T20:51:59.365-05:00
+    upd: 2023-04-29T22:51:20.236-05:00
+    uid: lh2vk0q4-0a06
+    dsc: Set a description
+    lbl: FREE
+    scp: DAY
+    emo: 3️⃣
+    points:
+      0iu2:
+        uid: lh2vk0q4-0o48
+        dsc: Set a description
+        lbl: Free Item
+        typ: TEXT
+        rlp: COUNT
+        emo: 🆓
+    entries: []
+    tags: {}
+  ay7l:
+    cre: 2023-04-29T22:51:20.235-05:00
+    upd: 2023-04-29T22:51:24.463-05:00
+    uid: lh2vk3zj-m9d6
+    dsc: Scoped at an **hour**, cause why not have that option?
+    lbl: Two Relabeled
+    scp: HOUR
+    emo: 2️⃣
+    points:
+      0pc6:
+        uid: lh2vk3zk-dywe
+        dsc: Set a description
+        lbl: Test Relabel
+        typ: NUMBER
+        rlp: AVERAGE
+        emo: "#️⃣"
+      0tb7:
+        uid: lh2vk3zl-r928
+        dsc: Orig desc
+        lbl: Boolean Thing
+        typ: BOOL
+        rlp: COUNT
+        emo: 👎
+    entries:
+      - cre: 2023-04-29T22:51:20.238-05:00
+        upd: 2023-04-29T22:51:24.467-05:00
+        uid: lh2vk3zm-097s
+        eid: lgricx7k-08al
+        per: 2023-04-22T06
+        nte: Updated noted
+        points: {}
+        0tb7: true
+        0pc6: 6
+    tags: {}
+deleted: []
