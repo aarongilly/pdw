@@ -114,41 +114,112 @@ altTempExport(all, 'data-files/TestNest.yaml')
 
 function createTestFilesDataElements() {
     //Testing newDef && Def.setPointDefs
-    pdwRef.newDef({
+    const one = pdwRef.newDef({
         _did: '0m7w',
-        _lbl: 'defOne',
+        _lbl: 'Friends',
         _emoji: '1️⃣',
         _scope: Scope.SECOND,
-        _desc: 'A definition with a select Point'
-    }).setPointDefs([{
-        _lbl: 'Select Test',
-        _type: pdw.PointType.SELECT,
-        _emoji: '⛏️',
-        _desc: 'For testing selects',
-        _pid: '8esq',
-        _rollup: pdw.Rollup.COUNTOFEACH
-    }])
+        _desc: 'A definition with a multiselect Point',
+        '8esq': {
+            _lbl: 'Friends',
+            _type: pdw.PointType.MULTISELECT,
+            _emoji: '⛏️',
+            _desc: 'For testing Multiselects',
+            _pid: '8esq',
+            _rollup: pdw.Rollup.COUNTOFEACH
+        }
+    })
 
-    pdwRef.newDef({
+    //Def-level tag
+    pdwRef.newTagDef({
+        _lbl: 'Journal',
+        _tid: 'apio'
+    })
+    one.addTag('apio');
+
+    //PointDef Multiselect Option tags
+    const selectPointDef = one.getPoints()[0];
+    selectPointDef.addEnumOption('Krista', 'tagk');
+    selectPointDef.addEnumOption('Nick', 'tagn');
+    selectPointDef.addEnumOption('Josh', 'tagj');
+
+    one.newEntry({
+        _period: '2023-06-10T17:34:17',
+        _source: 'Test File Data',
+        '8esq': ['tagk', 'tagn']
+    })
+
+    one.newEntry({
+        _period: '2023-06-11T18:29:20',
+        _source: 'Test File Data',
+        _note: 'Had a good time',
+        '8esq': ['tagj']
+    })
+
+    one.newEntry({
+        _period: '2023-05-28T09:29:27',
+        _source: 'Test File Data',
+        _note: 'Testing deleted stuff',
+        _deleted: true,
+        // '8esq': ['tagk'] //#THINK - marking entry as deleted doesn't mark its entryPoint as deleted.
+    })
+
+    const two = pdwRef.newDef({
         _did: 'ay7l',
-        _lbl: 'TWO',
+        _lbl: 'Fitness Hour',
         _emoji: '2️⃣',
         _scope: Scope.HOUR,
-        _desc: 'Scoped at an **hour**. With two points'
-    }).setPointDefs([{
-        _pid: '0pc6',
-        _type: pdw.PointType.NUMBER,
-        _lbl: 'Numeric Thing',
-        _emoji: '#️⃣',
-        _rollup: pdw.Rollup.AVERAGE
-    },
-    {
-        _pid: '0tb7',
-        _type: pdw.PointType.BOOL,
-        _lbl: 'Boolean Thing',
-        _emoji: '👍',
-        _desc: 'Boolean Point'
-    }])
+        _desc: 'Scoped at an **hour**. With two points',
+        'paxl': {
+            _type: pdw.PointType.NUMBER,
+            _lbl: 'Exercise Minutes',
+            _emoji: '🏃',
+            _rollup: pdw.Rollup.SUM
+        },
+        '0pc6': {
+            _type: pdw.PointType.NUMBER,
+            _lbl: 'Move Calories',
+            _emoji: '#️⃣',
+            _rollup: pdw.Rollup.AVERAGE
+        },
+        '0tb7': {
+            _type: pdw.PointType.BOOL,
+            _lbl: 'Stood',
+            _emoji: '👍',
+            _desc: 'For testing boolean points'
+        }
+    });
+
+    two.newEntry({
+        _period: '2023-06-10T17',
+        _note: '5PM Auto-check in',
+        _source: 'Hypothetical automation',
+        'paxl': 7,
+        '0pc6': 288,
+        '0tb7': true
+    });
+    two.newEntry({
+        _period: '2023-06-10T18',
+        _note: '6PM Auto-check in',
+        _source: 'Hypothetical automation',
+        'paxl': 0,
+        '0pc6': 98,
+        '0tb7': false
+    });
+
+    const three = pdwRef.newDef({
+        _did: 'cpsa',
+        _lbl: 'Daily Summary',
+        _emoji: '👀',
+        _scope: pdw.Scope.DAY,
+        _desc: 'Definition with no PointDefs - would use Notes here, maybe.',
+    })
+    three.addTag('Journal')
+
+    three.newEntry({
+        _period: '2023-06-10',
+        _note: 'Wrote this code. Remember notes are **supposed** to support Markdown eventually.'
+    })
 
     /*
     #THINK - how to treat PointDefs, EntryPoints, and Tags when their associated Defs & Entries & TagDefs are deleted
@@ -179,131 +250,13 @@ function createTestFilesDataElements() {
     }])
     */
 
+    //while you think on teh deleted stuff above, here's a simple test that should work for half
     pdwRef.newDef({
-        _did: '05a8',
-        _lbl: 'FREE',
-        _emoji: '3️⃣',
-        _scope: Scope.DAY,
-        _created: 'lgvm3a11'
+        _did: 'dltd',
+        _lbl: 'Def for deletion test',
+        _desc: 'This is created, then marked deleted',
+        _emoji: '❌',
+        _scope: pdw.Scope.DAY,
+        _deleted: true
     })
-    pdwRef.newPointDef({
-        _did: '05a8',
-        _type: pdw.PointType.TEXT,
-        _lbl: 'Free Item',
-        _emoji: '🆓'
-    })
-    
-    pdwRef.newEntry({
-        _eid: 'lgricx7k-08al',
-        _did: 'ay7l',
-        _note: 'Orig note',
-        _period: '2023-04-22T06',
-        'Boolean Thing': false, //key by _lbl
-        '0pc6': 5 //key by _pid
-    })
-    pdwRef.newEntry({
-        _did: '0m7w',
-    })
-    pdwRef.newTagDef({
-        _lbl: 'My Tag!',
-    })
-    pdwRef.newTagDef({
-        _lbl: 'Orig Tag Label',
-        _tid: 'vvct'
-    })
-    pdwRef.newTagDef({
-        _lbl: 'Select Option To Delete',
-        _tid: '0vvi'
-    })
-    pdwRef.newTagDef({
-        _lbl: 'Select Option 1',
-        _tid: '0vva'
-    })
-    pdwRef.newTagDef({
-        _lbl: 'Select Option 2',
-        _tid: '0vvb'
-    })
-    pdwRef.newTag({
-        _did: 'ay7l',
-        _tid: 'vvct'
-    })
-    pdwRef.newTag({
-        _did: '0m7w',
-        _tid: '0vvi',
-        _pid: '8esq'
-    })
-    pdwRef.newTag({
-        _did: '0m7w',
-        _tid: '0vva',
-        _pid: '8esq'
-    })
-    pdwRef.newTag({
-        _did: '0m7w',
-        _tid: '0vvb',
-        _pid: '8esq'
-    })
-
-    // //Write to file before any updates
-    // let outFileOneame = 'data-files/OutExcel1.xlsx';
-    // exportToFile(outFileOneame, pdwRef.getAll({ includeDeleted: 'yes' }));
-
-    /*
-    setTimeout(() => {
-
-        //update def (and pointdef)
-        pdwRef.setDefs([{
-            _did: 'ay7l',
-            _lbl: 'Two Relabeled',
-            '0pc6': {
-                _lbl: 'Test Relabel'
-            }
-        }]);
-        //update a pointdef
-        pdwRef.setPointDefs([{
-            _did: 'ay7l',
-            _pid: '0tb7',
-            _emoji: '👎',
-        }])
-        //update an entry (and entrypoint)
-        pdwRef.setEntries([{
-            _eid: 'lgricx7k-08al',
-            _note: 'Updated noted',
-            '0tb7': true
-        }])
-        //update an entrypoint explicitly
-        pdwRef.setEntryPoints([{
-            _eid: 'lgricx7k-08al',
-            _pid: '0pc6',
-            _val: 6
-        }])
-        //update a tagDef
-        pdwRef.setTagDefs([{
-            _tid: 'vvct',
-            _lbl: 'New Label'
-        }])
-        pdwRef.setTags([{
-            _tid: '0vvi',
-            _pid: '8esq',
-            _did: '0m7w',
-            _deleted: true
-        }])
-        //update a tag
-        pdwRef.setTags([{
-            _did: 'ay7l',
-            _tid: 'vvct',
-            _deleted: true
-        }])
-
-        //Write to updated files
-        let data = pdwRef.getAll({ includeDeleted: 'yes' });
-        let outFileTwoName = 'data-files/OutExcel2.xlsx';
-        exportToFile(outFileTwoName, data);
-        let outJsonName = 'data-files/OutJSON.json';
-        exportToFile(outJsonName, data);
-        let outYamlName = 'data-files/OutYaml.yaml';
-        exportToFile(outYamlName, data);
-        let outCSVName = 'data-files/OutCSV.csv';
-        exportToFile(outCSVName, data);
-    }, 1500)
-    */
 }

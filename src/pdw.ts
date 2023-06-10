@@ -1558,6 +1558,13 @@ export class Def extends Element implements DefLike {
         throw new Error('Multiple Data Stores are #TODO') //#TODO - for multiple data stores
     }
 
+    /**
+     * Associates an Existing TagDef with this Def
+     * Doesn't work for Enum values, I think.
+     * 
+     * @param tidOrLbl Tid or Lbl of EXISTING TagDef
+     * @returns the new Tag
+     */
     addTag(tidOrLbl: string): Tag {
         let pdwRef = PDW.getInstance();
         let tagArr = pdwRef.getTagDefs({ tid: tidOrLbl });
@@ -1570,7 +1577,7 @@ export class Def extends Element implements DefLike {
         }])[0]
     }
 
-    newEntry(entryData: any): Entry {
+    newEntry(entryData: MinimumEntry): Entry {
         //not tesitng the 'any' right here
         entryData._did = this._did;
         return PDW.getInstance().setEntries([entryData])[0];
@@ -1651,11 +1658,14 @@ export class PointDef extends Element implements PointDefLike {
 
     /**
      * Creates a new TagDef and a Tag assigning it to this point
+     * @param lbl label to use for the TagDef
+     * @param tid optional, tid for Tag and TagDef to share
+     * @returns the Tag (you can use Tag.getDef() to get to the TagDef)
      */
-    addEnumOption(lbl: string): Tag {
+    addEnumOption(lbl: string, tid?: string): Tag {
         if(this._type !== PointType.SELECT && this._type !== PointType.MULTISELECT) throw new Error('Attempted to add an enum option to a point of type: ' + this._type);
         const pdwRef = PDW.getInstance();
-        const newTid = makeSmallID();
+        const newTid = tid ?? makeSmallID();
         pdwRef.setTagDefs([{
             _did: this._did,
             _lbl: lbl,

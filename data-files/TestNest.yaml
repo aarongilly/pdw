@@ -1,88 +1,162 @@
 active:
   0m7w:
-    cre: 2023-04-29T22:51:20.233-05:00
-    upd: 2023-04-29T22:51:20.233-05:00
-    uid: lh2vk0q0-0db6
-    dsc: This is now inerited
-    lbl: defOne
+    cre: 2023-06-10T17:54:30.538-05:00
+    upd: 2023-06-10T17:54:30.539-05:00
+    uid: liqlg2o9-81k8
+    dsc: A definition with a multiselect Point
+    lbl: Friends
     scp: SECOND
     emo: 1️⃣
     points:
       8esq:
-        uid: lh2vk0q2-ojke
-        dsc: For testing selects
-        lbl: Select Test
-        typ: SELECT
+        uid: liqlg2ob-0qst
+        dsc: For testing Multiselects
+        lbl: Friends
+        typ: MULTISELECT
         rlp: COUNTOFEACH
         emo: ⛏️
-        opts: {}
-    entries:
-      - cre: 2023-04-29T22:51:20.239-05:00
-        upd: 2023-04-29T22:51:20.24-05:00
-        uid: lh2vk0q7-0kef
-        eid: lh2vk0q8-3am6
-        per: 2023-04-29T22:51:20
+        opts: {} #shit
+    entries: 
+      - cre: 2023-06-10T17:54:30.545-05:00
+        upd: 2023-06-10T17:54:30.545-05:00
+        uid: liqlg2oh-0k6p
+        eid: liqlg2oi-9oxh
+        per: 2023-06-10T17:34:17
         nte: ""
+        points: {} 
+        8esq: tagk, tagn #shit shit
+      - cre: 2023-06-10T17:54:30.547-05:00
+        upd: 2023-06-10T17:54:30.547-05:00
+        uid: liqlg2oj-j487
+        eid: liqlg2oj-hagc
+        per: 2023-06-11T18:29:20
+        nte: Had a good time
         points: {}
+        8esq: tagj
     tags:
-      0vva:
-        cre: 2023-04-29T22:51:20.244-05:00
-        upd: 2023-04-29T22:51:20.244-05:00
-        uid: lh2vk0qc-qss9
-      0vvb:
-        cre: 2023-04-29T22:51:20.245-05:00
-        upd: 2023-04-29T22:51:20.245-05:00
-        uid: lh2vk0qd-95rs
-  05a8:
-    cre: 2023-04-24T20:51:59.365-05:00
-    upd: 2023-04-29T22:51:20.236-05:00
-    uid: lh2vk0q4-0a06
-    dsc: Set a description
-    lbl: FREE
-    scp: DAY
-    emo: 3️⃣
-    points:
-      0iu2:
-        uid: lh2vk0q4-0o48
-        dsc: Set a description
-        lbl: Free Item
-        typ: TEXT
-        rlp: COUNT
-        emo: 🆓
-    entries: []
-    tags: {}
+      apio:
+        cre: 2023-06-10T17:54:30.541-05:00
+        upd: 2023-06-10T17:54:30.542-05:00
+        uid: liqlg2od-dbob
+      tagk:
+        cre: 2023-06-10T17:54:30.543-05:00
+        upd: 2023-06-10T17:54:30.543-05:00
+        uid: liqlg2of-umbo
+      tagn:
+        cre: 2023-06-10T17:54:30.544-05:00
+        upd: 2023-06-10T17:54:30.544-05:00
+        uid: liqlg2og-dzws
+      tagj:
+        cre: 2023-06-10T17:54:30.545-05:00
+        upd: 2023-06-10T17:54:30.545-05:00
+        uid: liqlg2oh-0r6m
   ay7l:
-    cre: 2023-04-29T22:51:20.235-05:00
-    upd: 2023-04-29T22:51:24.463-05:00
-    uid: lh2vk3zj-m9d6
-    dsc: Scoped at an **hour**, cause why not have that option?
-    lbl: Two Relabeled
+    cre: 2023-06-10T17:54:30.549-05:00
+    upd: 2023-06-10T17:54:30.549-05:00
+    uid: liqlg2ol-36vn
+    dsc: Scoped at an **hour**. With two points
+    lbl: Fitness Hour
     scp: HOUR
     emo: 2️⃣
     points:
-      0pc6:
-        uid: lh2vk3zk-dywe
+      paxl:
+        uid: liqlg2ol-5mjt
         dsc: Set a description
-        lbl: Test Relabel
+        lbl: Exercise Minutes
+        typ: NUMBER
+        rlp: SUM
+        emo: 🏃
+      0pc6:
+        uid: liqlg2om-etsc
+        dsc: Set a description
+        lbl: Move Calories
         typ: NUMBER
         rlp: AVERAGE
         emo: "#️⃣"
       0tb7:
-        uid: lh2vk3zl-r928
-        dsc: Orig desc
-        lbl: Boolean Thing
+        uid: liqlg2om-9mcl
+        dsc: For testing boolean points
+        lbl: Stood
         typ: BOOL
         rlp: COUNT
-        emo: 👎
+        emo: 👍
     entries:
-      - cre: 2023-04-29T22:51:20.238-05:00
-        upd: 2023-04-29T22:51:24.467-05:00
-        uid: lh2vk3zm-097s
-        eid: lgricx7k-08al
-        per: 2023-04-22T06
-        nte: Updated noted
+      - cre: 2023-06-10T17:54:30.551-05:00
+        upd: 2023-06-10T17:54:30.551-05:00
+        uid: liqlg2on-mfqn
+        eid: liqlg2on-1dt7
+        per: 2023-06-10T17
+        nte: 5PM Auto-check in
         points: {}
+        paxl: 7
+        0pc6: 288
         0tb7: true
-        0pc6: 6
+      - cre: 2023-06-10T17:54:30.552-05:00
+        upd: 2023-06-10T17:54:30.553-05:00
+        uid: liqlg2oo-fdq7
+        eid: liqlg2op-5xok
+        per: 2023-06-10T18
+        nte: 6PM Auto-check in
+        points: {}
+        paxl: 0
+        0pc6: 98
+        0tb7: false
     tags: {}
-deleted: []
+  cpsa:
+    cre: 2023-06-10T17:54:30.554-05:00
+    upd: 2023-06-10T17:54:30.554-05:00
+    uid: liqlg2oq-joch
+    dsc: Definition with no PointDefs - would use Notes here, maybe.
+    lbl: Daily Summary
+    scp: DAY
+    emo: 👀
+    points: {}
+    entries:
+      - cre: 2023-06-10T17:54:30.555-05:00
+        upd: 2023-06-10T17:54:30.555-05:00
+        uid: liqlg2or-02iu
+        eid: liqlg2os-0wgd
+        per: 2023-06-10
+        nte: Wrote this code. Remember notes are **supposed** to support Markdown
+          eventually.
+        points: {}
+    tags:
+      apio:
+        cre: 2023-06-10T17:54:30.555-05:00
+        upd: 2023-06-10T17:54:30.555-05:00
+        uid: liqlg2or-3w2d
+deleted:
+  - _deleted: true
+    _updated: liqlg2os
+    _uid: liqlg2os-zwog
+    _created: liqlg2os
+    _tempCreated: 2023-06-10T17:54:30.556-05:00[America/Chicago]
+    _tempUpdated: 2023-06-10T17:54:30.556-05:00[America/Chicago]
+    _did: dltd
+    _lbl: Def for deletion test
+    _desc: This is created, then marked deleted
+    _emoji: ❌
+    _scope: DAY
+  - _deleted: true
+    _updated: liqlg2ok
+    _uid: liqlg2ok-1v5r
+    _created: liqlg2ok
+    _tempCreated: 2023-06-10T17:54:30.548-05:00[America/Chicago]
+    _tempUpdated: 2023-06-10T17:54:30.548-05:00[America/Chicago]
+    _eid: liqlg2ok-sttl
+    _note: Testing deleted stuff
+    _did: 0m7w
+    _period: 2023-05-28T09:29:27
+    _source: Test File Data
+    __def:
+      _deleted: false
+      _updated: liqlg2ob
+      _uid: liqlg2o9-81k8
+      _created: liqlg2oa
+      _tempCreated: 2023-06-10T17:54:30.538-05:00[America/Chicago]
+      _tempUpdated: 2023-06-10T17:54:30.539-05:00[America/Chicago]
+      _did: 0m7w
+      _lbl: Friends
+      _desc: A definition with a multiselect Point
+      _emoji: 1️⃣
+      _scope: SECOND

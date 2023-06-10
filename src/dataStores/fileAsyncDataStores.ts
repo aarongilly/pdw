@@ -777,7 +777,7 @@ export class AsyncNestedYaml implements pdw.AsyncDataStore {
                 throw new Error("Data supplied must have an arrays for defs, pointDefs, tags, tagDefs, entries, and entryPoints'");
             }
 
-        let defs: any = {};
+        let activeByDef: any = {};
         let deleted: pdw.ElementLike[] = [];
 
         data.defs.forEach((def: any) => {
@@ -802,7 +802,7 @@ export class AsyncNestedYaml implements pdw.AsyncDataStore {
             //make room for Tags & TagDefs
             defMember.tags = {};
             //add to outer object;
-            defs[def._did] = defMember;
+            activeByDef[def._did] = defMember;
         })
 
         data.pointDefs.forEach(pd=>{
@@ -811,7 +811,7 @@ export class AsyncNestedYaml implements pdw.AsyncDataStore {
                 return;
             }
             if(pd._did === undefined) throw new Error("pointDef has no _did, yo");
-            let assDef = defs[pd._did];
+            let assDef = activeByDef[pd._did];
             if(assDef === undefined) throw new Error('Could not find Def associated with PointDef with _did = ' + pd._did);
             
             let pdMember: any = {};
@@ -836,7 +836,7 @@ export class AsyncNestedYaml implements pdw.AsyncDataStore {
                 return;
             }
             if(entry._did === undefined) throw new Error("entry has no _did, yo");
-            let assDef = defs[entry._did];
+            let assDef = activeByDef[entry._did];
             if(assDef === undefined) throw new Error('Could not find Def associated with Entry with _did = ' + entry._did);
 
             let entMember: any = {};
@@ -859,7 +859,7 @@ export class AsyncNestedYaml implements pdw.AsyncDataStore {
             }
             if(ep._did === undefined) throw new Error("entryPoint has no _did, yo");
             if(ep._eid === undefined) throw new Error("entryPoint has no _eid, yo");
-            let assDef = defs[ep._did];
+            let assDef = activeByDef[ep._did];
             if(assDef === undefined) throw new Error('Could not find Def associated with EntryPoint with _did = ' + ep._did);
             let assEntry = assDef.entries.find((ent: any )=> ent.eid == ep._eid)
             if(assEntry === undefined) throw new Error("Couldn't find an Entry for the EntryPoint with _eid = " + ep._eid);
@@ -873,7 +873,7 @@ export class AsyncNestedYaml implements pdw.AsyncDataStore {
                 return;
             }
             if(tag._did === undefined) throw new Error("tag has no _did, yo");
-            let assDef = defs[tag._did];
+            let assDef = activeByDef[tag._did];
             if(assDef === undefined) throw new Error('Could not find Def associated with Tag with _did = ' + tag._did);
             let assPointDef = data.tagDefs?.find(tagDef=>tagDef._tid === tag._tid && tagDef._deleted === false);
             if(assPointDef === undefined) throw new Error("Couldn't find associated TagDef for tag with _tid " + tag._tid);
@@ -887,7 +887,7 @@ export class AsyncNestedYaml implements pdw.AsyncDataStore {
             assDef.tags[tag._tid] = tagMember;
         })
 
-        let yamlObj: any = { active: defs, deleted: deleted }
+        let yamlObj: any = { active: activeByDef, deleted: deleted }
         const yaml = YAML.stringify(yamlObj);
         fs.writeFile(filepath, yaml, 'utf8', () => { });
 
