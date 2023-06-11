@@ -186,23 +186,6 @@ export interface AsyncDataStore {
 }
 
 /**
- * Manifest is a lazy-loaded Map of **undeleted** Definitions
- * keyed by their `did`, each containing a complete map of 
- * their associated _points and _tags
- */
-export interface Manifest {
-    [did: string]: Def & { _points: PointDefMap, _tags: TagMap }
-}
-
-interface PointDefMap {
-    [pid: string]: PointDef
-}
-
-interface TagMap {
-    [tid: string]: Tag & { _tagDef: TagDef }
-}
-
-/**
  * Basic data filtering parameters, supported by the {@link PDW} methods for
  * {@link getDefs} & the 5 other element "getters". The {@link DataStore} methods
  * will get {@link SanitizedParams} passed to them by the PDW methods, which will
@@ -744,7 +727,6 @@ export interface AssociatedElementMap {
 
 export class PDW {
     dataStores: DataStore[];
-    manifest: Manifest;
     private static instance: PDW;
     private constructor(store?: DataStore) {
         if (store !== undefined) {
@@ -752,7 +734,6 @@ export class PDW {
         } else {
             this.dataStores = [new DefaultDataStore(this)]
         }
-        this.manifest = {};
         PDW.instance = this; //for singleton
     }
 

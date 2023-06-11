@@ -23,11 +23,11 @@ let all = pdwRef.getAll({includeDeleted: 'yes'});
 
 console.log(all);
 
-altTempExport(all, 'data-files/TestNest.yaml')
+// altTempExport(all, 'data-files/TestNest.yaml')
 
 //Write to file before any updates
-// let outFileOneame = 'data-files/TesterDataset.yaml';
-// exportToFile(outFileOneame, pdwRef.getAll({ includeDeleted: 'yes' }));
+let outFileOneame = 'data-files/newYaml.yaml';
+exportToFile(outFileOneame, pdwRef.getAll({ includeDeleted: 'yes' }));
 
 /* old stuff
 //the firestore/mongo big merge

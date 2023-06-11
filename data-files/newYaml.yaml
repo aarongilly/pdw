@@ -1,275 +1,249 @@
 defs:
-  - uid: lh2vk0q0-0db6
-    cre: 2023-04-29T22:51:20.233-05:00
-    upd: 2023-04-29T22:51:20.233-05:00
+  - uid: lirnym66-hsqy
+    cre: 2023-06-11T11:52:41.023-05:00
+    upd: 2023-06-11T11:52:41.024-05:00
     del: false
-    dsc: This is now inerited
+    dsc: A definition with a multiselect Point
     did: 0m7w
+    lbl: Friends
     emo: 1️⃣
     scp: SECOND
-  - uid: lh2vk0q3-0dtj
-    cre: 2023-04-29T22:51:20.235-05:00
-    upd: 2023-04-29T22:51:24.465-05:00
-    del: true
-    dsc: Scoped at an **hour**, cause why not have that option?
+    pts: 
+      8esq:
+        dsc: For testing Multiselects
+        lbl: Friends
+        emo: ⛏️
+        typ: MULTISELECT
+        rlp: COUNTOFEACH
+  - uid: lirnym6h-weak
+    cre: 2023-06-11T11:52:41.034-05:00
+    upd: 2023-06-11T11:52:41.034-05:00
+    del: false
+    dsc: Scoped at an **hour**. With two points
     did: ay7l
+    lbl: Fitness Hour
     emo: 2️⃣
     scp: HOUR
-  - uid: lh2vk0q4-0a06
-    cre: 2023-04-24T20:51:59.365-05:00
-    upd: 2023-04-29T22:51:20.236-05:00
+    pts:
+      paxl:
+        dsc: Set a description
+        lbl: Exercise Minutes
+        emo: 🏃
+        typ: NUMBER
+        rlp: SUM
+      0pc6:
+        dsc: Set a description
+        lbl: Move Calories
+        emo: "#️⃣"
+        typ: NUMBER
+        rlp: AVERAGE
+      0tb7:
+        dsc: For testing boolean points
+        lbl: Stood
+        emo: 👍
+        typ: BOOL
+        rlp: SUM
+    rlp: COUNT
+  - uid: lirnym6n-4u8l
+    cre: 2023-06-11T11:52:41.039-05:00
+    upd: 2023-06-11T11:52:41.039-05:00
     del: false
-    dsc: Set a description
-    did: 05a8
-    emo: 3️⃣
+    dsc: Definition with no PointDefs - would use Notes here, maybe.
+    did: cpsa
+    lbl: Daily Summary
+    emo: 👀
     scp: DAY
-  - uid: lh2vk3zj-m9d6
-    cre: 2023-04-29T22:51:20.235-05:00
-    upd: 2023-04-29T22:51:24.463-05:00
-    del: false
-    dsc: Scoped at an **hour**, cause why not have that option?
-    did: ay7l
-    emo: 2️⃣
-    scp: HOUR
-pointDefs:
-  - uid: lh2vk0q2-ojke
-    cre: 2023-04-29T22:51:20.234-05:00
-    upd: 2023-04-29T22:51:20.234-05:00
-    del: false
-    dsc: For testing selects
-    did: 0m7w
-    pid: 8esq
-    emo: ⛏️
-    typ: SELECT
-    rlp: COUNTOFEACH
-  - uid: lh2vk0q4-0o48
-    cre: 2023-04-29T22:51:20.236-05:00
-    upd: 2023-04-29T22:51:20.236-05:00
-    del: false
-    dsc: Set a description
-    did: 05a8
-    pid: 0iu2
-    emo: 🆓
-    typ: TEXT
-    rlp: COUNT
-  - uid: lh2vk0q5-klza
-    cre: 2023-04-29T22:51:20.237-05:00
-    upd: 2023-04-29T22:51:24.465-05:00
+  - uid: lirnym6p-sagc
+    cre: 2023-06-11T11:52:41.041-05:00
+    upd: 2023-06-11T11:52:41.041-05:00
     del: true
-    dsc: Set a description
-    did: ay7l
-    pid: 0pc6
-    emo: "#️⃣"
-    typ: NUMBER
-    rlp: AVERAGE
-  - uid: lh2vk0q5-1wpj
-    cre: 2023-04-29T22:51:20.237-05:00
-    upd: 2023-04-29T22:51:24.466-05:00
-    del: true
-    dsc: Orig desc
-    did: ay7l
-    pid: 0tb7
-    emo: 👍
-    typ: BOOL
-    rlp: COUNT
-  - uid: lh2vk3zk-dywe
-    cre: 2023-04-29T22:51:20.237-05:00
-    upd: 2023-04-29T22:51:24.464-05:00
-    del: false
-    dsc: Set a description
-    did: ay7l
-    pid: 0pc6
-    emo: "#️⃣"
-    typ: NUMBER
-    rlp: AVERAGE
-  - uid: lh2vk3zl-r928
-    cre: 2023-04-29T22:51:20.237-05:00
-    upd: 2023-04-29T22:51:24.466-05:00
-    del: false
-    dsc: Orig desc
-    did: ay7l
-    pid: 0tb7
-    emo: 👎
-    typ: BOOL
-    rlp: COUNT
+    dsc: This is created, then marked deleted
+    did: dltd
+    lbl: Def for deletion test
+    emo: ❌
+    scp: DAY
 entries:
-  - uid: lh2vk0q6-0m06
-    cre: 2023-04-29T22:51:20.238-05:00
-    upd: 2023-04-29T22:51:24.469-05:00
-    del: true
-    did: ay7l
-    eid: lgricx7k-08al
-    per: 2023-04-22T06
-    nte: Orig note
-  - uid: lh2vk0q7-0kef
-    cre: 2023-04-29T22:51:20.239-05:00
-    upd: 2023-04-29T22:51:20.24-05:00
+  - uid: lirnym6e-0ry2
+    cre: 2023-06-11T11:52:41.03-05:00
+    upd: 2023-06-11T11:52:41.03-05:00
     del: false
     did: 0m7w
-    eid: lh2vk0q8-3am6
-    per: 2023-04-29T22:51:20
+    eid: lirnym6f-nuzh
+    per: 2023-06-10T17:34:17
     nte: ""
-  - uid: lh2vk3zm-097s
-    cre: 2023-04-29T22:51:20.238-05:00
-    upd: 2023-04-29T22:51:24.467-05:00
+  - uid: lirnym6g-5laj
+    cre: 2023-06-11T11:52:41.032-05:00
+    upd: 2023-06-11T11:52:41.032-05:00
+    del: false
+    did: 0m7w
+    eid: lirnym6g-9gol
+    per: 2023-06-11T18:29:20
+    nte: Had a good time
+  - uid: lirnym6h-o59a
+    cre: 2023-06-11T11:52:41.033-05:00
+    upd: 2023-06-11T11:52:41.033-05:00
+    del: true
+    did: 0m7w
+    eid: lirnym6h-18cm
+    per: 2023-05-28T09:29:27
+    nte: Testing deleted stuff
+  - uid: lirnym6k-0tec
+    cre: 2023-06-11T11:52:41.036-05:00
+    upd: 2023-06-11T11:52:41.036-05:00
     del: false
     did: ay7l
-    eid: lgricx7k-08al
-    per: 2023-04-22T06
-    nte: Updated noted
+    eid: lirnym6k-txac
+    per: 2023-06-10T17
+    nte: 5PM Auto-check in
+  - uid: lirnym6l-5vem
+    cre: 2023-06-11T11:52:41.037-05:00
+    upd: 2023-06-11T11:52:41.037-05:00
+    del: false
+    did: ay7l
+    eid: lirnym6m-6a2c
+    per: 2023-06-10T18
+    nte: 6PM Auto-check in
+  - uid: lirnym6o-06vt
+    cre: 2023-06-11T11:52:41.04-05:00
+    upd: 2023-06-11T11:52:41.04-05:00
+    del: false
+    did: cpsa
+    eid: lirnym6p-g5zc
+    per: 2023-06-10
+    nte: Wrote this code. Remember notes are **supposed** to support Markdown
+      eventually.
 entryPoints:
-  - uid: lh2vk0q6-idb9
-    cre: 2023-04-29T22:51:20.239-05:00
-    upd: 2023-04-29T22:51:24.468-05:00
-    del: true
-    did: ay7l
-    eid: lgricx7k-08al
-    pid: 0tb7
-    val: false
-  - uid: lh2vk0q7-r0s5
-    cre: 2023-04-29T22:51:20.239-05:00
-    upd: 2023-04-29T22:51:24.47-05:00
-    del: true
-    did: ay7l
-    eid: lgricx7k-08al
-    pid: 0pc6
-    val: 5
-  - uid: lh2vk3zo-pwh7
-    cre: 2023-04-29T22:51:20.239-05:00
-    upd: 2023-04-29T22:51:24.468-05:00
+  - uid: lirnym6f-o6fb
+    cre: 2023-06-11T11:52:41.031-05:00
+    upd: 2023-06-11T11:52:41.031-05:00
+    del: false
+    did: 0m7w
+    eid: lirnym6f-nuzh
+    pid: 8esq
+    val: tagk, tagn
+  - uid: lirnym6g-wwii
+    cre: 2023-06-11T11:52:41.032-05:00
+    upd: 2023-06-11T11:52:41.033-05:00
+    del: false
+    did: 0m7w
+    eid: lirnym6g-9gol
+    pid: 8esq
+    val: tagj
+  - uid: lirnym6k-2teo
+    cre: 2023-06-11T11:52:41.036-05:00
+    upd: 2023-06-11T11:52:41.036-05:00
     del: false
     did: ay7l
-    eid: lgricx7k-08al
+    eid: lirnym6k-txac
+    pid: paxl
+    val: 7
+  - uid: lirnym6l-93kw
+    cre: 2023-06-11T11:52:41.037-05:00
+    upd: 2023-06-11T11:52:41.037-05:00
+    del: false
+    did: ay7l
+    eid: lirnym6k-txac
+    pid: 0pc6
+    val: 288
+  - uid: lirnym6l-s0wd
+    cre: 2023-06-11T11:52:41.037-05:00
+    upd: 2023-06-11T11:52:41.037-05:00
+    del: false
+    did: ay7l
+    eid: lirnym6k-txac
     pid: 0tb7
     val: true
-  - uid: lh2vk3zp-0p2f
-    cre: 2023-04-29T22:51:20.239-05:00
-    upd: 2023-04-29T22:51:24.469-05:00
+  - uid: lirnym6m-k3ud
+    cre: 2023-06-11T11:52:41.038-05:00
+    upd: 2023-06-11T11:52:41.038-05:00
     del: false
     did: ay7l
-    eid: lgricx7k-08al
+    eid: lirnym6m-6a2c
+    pid: paxl
+    val: 0
+  - uid: lirnym6m-l5hf
+    cre: 2023-06-11T11:52:41.038-05:00
+    upd: 2023-06-11T11:52:41.039-05:00
+    del: false
+    did: ay7l
+    eid: lirnym6m-6a2c
     pid: 0pc6
-    val: 6
-tagDefs:
-  - uid: lh2vk0q9-0iha
-    cre: 2023-04-29T22:51:20.241-05:00
-    upd: 2023-04-29T22:51:20.241-05:00
+    val: 98
+  - uid: lirnym6n-mojr
+    cre: 2023-06-11T11:52:41.039-05:00
+    upd: 2023-06-11T11:52:41.039-05:00
     del: false
-    tid: 0x2q
-  - uid: lh2vk0q9-5k8p
-    cre: 2023-04-29T22:51:20.241-05:00
-    upd: 2023-04-29T22:51:24.471-05:00
-    del: true
-    tid: vvct
-  - uid: lh2vk0qa-qbib
-    cre: 2023-04-29T22:51:20.242-05:00
-    upd: 2023-04-29T22:51:20.242-05:00
-    del: false
-    tid: 0vvi
-  - uid: lh2vk0qa-4x8q
-    cre: 2023-04-29T22:51:20.242-05:00
-    upd: 2023-04-29T22:51:20.242-05:00
-    del: false
-    tid: 0vva
-  - uid: lh2vk0qb-gn9e
-    cre: 2023-04-29T22:51:20.243-05:00
-    upd: 2023-04-29T22:51:20.243-05:00
-    del: false
-    tid: 0vvb
-  - uid: lh2vk3zq-j8yj
-    cre: 2023-04-29T22:51:20.241-05:00
-    upd: 2023-04-29T22:51:24.47-05:00
-    del: false
-    tid: vvct
-tags:
-  - uid: lh2vk0qb-bq3o
-    cre: 2023-04-29T22:51:20.243-05:00
-    upd: 2023-04-29T22:51:24.472-05:00
-    del: true
     did: ay7l
-    tid: vvct
-  - uid: lh2vk0qc-98am
-    cre: 2023-04-29T22:51:20.244-05:00
-    upd: 2023-04-29T22:51:24.471-05:00
-    del: true
+    eid: lirnym6m-6a2c
+    pid: 0tb7
+    val: false
+tagDefs:
+  - uid: lirnym69-0qqw
+    cre: 2023-06-11T11:52:41.025-05:00
+    upd: 2023-06-11T11:52:41.025-05:00
+    del: false
+    lbl: Journal
+    tid: apio
+  - uid: lirnym6b-jlzl
+    cre: 2023-06-11T11:52:41.027-05:00
+    upd: 2023-06-11T11:52:41.027-05:00
+    del: false
+    lbl: Krista
+    tid: tagk
+  - uid: lirnym6c-m6vq
+    cre: 2023-06-11T11:52:41.028-05:00
+    upd: 2023-06-11T11:52:41.028-05:00
+    del: false
+    lbl: Nick
+    tid: tagn
+  - uid: lirnym6d-x7sw
+    cre: 2023-06-11T11:52:41.029-05:00
+    upd: 2023-06-11T11:52:41.029-05:00
+    del: false
+    lbl: Josh
+    tid: tagj
+tags:
+  - uid: lirnym6a-0fut
+    cre: 2023-06-11T11:52:41.026-05:00
+    upd: 2023-06-11T11:52:41.026-05:00
+    del: false
     did: 0m7w
-    pid: 8esq
-    tid: 0vvi
-  - uid: lh2vk0qc-qss9
-    cre: 2023-04-29T22:51:20.244-05:00
-    upd: 2023-04-29T22:51:20.244-05:00
+    tid: apio
+  - uid: lirnym6c-dq3j
+    cre: 2023-06-11T11:52:41.028-05:00
+    upd: 2023-06-11T11:52:41.028-05:00
     del: false
     did: 0m7w
     pid: 8esq
-    tid: 0vva
-  - uid: lh2vk0qd-95rs
-    cre: 2023-04-29T22:51:20.245-05:00
-    upd: 2023-04-29T22:51:20.245-05:00
+    tid: tagk
+  - uid: lirnym6d-e8ug
+    cre: 2023-06-11T11:52:41.029-05:00
+    upd: 2023-06-11T11:52:41.029-05:00
     del: false
     did: 0m7w
     pid: 8esq
-    tid: 0vvb
+    tid: tagn
+  - uid: lirnym6d-uu2s
+    cre: 2023-06-11T11:52:41.03-05:00
+    upd: 2023-06-11T11:52:41.03-05:00
+    del: false
+    did: 0m7w
+    pid: 8esq
+    tid: tagj
+  - uid: lirnym6o-sizt
+    cre: 2023-06-11T11:52:41.04-05:00
+    upd: 2023-06-11T11:52:41.04-05:00
+    del: false
+    did: cpsa
+    tid: apio
 overview:
   defs:
     current: 3
     deleted: 1
-  pointDefs:
-    current: 4
-    deleted: 2
   entries:
-    current: 2
-    deleted: 1
-  entryPoints:
-    current: 2
-    deleted: 2
-  tagDefs:
     current: 5
     deleted: 1
   tags:
-    current: 2
-    deleted: 2
-  lastUpdated: 2023-04-29T22:51:24.472-05:00
-
-
-
-
-
-/**
-     * Will call the PDW setDefs method and pass
-     * in the `this` as the existing data
-     * @param dataIn a Map of Def attributes
-     */
-    updateTo(dataIn: MinimumDef){
-        //ensure this isn't overwriting newer data
-        if(dataIn._updated !== undefined && dataIn._updated < this._updated){
-            console.warn('Called update on Def using data that was older than the def itself');
-            throw new Error('Do you want this to error? Or just return null?')
-        }
-
-        if(dataIn._did !== undefined && dataIn._did !== this._did){
-            console.warn("You decided you dont wnat to enable chaging of _did");
-            throw new Error('You cannot change _did on an existing def');
-        }
-
-        let newDefData: DefLike = {
-            _did: this._did,
-            _lbl: dataIn._lbl ?? this._lbl,
-            _desc: dataIn._desc ?? this._desc,
-            _emoji: dataIn._emoji ?? this._emoji,
-            _scope: dataIn._scope ?? this._scope,
-            _uid: makeUID(),
-            _deleted: false,
-            _created: dataIn._created ?? this._created,
-            _updated: makeEpochStr(),
-            __isNew: true, //no need to look for existing for this
-        }
-
-        // PDW
-        this._deleted = true;
-        this._updated = makeEpochStr();
-
-        PDW.getInstance().setDefs([
-            this, //writing the deletes to the dbs
-            newDefData
-        ])
-    }
+    current: 5
+    deleted: 0
+  lastUpdated: 2023-06-11T11:52:41.041-05:00
