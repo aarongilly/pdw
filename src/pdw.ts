@@ -127,15 +127,9 @@ export interface DataStore {
 
     getDefs(params: SanitizedParams): DefLike[];
 
-    getPointDefs(params: SanitizedParams): PointDefLike[];
-
     getEntries(params: SanitizedParams): EntryLike[];
 
-    getEntryPoints(params: SanitizedParams): EntryPointLike[];
-
     getTags(params: SanitizedParams): TagLike[];
-
-    getTagDefs(params: SanitizedParams): TagDefLike[];
 
     getAll(params: SanitizedParams): CompleteDataset;
 
@@ -143,15 +137,9 @@ export interface DataStore {
 
     setDefs(defs: Def[]): Def[];
 
-    setPointDefs(pointDefs: PointDef[]): any
-
     setEntries(entries: Entry[]): Entry[];
 
-    setEntryPoints(entryPointData: MinimumEntryPoint[]): EntryPointLike[];
-
     setTags(tagData: Tag[]): TagLike[];
-
-    setTagDefs(tagData: TagDef[]): TagDefLike[];
 
     setAll(completeDataset: CompleteDataset): CompleteDataset;
 
@@ -266,10 +254,7 @@ export interface SanitizedParams {
 export interface CompleteDataset {
     overview?: DataStoreOverview;
     defs?: DefLike[];
-    pointDefs?: PointDefLike[];
     entries?: EntryLike[];
-    entryPoints?: EntryPointLike[];
-    tagDefs?: TagDefLike[];
     tags?: TagLike[];
 }
 
@@ -333,16 +318,21 @@ export interface DefLike extends ElementLike {
      */
     _scope: Scope;
     /**
-     * Tags for grouping similar definitions easier in filters
-     */
-    // _tags?: TagLike[];
-    /**
      * The points on the definition
      */
-    // _points?: PointDefLike[];
+    _points?: PointDefMap;
+    /**
+     * Tags for grouping similar definitions easier in filters,
+     * An array of _tid
+     */
+    _tags?: string[];
 }
 
-export interface PointDefLike extends ElementLike {
+interface PointDefMap{
+    [_pid: string]: PointDefLike
+}
+
+export interface PointDefLike {
     /**
      * Definition ID - the type of the thing.
      */
@@ -396,36 +386,18 @@ export interface EntryLike extends ElementLike {
      * For tracking where the tracking is coming from
      */
     _source: string,
+
+    /**
+     * Map keyed by _pid values, with the value of the EntryPoint
+     */
+    _points: PointValMap
 }
 
-export interface EntryPointLike extends ElementLike {
-    /**
-     * The Entry the Point is Associated With
-     */
-    _eid: UID,
-    /**
-     * Definition ID of the Entry
-     */
-    _did: SmallID,
-    /**
-     * Associated Point Definition ID
-     */
-    _pid: SmallID,
-    /**
-     * The actual value of the entry
-     */
-    _val: any
-}
-
-export interface TagDefLike extends ElementLike {
-    /**
-     * Like the Definition ID, the ID of the Tag
-     */
-    _tid: string;
-    /**
-     * Human-readable tag
-     */
-    _lbl: string;
+/**
+ * A Map keyed by _pid values, with the value of the EntryPoint
+ */
+interface PointValMap{
+    [_pid: string]: any
 }
 
 export interface TagLike extends ElementLike {
@@ -436,7 +408,7 @@ export interface TagLike extends ElementLike {
     /**
      * The Definition the tag is associated with
      */
-    _did: SmallID
+    _did: SmallID[]
     /**
      * The Point ID for 'Select'-type Points to
      * use as a select option. (Like an Enum)
@@ -507,28 +479,27 @@ export interface MinimumDef extends MinimumElement {
      */
     _scope?: Scope;
     /**
+     * The points on the definition
+     */
+    _points?: PointDefMap;
+    /**
+     * Tags for grouping similar definitions easier in filters,
+     * An array of _tid
+     */
+    _tags?: string[];
+    /**
      * other key/value pairs will attempt to set
      * up a {@link PointDef} with the embedded info 
      * the value
      */
     [x: string]: any;
-    /**
-     * Tags
-     * Defaults to empty array
-     */
-    // _tags?: TagDefLike[];
-    /**
-     * Point Definitions
-     * Defaults to empty array
-     */
-    // _points?: PointDefLike[];
 }
 
 /**
  * required: _did
  * optoinal: all others
  */
-export interface MinimumPointDef extends MinimumElement {
+export interface MinimumPointDef {
     /**
      * Label for the points, defaults to "Label Unset"
      */
@@ -590,45 +561,10 @@ export interface MinimumEntry extends MinimumElement {
      * Where did the data come from?
      */
     _source?: string;
-}
-
-/**
- * required: _pid, _val, and _eid
- */
-export interface MinimumEntryPoint extends MinimumElement {
     /**
-     * What kind of entry it is
-     * Can be inferred
+     * Map keyed by _pid values, with the value of the EntryPoint
      */
-    _did?: SmallID;
-    /**
-     * Which Point is it
-     */
-    _pid: SmallID;
-    /**
-     * What Entry is it associated with?
-     */
-    _eid: SmallID;
-    /**
-     * What is the entry value?
-     */
-    _val: string | number | boolean | object;
-}
-
-/**
- * required: _lbl
- * optional: _tid
- */
-export interface MinimumTagDef extends MinimumElement {
-    /**
-     * Label to be applied to the tag
-     */
-    _lbl: string
-    /**
-     * Tag ID, if known.
-     * Defaults to a new {@link SmallID}
-     */
-    _tid?: SmallID;
+    _points?: PointValMap
 }
 
 /**
@@ -699,28 +635,11 @@ interface CurrentAndDeletedCounts {
 export interface DataStoreOverview {
     storeName?: string;
     defs: CurrentAndDeletedCounts;
-    pointDefs: CurrentAndDeletedCounts;
     entries: CurrentAndDeletedCounts;
-    entryPoints: CurrentAndDeletedCounts
-    tagDefs: CurrentAndDeletedCounts;
     tags: CurrentAndDeletedCounts;
     lastUpdated: EpochStr;
 }
 
-// export interface NestedByDef {
-//     //#UNTESTED
-//     [did: string]: Def & {points: PointDef[], entries: (Entry & {points: EntryPoint[]})[]}
-// }
-
-export interface AssociatedElementMap {
-    existing: Def | PointDef | Entry | EntryPoint | Tag | TagDef;
-    def: Def;
-    pointDef: PointDef;
-    entry: Entry;
-    //entryPoint --- don't think I want these
-    //tag --- don't think I want these
-    //tagDef --- don't think I want these
-}
 //#endregion
 
 //#region ### CLASSES ###
@@ -758,10 +677,7 @@ export class PDW {
 
         let data = {
             defs: this.dataStores[0].getDefs(params),
-            pointDefs: this.dataStores[0].getPointDefs(params),
             entries: this.dataStores[0].getEntries(params),
-            entryPoints: this.dataStores[0].getEntryPoints(params),
-            tagDefs: this.dataStores[0].getTagDefs(params),
             tags: this.dataStores[0].getTags(params),
         }
         return PDW.addOverviewToCompleteDataset(data);
