@@ -5,20 +5,14 @@ export class DefaultDataStore implements pdw.DataStore {
     serviceName: string;
     pdw: pdw.PDW;
     defs: pdw.Def[];
-    pointDefs: pdw.PointDef[];
     entries: pdw.Entry[];
-    entryPoints: pdw.EntryPoint[];
-    tagDefs: pdw.TagDef[];
     tags: pdw.Tag[];
 
     constructor(pdwRef: pdw.PDW) {
         this.serviceName = 'In memory dataset';
         this.pdw = pdwRef;
         this.defs = [];
-        this.pointDefs = [];
         this.entries = [];
-        this.entryPoints = [];
-        this.tagDefs = [];
         this.tags = [];
     }
 
@@ -28,10 +22,7 @@ export class DefaultDataStore implements pdw.DataStore {
      */
     clearAllStoreArrays() {
         this.defs = [];
-        this.pointDefs = [];
         this.entries = [];
-        this.entryPoints = [];
-        this.tagDefs = [];
         this.tags = [];
     }
 
@@ -42,22 +33,13 @@ export class DefaultDataStore implements pdw.DataStore {
     getAll(params: pdw.SanitizedParams): pdw.CompleteDataset {
         return {
             defs: this.getDefs(params),
-            pointDefs: this.getPointDefs(params),
             entries: this.getEntries(params),
-            entryPoints: this.getEntryPoints(params),
-            tagDefs: this.getTagDefs(params),
             tags: this.getTags(params),
         };
     }
 
     getDefs(params: pdw.SanitizedParams): pdw.DefLike[] {
         const allMatches = this.defs.filter(def => def.passesFilters(params));
-        let noDupes = new Set(allMatches);
-        return Array.from(noDupes);
-    }
-
-    getPointDefs(params: pdw.SanitizedParams): pdw.PointDefLike[] {
-        const allMatches = this.pointDefs.filter(pd => pd.passesFilters(params));
         let noDupes = new Set(allMatches);
         return Array.from(noDupes);
     }
@@ -74,21 +56,8 @@ export class DefaultDataStore implements pdw.DataStore {
         return Array.from(noDupes);
     }
 
-    getEntryPoints(params: pdw.SanitizedParams): pdw.EntryPointLike[] {
-        const allMatches = this.entryPoints.filter(entryPoint => entryPoint.passesFilters(params));
-        let noDupes = new Set(allMatches);
-        return Array.from(noDupes);
-    }
-
     getTags(params: pdw.SanitizedParams): pdw.TagLike[] {
         const allMatches = this.tags.filter(tag => tag.passesFilters(params));
-        let noDupes = new Set(allMatches);
-        return Array.from(noDupes);
-    }
-
-    getTagDefs(params: pdw.SanitizedParams): pdw.TagDefLike[] {
-
-        const allMatches = this.tagDefs.filter(tagDef => tagDef.passesFilters(params));
         let noDupes = new Set(allMatches);
         return Array.from(noDupes);
     }
@@ -126,26 +95,14 @@ export class DefaultDataStore implements pdw.DataStore {
         return this.setElementsInRepo(defsIn, this.defs) as pdw.Def[];
     }
 
-    setPointDefs(pointDefsIn: pdw.PointDef[]) {
-        return this.setElementsInRepo(pointDefsIn, this.pointDefs) as pdw.PointDef[];
-    }
-
     setEntries(entriesIn: pdw.Entry[]): pdw.Entry[] {
         return this.setElementsInRepo(entriesIn, this.entries) as pdw.Entry[];
-    }
-
-    setEntryPoints(entryPointData: pdw.EntryPoint[]): pdw.EntryPoint[] {
-        return this.setElementsInRepo(entryPointData, this.entryPoints) as pdw.EntryPoint[];
     }
 
     setTags(tagData: pdw.Tag[]): pdw.TagLike[] {
         return this.setElementsInRepo(tagData, this.tags) as pdw.Tag[];
     }
-
-    setTagDefs(tagDefsIn: pdw.TagDef[]): pdw.TagDefLike[] {
-        return this.setElementsInRepo(tagDefsIn, this.tagDefs) as pdw.TagDef[];
-    }
-
+    
     getOverview(): pdw.DataStoreOverview {
         throw new Error("Method not implemented.");
     }

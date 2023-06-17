@@ -6,16 +6,20 @@ import { importFromFile } from '../src/dataStores/fileAsyncDataStores';
 
 const pdwRef = pdw.PDW.getInstance();
 
-test.skip('Def Basics', () => {
+test('Def Setting and Getting', () => {
     /**
      * Most Basic Def Creation
     */
     let firstDef = pdwRef.newDef({
-        _lbl: 'First Def'
+        _did: 'aaaa'
     });
-    expect(firstDef._lbl).toBe('First Def'); //return value
+    expect(firstDef._did).toBe('aaaa'); //accepts input value
+    expect(firstDef._lbl).toBe('Unlabeled Definition aaaa'); //return value
     expect(firstDef._scope).toBe(pdw.Scope.SECOND); //default scope
     expect(firstDef._emoji).toBe('🆕') //default emoji
+    expect(firstDef._pts).toEqual([]); //default points = empty array
+    expect(firstDef._desc).toBe('Set a description'); //default description
+    expect(firstDef._deleted).toBe(false); //default deletion status
     expect(firstDef._tempCreated.epochMilliseconds).toBeGreaterThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString()) - 5000) //created not long ago...
     expect(firstDef._tempCreated.epochMilliseconds).toBeLessThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString())) //...but not in the future
 
@@ -39,81 +43,234 @@ test.skip('Def Basics', () => {
     expect(secondDef._uid).toBe('handjammed-30so');
     expect(secondDef._did).toBe('gggg');
     expect(secondDef._lbl).toBe('Second Def');
+    expect(secondDef._deleted).toBe(false);
+    //checking epochStr
+    const epochMillis = parseInt(secondDef._created, 36)
+    const parsedTemporal = Temporal.Instant.fromEpochMilliseconds(epochMillis).toZonedDateTimeISO(Temporal.Now.timeZone());
+    const localeString = parsedTemporal.toLocaleString();
+    expect(localeString).toBe('5/19/2023, 4:13:30\u202fPM CDT'); //until daylight savings hits, then it will be an hour off. also \u202f is the non-breaking space char code    
+    expect(secondDef._created).toEqual(secondDef._updated); //created & updated are the same if the Element isn't an update to an existing one
 
-    //@ts-expect-error
-    expect(() => pdwRef.newDef({ _lbl: 'invalid scope test', _scope: 'millisecond' })).toThrowError('Invalid scope supplied when creating Def: millisecond')
-
+    /**
+     * Some base class {@link Element} methods
+     */
+    expect(firstDef.getType()).toBe('DefLike');
+    expect(firstDef.isOlderThan(secondDef)).toBe(false); //because secondDef was backdated on creation
+    expect(firstDef.shouldBeReplacedWith(secondDef)).toBe(false); //not the same _did
+    expect(firstDef.sameIdAs(secondDef)).toBe(false); //not the same _did
+    expect(firstDef.sameTypeAs(secondDef)).toBe(true); //both 'DefLike'
+    
     /**
     * Wide-open getter
     */
     let defs = pdwRef.getDefs();
-    expect(defs[0]).toEqual(firstDef); //REF deep equal code
+    expect(defs[0]).toEqual(firstDef); //REF deep-equal syntax
     expect(defs[1]).toEqual(secondDef);
 
     /**
      * Specified getter
      */
     defs = pdwRef.getDefs({ did: ['gggg'] });
-    expect(defs[0]._desc).toBe('Test Desc');
-
-    /**
-     * Directly update a Def
-     */
-    secondDef.updateTo({
-        _lbl: 'Updated Second Def'
-    });
-
-    /**
-     * Check current def is updated
-     */
-    defs = pdwRef.getDefs({ did: 'gggg', includeDeleted: 'no' });
-    expect(defs[0]._lbl).toBe('Updated Second Def');
-
-    /**
-     * Indirectly update a Def
-     */
-    pdwRef.setDefs([{
-        _did: 'gggg',
-        _lbl: 'Updated Second Def Again'
-    }]);
-
-    /**
-     * Check current def is updated
-     */
-    defs = pdwRef.getDefs({ did: 'gggg', includeDeleted: 'no' });
-
-    expect(defs[0]._lbl).toBe('Updated Second Def Again');
-
-    /**
-     * Check that out of date def was marked deleted
-     */
-    defs = pdwRef.getDefs({ did: 'gggg', includeDeleted: 'only' });
     expect(defs[0]._lbl).toBe('Second Def');
 
     /**
-     * Check simple deletion
+     * Bulk Def Creation
      */
-    firstDef.markDeleted();
-    defs = pdwRef.getDefs({ includeDeleted: 'only', did: firstDef._did });
-    expect(defs[0]._lbl).toBe('First Def');
+    let thirdAndForthDef = pdwRef.setDefs(
+        [
+            {
+                _lbl: 'Third def'
+            },
+            {
+                _lbl: 'Forth def'
+            }
+        ]
+    );
+    expect(thirdAndForthDef[0]._lbl).toBe('Third def');
+    expect(thirdAndForthDef[1]._lbl).toBe('Forth def');
+    defs = pdwRef.getDefs()
+    expect(defs.length).toBe(4);
 
     /**
-     * Setting PointDef
+     * Emoji not emoji error
      */
-    let points = secondDef.setPointDefs([
+    expect(() => pdwRef.newDef({
+        _emoji: 'not an emoji' //emoji isn't 1 character long
+    })).toThrowError('Def was mal-formed.');
+
+    /**
+     * Invalid Scope Error
+     */
+    expect(() => pdwRef.newDef(
+        { 
+            _lbl: 'invalid scope test', 
+            //@ts-expect-error // luckily typescript warns me on this
+            _scope: 'millisecond' 
+        }
+    )).toThrowError('Invalid scope supplied when creating Def: millisecond');
+
+    (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
+
+    /**
+     * Setting Def with explicity ._pts PointDefs 
+     */
+    firstDef = pdwRef.newDef({
+        _did: 'aaaa',
+        _lbl: 'Def 1',
+        _pts: [
+            {
+                _pid: 'a111',
+                _lbl: 'Def 1 point 1',
+                _emoji: '1️⃣',
+                _desc: 'Text type',
+                _type: pdw.PointType.TEXT
+            },
+            {
+                _pid: 'a222',
+                _lbl: 'Def 1 point 2',
+                _emoji: '2️⃣',
+                _desc: "Boolean Type",
+                _type: pdw.PointType.BOOL
+            }
+        ]
+    })
+    expect(firstDef._pts.length).toBe(2);
+    expect(firstDef._pts[0]._lbl).toBe('Def 1 point 1');
+    expect(firstDef._pts[1]._lbl).toBe('Def 1 point 2');
+    
+    /**
+     * Setting Def with implicit Points
+     */
+    secondDef = pdwRef.newDef({
+        _did: 'bbbb',
+        _lbl: 'Def 2',
+        'b111': {
+            _lbl: 'Def 2 point 1',
+            _type: pdw.PointType.NUMBER,
+            _desc: 'Number Type'
+        },
+        'b222': {
+            _lbl: 'Def 2 point 2',
+            _type: pdw.PointType.SELECT,
+            _desc: 'Select type'
+        }
+    })
+    expect(secondDef._pts.length).toBe(2);
+    expect(secondDef._pts[0]._lbl).toBe('Def 2 point 1');
+    expect(secondDef._pts[1]._lbl).toBe('Def 2 point 2');
+
+    /**
+     * Setting a Def using both - probably not common to do in practice
+     */
+    let thirdDef = pdwRef.newDef({
+        _did: 'cccc',
+        _lbl: 'Def 3',
+        'c111': {
+            _lbl: 'Def 3 point 1',
+            _type: pdw.PointType.MARKDOWN,
+            _desc: 'Markdown type'
+        },
+        _pts: [
+            {
+                _pid: 'c222',
+                _lbl: 'Def 3 point 2',
+                _type: pdw.PointType.MULTISELECT,
+                _desc: 'Multiselect Type'
+            }
+        ]
+    })
+    expect(thirdDef._pts.length).toBe(2);
+    expect(thirdDef._pts[1]._lbl).toBe('Def 3 point 1'); //order cannot be trusted I guess
+    expect(thirdDef._pts[0]._lbl).toBe('Def 3 point 2');
+
+    /**
+     * Setting Defs & PointDefs implicitly, mixing point setter methods
+     */
+    let defsFourAndFive = pdwRef.setDefs([
         {
-            _lbl: 'Test point one',
-            _type: pdw.PointType.TEXT,
+            _did: 'dddd',
+            _pts: [
+                {
+                    _pid: 'd1111',
+                    _lbl: 'Def 4 point 1',
+                    _type: pdw.PointType.DURATION,
+                }
+            ]
         },
         {
-            _lbl: 'Test point 2',
-            _type: pdw.PointType.NUMBER,
+            _did: 'eeee',
+            'e111': {
+                _lbl: 'Def 5 point 1',
+                _type: pdw.PointType.JSON
+            }
         }
     ]);
-    expect(points.length).toBe(2);
+    expect(defsFourAndFive[0]._pts[0]._lbl).toBe('Def 4 point 1');
+    expect(defsFourAndFive[1]._pts[0]._lbl).toBe('Def 5 point 1');
 
-    let samePoints = secondDef.getPoints();
-    expect(points).toEqual(samePoints);
+    /**
+     * Def.getPoint(pid)
+     */
+    let point = firstDef.getPoint('a111');
+    expect(point._type).toBe(pdw.PointType.TEXT);
+
+    /**
+     * Def.getPoint(lbl)
+     */
+    point = firstDef.getPoint('Def 1 point 2');
+    expect(point._type).toBe(pdw.PointType.BOOL);
+
+    /**
+     * Point.getDef
+     */
+    expect(point.getDef()).toEqual(firstDef);
+
+    /**
+     * Should have Options Property
+     */
+    let textType = firstDef.getPoint('a111');
+    let selectType = secondDef.getPoint('b222');
+    let multiselectType = thirdDef.getPoint('c222');
+    //predicate
+    expect(textType.shouldHaveOptsProp()).toBe(false);
+    expect(selectType.shouldHaveOptsProp()).toBe(true);
+    expect(multiselectType.shouldHaveOptsProp()).toBe(true);
+    //existance & type of prop
+    expect(textType._opts).toBeUndefined();
+    expect(Array.isArray(selectType._opts)).toBe(true);
+    expect(Array.isArray(multiselectType._opts)).toBe(true);
+
+    /**
+     * Invalid PointDef (bad Type)
+     */    
+    expect(()=>{
+        pdwRef.newDef({
+            _did: 'test',
+            _pts:[
+                {
+                    _pid: 'test',
+                    //@ts-expect-error //nice
+                    _type: 'Invalid type'
+                }
+            ]
+        })
+    }).toThrowError('Cannot parse point type Invalid type')
+    
+    /**
+     * Invalid PointDef (bad Rollup)
+    */    
+   expect(()=>{
+       pdwRef.newDef({
+           _did: 'test',
+           _pts:[
+               {
+                   _pid: 'test',
+                   //@ts-expect-error //nice
+                    _rollup: 'Invalid rollup'
+                }
+            ]
+        })
+    }).toThrowError('Cannot parse point rollup Invalid rollup');
 
     /**
      * Defs are Deflike
@@ -123,83 +280,31 @@ test.skip('Def Basics', () => {
     /**
      * But PointDefs are not DefLike
      */
-    expect(pdw.Def.isDefLike(points[0])).toBe(false);
-
-    /**
-     * Fancy way to establish a new Def with PointDefs.
-     * Nest PointDef in using a desired _pid as the key
-     */
-    let thirdDef = pdwRef.newDef({
-        _lbl: 'has points!',
-        _did: 'thre',
-        'aheo': {
-            _lbl: 'Point with _pid equal to aheo'
-        },
-        'thqe': {
-            _lbl: 'Point with _pid equal to thqe',
-            _type: pdw.PointType.NUMBER
-        }
-    });
-    defs = pdwRef.getDefs({ did: 'thre' });
-    expect(defs[0]).toEqual(thirdDef);
-    points = pdwRef.getPointDefs({ did: 'thre' });
-    expect(thirdDef.getPoints()).toEqual(points);
-    points = pdwRef.getPointDefs({ pid: 'aheo' });
-    expect(points.length).toBe(1);
-    points = pdwRef.getPointDefs({ pid: 'thqe' });
-    expect(points.length).toBe(1);
+    expect(pdw.Def.isDefLike(point)).toBe(false);
 })
 
-test.skip('PointDef Basics', () => {
-    //Reset DataStore for test
+test('Update Logic', ()=>{
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 
-    /**
-     * Throw error if there's no associated Definition
-     */
-    expect(() => pdwRef.setPointDefs([{
-        _did: 'doesntexist',
-        _lbl: 'should error'
-    }])).toThrowError('No associated Def for PointDef');
+    const origUid = pdw.makeUID();
 
-    /**
-     * Make Def & PointDef Simultaneously
-     */
-    const testDef = pdwRef.newDef({
-        _lbl: 'Test Def',
-        _did: 'thre',
-        'aheo': {
-            _lbl: 'Test Point One'
-        }
+    let firstDef = pdwRef.newDef({
+        _uid: origUid,
+        _did: 'aaaa',
+        _lbl: 'Def 1',
+        _desc: 'Def Desc',
+        _pts: [
+            {       
+                _pid: 'a111',
+                _lbl: 'Def 1 point 1',
+                _desc: 'Point Desc'
+            }
+        ]
     });
-    expect(testDef.getPoints().length).toBe(1);
 
-    /**
-     * Append implicitly
-     */
-    pdwRef.newPointDef({
-        _did: 'thre',
-        _lbl: 'Test Point Two'
-    })
-    expect(testDef.getPoints().length).toBe(2);
+    firstDef.markDeleted();
+    firstDef.save();
 
-    /**
-     * Test bad point type
-     */
-    expect(() => pdwRef.newPointDef({
-        _did: 'thre',
-        //@ts-expect-error
-        _type: 'should error'
-    })).toThrowError()
-
-    /**
-     * Test bad rollup
-     */
-    expect(() => pdwRef.newPointDef({
-        _did: 'thre',
-        //@ts-expect-error
-        _rollup: 'should error'
-    })).toThrowError()
 })
 
 test.skip('Entry Basics', () => {
@@ -415,7 +520,7 @@ test.skip('Entry Basics', () => {
 
 })
 
-test.skip('Tag & TagDef Basics', ()=>{
+test.skip('Tag Basics', () => {
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 
     let testDef = pdwRef.newDef({
@@ -454,7 +559,7 @@ test.skip('Tag & TagDef Basics', ()=>{
     /**
      * TagDef type error test
      */
-    expect(()=>{
+    expect(() => {
         pdwRef.newTagDef({
             //@ts-expect-error
             _lbl: 5, //wrong type, should error
@@ -470,14 +575,14 @@ test.skip('Tag & TagDef Basics', ()=>{
     });
     expect(tagA._did).toBe('aaaa');
     expect(tagA._tid).toBe('taga');
-    expect(pdwRef.getTags({tid: 'taga'})[0]).toEqual(tagA);
+    expect(pdwRef.getTags({ tid: 'taga' })[0]).toEqual(tagA);
 
     /**
      * Def.addTag method 
      */
     let tagB = testDef.addTag('tagb');
-    expect(pdwRef.getTags({did: 'aaaa'}).length).toBe(2);
-    expect(pdwRef.getTags({did: 'aaaa', tid: 'tagb'})[0]).toEqual(tagB);
+    expect(pdwRef.getTags({ did: 'aaaa' }).length).toBe(2);
+    expect(pdwRef.getTags({ did: 'aaaa', tid: 'tagb' })[0]).toEqual(tagB);
 
     /**
      * TagDef.getTaggedDefs
@@ -490,15 +595,15 @@ test.skip('Tag & TagDef Basics', ()=>{
      * TagDef.addTag
      */
     tagDefB.addTag('aaaa')
-    expect(pdwRef.getTags({did: 'aaaa'}).length).toBe(2);
+    expect(pdwRef.getTags({ did: 'aaaa' }).length).toBe(2);
 
     /**
      * Don't create duplicates
      */
-    let numBefore = pdwRef.getTags({includeDeleted: 'only'}).length
+    let numBefore = pdwRef.getTags({ includeDeleted: 'only' }).length
     testDef.addTag('taga') //already exists
     //creates a new Tag, but deletes the old one, even though they're the same content
-    expect(pdwRef.getTags({includeDeleted:'only'}).length).toBe(numBefore + 1);
+    expect(pdwRef.getTags({ includeDeleted: 'only' }).length).toBe(numBefore + 1);
 
     //Enumerations
     //Create Definition with a Select type
@@ -512,7 +617,7 @@ test.skip('Tag & TagDef Basics', ()=>{
         }
     });
 
-    let enumPoint = defWithEnum.getPoints()[0];
+    let enumPoint = defWithEnum.getPointsAsArray()[0];
     expect(enumPoint._lbl).toBe('Enum PointDef');
 
     /**
@@ -544,22 +649,22 @@ test.skip('Tag & TagDef Basics', ()=>{
         }
     ])
     expect(pdwRef.getTags().length).toBe(numBefore + 2);
-    
+
     /**
      * PointDef.getEnumOptions
      */
     let enumTags = enumPoint.getEnumOptions();
     expect(enumTags.length).toBe(2);
-    
+
     /**
      * PointDef.addEnumOption
      */
     enumPoint.addEnumOption('Choice C');
     enumTags = enumPoint.getEnumOptions();
     expect(enumTags.length).toBe(3);
-    expect(enumTags.map(t=>t.getLbl())).toEqual(['Choice A','Choice B','Choice C']);
-    let tagDef = pdwRef.getTagDefs({tagLbl: 'Choice C'})[0];
-    let tagC = pdwRef.getTags({tid: tagDef._tid})[0];
+    expect(enumTags.map(t => t.getLbl())).toEqual(['Choice A', 'Choice B', 'Choice C']);
+    let tagDef = pdwRef.getTagDefs({ tagLbl: 'Choice C' })[0];
+    let tagC = pdwRef.getTags({ tid: tagDef._tid })[0];
     expect(tagC.getDef()._lbl).toBe('Choice C'); //tagDef was created
 
     /**
@@ -569,7 +674,7 @@ test.skip('Tag & TagDef Basics', ()=>{
     expect(tagC.getLbl()).toBe('CHOICE C'); //will pull the newly updated TagDef. Nice.
 })
 
-test('Query Basics', () => {
+test.skip('Query Basics', () => {
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 
     let q = new pdw.Query();
@@ -583,8 +688,8 @@ test.skip('Data Merge', () => {
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 })
 
-function loadFullTestDatasetFromFile(){
+function loadFullTestDatasetFromFile() {
     importFromFile('data-files/OutExcel1.xlsx');
     console.log(pdwRef.getAll({}));
-    
+
 }
