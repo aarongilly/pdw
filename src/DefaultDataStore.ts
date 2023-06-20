@@ -1,4 +1,4 @@
-import * as pdw from "./pdw";
+import * as pdw from "./pdw.js"; //why was this erroring before I put ".js" on there?
 
 
 export class DefaultDataStore implements pdw.DataStore {
@@ -41,7 +41,7 @@ export class DefaultDataStore implements pdw.DataStore {
     getDefs(params: pdw.SanitizedParams): pdw.DefLike[] {
         const allMatches = this.defs.filter(def => def.passesFilters(params));
         let noDupes = new Set(allMatches);
-        return Array.from(noDupes);
+        return Array.from(noDupes).map(def => new pdw.Def(def, false))
     }
 
     /**
@@ -53,13 +53,13 @@ export class DefaultDataStore implements pdw.DataStore {
     getEntries(params: pdw.SanitizedParams): pdw.EntryLike[] {
         const allMatches = this.entries.filter(entry => entry.passesFilters(params));
         let noDupes = new Set(allMatches);
-        return Array.from(noDupes);
+        return Array.from(noDupes).map(entry => new pdw.Entry(entry));
     }
 
     getTags(params: pdw.SanitizedParams): pdw.TagLike[] {
         const allMatches = this.tags.filter(tag => tag.passesFilters(params));
         let noDupes = new Set(allMatches);
-        return Array.from(noDupes);
+        return Array.from(noDupes).map(tag => new pdw.Tag(tag));
     }
 
     /**
@@ -68,18 +68,19 @@ export class DefaultDataStore implements pdw.DataStore {
      * @param elementsIn list of Elements (Defs, Entries, etc) to set
      * @param elementRepo the existing set of Elements in the DataStore (this.defs, this.entries, etc)
      */
-    setElementsInRepo(elementsIn: pdw.Element[], elementRepo: pdw.Element[]) {
+    setElementsInRepo(elementsIn: pdw.Element[], elementRepo: pdw.ElementLike[]) {
         let newElements: pdw.Element[] = [];
         elementsIn.forEach(el => {
-            if (el.__isNew) {
-                newElements.push(el);
-                return;
-            }
+            // if (el.__isNew) {
+            //     newElements.push(el);
+            //     return;
+            // }
             let existing = elementRepo.find(existingElement => existingElement._deleted === false && existingElement.sameIdAs(el));
             if (existing !== undefined) {
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
                 if (existing.shouldBeReplacedWith(el)) {
-                    existing.markDeleted();
+                    existing._deleted = true;
+                    existing._updated = pdw.makeEpochStr();
                     if (!el._deleted)
                         newElements.push(el); //don't duplicate in case of calling setElement purely to delete
                 }
@@ -87,8 +88,18 @@ export class DefaultDataStore implements pdw.DataStore {
                 newElements.push(el);
             }
         });
+
+        //ensure what's in the repo isn't linked by reference to what was sent in
+        // const staticCopies = newElements.map(ele => makeStaticCopy(ele))
+        // elementRepo.push(...staticCopies);
         elementRepo.push(...newElements);
         return elementsIn;
+
+        // function makeStaticCopy(elementInstance: pdw.Element): pdw.ElementLike {
+
+
+        //     return JSON.parse(JSON.stringify(elementInstance));
+        // }
     }
 
     setDefs(defsIn: pdw.Def[]): pdw.Def[] {
@@ -102,7 +113,7 @@ export class DefaultDataStore implements pdw.DataStore {
     setTags(tagData: pdw.Tag[]): pdw.TagLike[] {
         return this.setElementsInRepo(tagData, this.tags) as pdw.Tag[];
     }
-    
+
     getOverview(): pdw.DataStoreOverview {
         throw new Error("Method not implemented.");
     }

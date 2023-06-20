@@ -361,10 +361,6 @@ export interface PointDefLike {
      * An array of _tid
      */
     _opts?: OptKeyVal[];
-    /**
-     * Meta-property
-     */
-    __isNew?: boolean
 }
 
 export interface EntryLike extends ElementLike {
@@ -581,8 +577,6 @@ export class PDW {
         throw new Error('Multiple datastores not yet implemented');
     }
 
-
-
     setDefs(defsIn: DefLike[]): Def[] {
         let defs: Def[] = defsIn.map(defLike => new Def(defLike));
         this.dataStores.forEach(connection => {
@@ -607,11 +601,11 @@ export class PDW {
         return tags
     }
 
-    setAll(completeDataset: CompleteDataset): CompleteDataset {
-        throw new Error("Method not implemented")
+    setAll(completeDataset: CompleteDataset) {
+        if(completeDataset.defs !== undefined) this.setDefs(completeDataset.defs);
+        if(completeDataset.entries !== undefined) this.setEntries(completeDataset.entries);
+        if(completeDataset.tags !== undefined) this.setTags(completeDataset.tags);
     }
-
-
 
     /**
      * Creates a new definition from {@link DefLike} components
@@ -620,8 +614,7 @@ export class PDW {
      * @returns the newly created Definition
     */
     newDef(defInfo: DefLike): Def {
-        defInfo.__isNew = true; //optimize constructor slightly
-        let newDef = new Def(defInfo);
+        let newDef = new Def(defInfo, false);
         this.dataStores.forEach(connection => {
             connection.setDefs([newDef])
         })
@@ -629,8 +622,7 @@ export class PDW {
     }
 
     newEntry(entryInfo: EntryLike): Entry {
-        entryInfo.__isNew = true; //optimize constructor slightly
-        let newEntry = new Entry(entryInfo);
+        let newEntry = new Entry(entryInfo, false);
         this.dataStores.forEach(connection => {
             connection.setEntries([newEntry])
         })
@@ -638,8 +630,7 @@ export class PDW {
     }
 
     newTag(tagInfo: TagLike): Tag {
-        tagInfo.__isNew = true; //optimize constructor slightly
-        let newTag = new Tag(tagInfo);
+        let newTag = new Tag(tagInfo, false);
         this.dataStores.forEach(connection => {
             connection.setTags([newTag])
         })
@@ -785,25 +776,20 @@ export abstract class Element implements ElementLike {
      * For convenience only - a ZonedDateTime representation
      * of _created.
      */
-    readonly _tempCreated: Temporal.ZonedDateTime;
+    readonly __tempCreated: Temporal.ZonedDateTime;
     /**
      * For convenience only - a ZonedDateTime representation
      * of _updated.
      */
-    readonly _tempUpdated: Temporal.ZonedDateTime;
-    /**
-     * Meta-property - not stored
-     */
-    __isNew?: boolean;
+    readonly __tempUpdated: Temporal.ZonedDateTime;
 
     constructor(inputData: ElementLike) {//, associatedElements: AssociatedElementMap) {
         this._uid = inputData._uid ?? makeUID();
         this._deleted = this.handleDeletedInputVariability(inputData._deleted);
         this._created = this.handleEpochStrInputVariability(inputData._created);
         this._updated = this.handleEpochStrInputVariability(inputData._updated);
-        this._tempCreated = parseTemporalFromEpochStr(this._created);
-        this._tempUpdated = parseTemporalFromEpochStr(this._updated);
-        if (inputData.__isNew !== undefined) this.__isNew = inputData.__isNew;
+        this.__tempCreated = parseTemporalFromEpochStr(this._created);
+        this.__tempUpdated = parseTemporalFromEpochStr(this._updated);
     }
 
     /**
@@ -839,21 +825,41 @@ export abstract class Element implements ElementLike {
     }
 
     /**
-     * Sets _deleted & _updated.
-     * Does **NOT** write to DataStores
+     * Sets _deleted & _updated and updates DataStores
      */
-    markDeleted() {
-        this._deleted = true;
-        this._updated = makeEpochStr();
+    deleteAndSave(): Entry | Def | Tag {
+        const type = this.getType();
+        const pdwRef = PDW.getInstance();
+
+        if(type === 'DefLike'){
+            return pdwRef.setDefs([{_uid: this._uid, _deleted: true}])[0];
+        }
+        if(type === 'EntryLike'){
+            return pdwRef.setEntries([{_uid: this._uid, _deleted: true}])[0];
+        }
+        if(type === 'TagLike'){
+            return pdwRef.setTags([{_uid: this._uid, _deleted: true}])[0];
+        }
+        throw new Error('Type was not found')
     }
 
     /**
-     * Sets _deleted & _updated.
-     * Does **NOT** write to DataStores
+     * Sets _deleted & _updated and updates DataStores
      */
-    markUndeleted() {
-        this._deleted = false;
-        this._updated = makeEpochStr();
+    unDeleteAndSave() {
+        const type = this.getType();
+        const pdwRef = PDW.getInstance();
+
+        if(type === 'DefLike'){
+            return pdwRef.setAll({'defs':[{_uid: this._uid, _deleted: false}]})
+        }
+        if(type === 'EntryLike'){
+            return pdwRef.setAll({'entries':[{_uid: this._uid, _deleted: false}]})
+        }
+        if(type === 'TagLike'){
+            return pdwRef.setAll({'tags':[{_uid: this._uid, _deleted: false}]})
+        }
+        throw new Error('Type was not found')
     }
 
     /**
@@ -948,8 +954,6 @@ export abstract class Element implements ElementLike {
     }
 
     passesFilters(params: SanitizedParams) {
-        const type = this.getType()!;
-
         if (params.uid !== undefined && !params.uid.some(uid => uid === this._uid)) return false;
         //@ts-expect-error
         if (params.did !== undefined && this._did !== undefined && !params.did.some(did => did === this._did)) return false;
@@ -959,6 +963,8 @@ export abstract class Element implements ElementLike {
         if (params.tid !== undefined && this._tid != undefined && !params.tid.some(tid => tid === this._tid)) return false;
         //@ts-expect-error
         if (params.pid !== undefined && this._pid !== undefined && !params.pid.some(pid => pid === this._pid)) return false;
+        
+        const type = this.getType()!;
 
         //@ts-expect-error
         if (params.defLbl !== undefined && type === 'DefLike' && !params.defLbl.some(lbl => lbl === this._lbl)) return false;
@@ -1063,10 +1069,10 @@ export class Def extends Element implements DefLike {
     readonly _scope: Scope;
     readonly _tags: SmallID[];
     readonly _pts: PointDef[];
-    constructor(defData: DefLike) {
+    constructor(defData: DefLike, lookForExisting = true) {
         if (defData._scope !== undefined && !Def.isValidScope(defData._scope)) throw new Error('Invalid scope supplied when creating Def: ' + defData._scope);
-        if (defData._did !== undefined && defData.__isNew !== true) {
-            let existing = Element.findExistingData(defData);
+        if (lookForExisting) {
+            let existing = Element.findExistingData(defData, 'Def');
             if (existing !== undefined) {
                 if (defData._created === undefined) defData._created = existing._created;
                 if (defData._desc === undefined) defData._desc = existing._desc;
@@ -1093,7 +1099,7 @@ export class Def extends Element implements DefLike {
         })
 
         this._pts = pointsToSanitize.map(rawPoint => new PointDef(rawPoint, this));
-
+        
         if (!Def.isDefLike(this)) throw new Error('Def was mal-formed.')
     }
 
@@ -1174,18 +1180,18 @@ export class PointDef implements PointDefLike {
     constructor(newPointDefData: PointDefLike, def: Def) {
         if (newPointDefData._pid === undefined) throw new Error("No PointDef _pid supplied.");
 
-        if (newPointDefData.__isNew !== true) {
-            let existing = Element.findExistingData(newPointDefData);
-            if (existing !== undefined) {
-                if (newPointDefData._active === undefined) newPointDefData._active = existing._active;
-                if (newPointDefData._desc === undefined) newPointDefData._desc = existing._desc;
-                if (newPointDefData._emoji === undefined) newPointDefData._emoji = existing._emoji;
-                if (newPointDefData._lbl === undefined) newPointDefData._lbl = existing._lbl;
-                if (newPointDefData._type === undefined) newPointDefData._type = existing._type;
-                if (newPointDefData._rollup === undefined) newPointDefData._rollup = existing._rollup;
-                if (newPointDefData._opts === undefined) newPointDefData._opts = existing._opts;
-            }
-        }
+        // if (newPointDefData.__isNew !== true) {
+        //     let existing = Element.findExistingData(newPointDefData);
+        //     if (existing !== undefined) {
+        //         if (newPointDefData._active === undefined) newPointDefData._active = existing._active;
+        //         if (newPointDefData._desc === undefined) newPointDefData._desc = existing._desc;
+        //         if (newPointDefData._emoji === undefined) newPointDefData._emoji = existing._emoji;
+        //         if (newPointDefData._lbl === undefined) newPointDefData._lbl = existing._lbl;
+        //         if (newPointDefData._type === undefined) newPointDefData._type = existing._type;
+        //         if (newPointDefData._rollup === undefined) newPointDefData._rollup = existing._rollup;
+        //         if (newPointDefData._opts === undefined) newPointDefData._opts = existing._opts;
+        //     }
+        // }
 
         if (newPointDefData._type !== undefined && !PointDef.isValidType(newPointDefData._type)) throw new Error('Cannot parse point type ' + newPointDefData._type);
         if (newPointDefData._rollup !== undefined && !PointDef.isValidRollup(newPointDefData._rollup)) throw new Error('Cannot parse point rollup ' + newPointDefData._rollup);
@@ -1356,11 +1362,11 @@ export class Entry extends Element implements EntryLike {
     readonly _source: string;
     readonly _pts: PidKeyVal[];
     __def?: Def;
-    constructor(entryData: EntryLike, def?: Def) {
+    constructor(entryData: EntryLike, lookForExisting = true, def?: Def) {
         if (entryData._eid === undefined && entryData._did === undefined && def === undefined)
             throw new Error('Not enough info to determine Entry type')
-        if (entryData._eid !== undefined && entryData.__isNew !== true) {
-            let existing = Element.findExistingData(entryData);
+        if (lookForExisting) {
+            let existing = Element.findExistingData(entryData, 'Entry');
             if (existing !== undefined) {
                 if (entryData._created === undefined) entryData._created = existing._created;
                 if (entryData._did === undefined) entryData._did = existing._did;
@@ -1524,9 +1530,9 @@ export class Entry extends Element implements EntryLike {
 export class Tag extends Element implements TagLike {
     readonly _tid: string;
     readonly _lbl: string;
-    constructor(tagDefData: TagLike) {
-        if (tagDefData._tid !== undefined) {
-            let existing = Element.findExistingData(tagDefData);
+    constructor(tagDefData: TagLike, lookForExisting = true) {
+        if (lookForExisting) {
+            let existing = Element.findExistingData(tagDefData, 'Tag');
             if (existing !== undefined) {
                 if (tagDefData._created === undefined) tagDefData._created = existing._created;
             }

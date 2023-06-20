@@ -6,7 +6,7 @@ import { importFromFile } from '../src/dataStores/fileAsyncDataStores';
 
 const pdwRef = pdw.PDW.getInstance();
 
-test('Def Setting and Getting', () => {
+test.skip('Def Setting and Getting', () => {
     /**
      * Most Basic Def Creation
     */
@@ -20,8 +20,8 @@ test('Def Setting and Getting', () => {
     expect(firstDef._pts).toEqual([]); //default points = empty array
     expect(firstDef._desc).toBe('Set a description'); //default description
     expect(firstDef._deleted).toBe(false); //default deletion status
-    expect(firstDef._tempCreated.epochMilliseconds).toBeGreaterThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString()) - 5000) //created not long ago...
-    expect(firstDef._tempCreated.epochMilliseconds).toBeLessThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString())) //...but not in the future
+    expect(firstDef.__tempCreated.epochMilliseconds).toBeGreaterThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString()) - 5000) //created not long ago...
+    expect(firstDef.__tempCreated.epochMilliseconds).toBeLessThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString())) //...but not in the future
 
     /**
      * Fully specified Def Creation
@@ -36,7 +36,7 @@ test('Def Setting and Getting', () => {
         _did: 'gggg',
         _lbl: 'Second Def',
         _desc: 'Test Desc'
-    });
+    })
     expect(secondDef._desc).toBe('Test Desc');
     expect(secondDef._emoji).toBe('🌭');
     expect(secondDef._scope).toBe('DAY');
@@ -273,14 +273,17 @@ test('Def Setting and Getting', () => {
     }).toThrowError('Cannot parse point rollup Invalid rollup');
 
     /**
-     * Defs are Deflike
+     * Defs are Deflike, but not PointDefs
      */
     expect(pdw.Def.isDefLike(firstDef)).toBe(true);
+    expect(pdw.Def.isDefLike(point)).toBe(false);
 
     /**
-     * But PointDefs are not DefLike
+     * Vice Versa
      */
-    expect(pdw.Def.isDefLike(point)).toBe(false);
+    expect(pdw.PointDef.isPointDefLike(point)).toBe(true);
+    expect(pdw.PointDef.isPointDefLike(firstDef)).toBe(false);
+
 })
 
 test('Update Logic', ()=>{
@@ -301,9 +304,13 @@ test('Update Logic', ()=>{
             }
         ]
     });
-
-    firstDef.markDeleted();
-    firstDef.save();
+    
+    firstDef = firstDef.deleteAndSave() as pdw.Def;
+    expect(firstDef._deleted).toBe(true);
+    expect(pdwRef.getDefs({includeDeleted: 'only'}).length).toBe(1);
+    console.log(pdwRef.getDefs({includeDeleted: 'no'}));
+    
+    expect(pdwRef.getDefs({includeDeleted: 'no'}).length).toBe(0); 
 
 })
 

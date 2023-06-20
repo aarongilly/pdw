@@ -8,26 +8,20 @@ import { importFirestore, importMongo, importOldV9, importOldest } from './oneti
 
 const pdwRef = pdw.PDW.getInstance();
 
-let def = pdwRef.newDef({
-    _did: 'spoe',
-    _scope: pdw.Scope.SECOND,
-    _lbl: 'test',
-    _desc: 'A test.',
-    'aaaa': {
-        _lbl: 'a point',
-        _type: pdw.PointType.BOOL,
-        _emoji: '🫠'
-    },
+let firstDef = pdwRef.newDef({
+    _did: 'aaaa',
+    _lbl: 'Def 1',
+    _desc: 'Def Desc',
     _pts: [
-        
-        {
-            _pid: 'bbbb',
-            _lbl: 'b point',
-            _desc: 'Point b',
-            _emoji: '🧠',
+        {       
+            _pid: 'a111',
+            _lbl: 'Def 1 point 1',
+            _desc: 'Point Desc'
         }
     ]
-})
+});
+pdwRef.getDefs()
+firstDef.deleteAndSave();
 
 // importFromFile('data-files/OutJSON.json');
 // altTempImport('data-files/SmallNested.yaml');
@@ -42,8 +36,8 @@ let def = pdwRef.newDef({
 // })
 // let all = pdwRef.getAll({includeDeleted: 'yes'});
 
-console.log(def);
-console.log(def.getType());
+// console.log(def);
+// console.log(def.getType());
 
 // altTempExport(all, 'data-files/TestNest.yaml')
 
