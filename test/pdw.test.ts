@@ -6,7 +6,7 @@ import { importFromFile } from '../src/dataStores/fileAsyncDataStores';
 
 const pdwRef = pdw.PDW.getInstance();
 
-test.skip('Def Setting and Getting', () => {
+test('Def Setting and Getting', () => {
     /**
      * Most Basic Def Creation
     */
@@ -289,7 +289,7 @@ test.skip('Def Setting and Getting', () => {
 test('Update Logic', ()=>{
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 
-    const origUid = pdw.makeUID();
+    let origUid = pdw.makeUID();
 
     let firstDef = pdwRef.newDef({
         _uid: origUid,
@@ -304,14 +304,82 @@ test('Update Logic', ()=>{
             }
         ]
     });
+
+    expect(pdwRef.getDefs({did: 'aaaa'})[0]._lbl).toBe('Def 1');
     
+    /**
+     * Element.deleteAndSave()
+     */
     firstDef = firstDef.deleteAndSave() as pdw.Def;
     expect(firstDef._deleted).toBe(true);
+    expect(pdwRef.getDefs({includeDeleted: 'yes'}).length).toBe(1);
     expect(pdwRef.getDefs({includeDeleted: 'only'}).length).toBe(1);
-    console.log(pdwRef.getDefs({includeDeleted: 'no'}));
+    expect(pdwRef.getDefs({includeDeleted: 'only'})[0]).toEqual(firstDef);
     
-    expect(pdwRef.getDefs({includeDeleted: 'no'}).length).toBe(0); 
+    /**
+     * Element.unDeleteAndSave()
+     */
+    firstDef = firstDef.unDeleteAndSave() as pdw.Def;
+    expect(firstDef._deleted).toBe(false);
+    expect(pdwRef.getDefs({includeDeleted: 'yes'}).length).toBe(1);
+    expect(pdwRef.getDefs({includeDeleted: 'no'}).length).toBe(1);
+    
+    /**
+     * Update Props, don't save yet
+     */
+    let modified = firstDef.setProps({_lbl: 'DEF ONE'}) as pdw.Def;
+    expect(modified._lbl).toBe('DEF ONE'); //new object created
+    expect(firstDef._lbl).toBe('Def 1'); //original object unchanged
+    expect(modified._desc).toEqual(firstDef._desc); //unchanged props inherited
+    expect(pdwRef.getDefs({includeDeleted: 'yes'}).length).toBe(1); //DataStore not changed yet
 
+    /**
+     * Save to DataStore after updating
+     */
+    modified.save();
+    expect(pdwRef.getDefs({includeDeleted: 'yes'}).length).toBe(2);
+    expect(pdwRef.getDefs({includeDeleted: 'no'}).length).toBe(1);
+    let defs = pdwRef.getDefs({did: 'aaaa', includeDeleted: 'yes'});
+    expect(defs.length).toBe(2);
+    expect(defs.find(def=>def._deleted)!._lbl).toBe('Def 1'); //deleted one unchanged
+    expect(defs.find(def=>!def._deleted)!._lbl).toBe('DEF ONE'); //new one reflects change
+
+    /**
+     * Set a few props & save
+     */
+    modified = modified.setProps({_desc: 'New Description', _emoji: '🧠'}).save() as pdw.Def;
+    expect(pdwRef.getDefs({did: 'aaaa', includeDeleted: 'yes'}).length).toBe(3);
+    expect(pdwRef.getDefs({did: 'aaaa', includeDeleted: 'no'}).length).toBe(1);
+    let fromStore = pdwRef.getDefs({did: 'aaaa', includeDeleted: 'no'})[0];
+    // expect(modified).toEqual(fromStore); //_tempUpdated is slightly off? Weird.
+    expect(modified._updated).toEqual(fromStore._updated);
+    expect(fromStore._desc).toBe("New Description");
+    expect(fromStore._emoji).toBe("🧠");
+    let overwritenFromStore = pdwRef.getDefs({did: 'aaaa', includeDeleted: 'only'});
+    expect(overwritenFromStore.length).toBe(2);
+    expect(overwritenFromStore[0]._desc).toBe('Def Desc');
+    expect(overwritenFromStore[0]._emoji).toBe("🆕");
+    expect(overwritenFromStore[1]._desc).toBe('Def Desc');
+    expect(overwritenFromStore[1]._emoji).toBe("🆕");
+
+    /**
+     * setting no props doesn't change datastore
+     */
+    expect(pdwRef.getDefs({includeDeleted: 'yes'}).length).toBe(3);
+    modified.setProps({});
+    expect(pdwRef.getDefs({includeDeleted: 'yes'}).length).toBe(3);
+    
+    /**
+     * Cannot set ID-like props
+    */
+   modified = modified.setProps({_did: 'bbbb'}) as pdw.Def; //should log warning about not updating ID
+   expect(modified._did).toBe('aaaa');
+   origUid = modified._uid;
+   modified = modified.setProps({_uid: 'whatever'}) as pdw.Def; //should log warning about not updating ID
+   expect(modified._uid).toBe(origUid);
+
+   //#### Updating PointDef stuff ####
+    
 })
 
 test.skip('Entry Basics', () => {

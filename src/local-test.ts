@@ -8,7 +8,10 @@ import { importFirestore, importMongo, importOldV9, importOldest } from './oneti
 
 const pdwRef = pdw.PDW.getInstance();
 
+const origUid = pdw.makeUID();
+
 let firstDef = pdwRef.newDef({
+    _uid: origUid,
     _did: 'aaaa',
     _lbl: 'Def 1',
     _desc: 'Def Desc',
@@ -20,8 +23,30 @@ let firstDef = pdwRef.newDef({
         }
     ]
 });
-pdwRef.getDefs()
-firstDef.deleteAndSave();
+
+/**
+ * Element.deleteAndSave()
+ */
+firstDef = firstDef.deleteAndSave() as pdw.Def;
+let savedDef = pdwRef.getDefs({includeDeleted: 'yes'});
+
+/**
+ * Element.unDeleteAndSave()
+ */
+firstDef = firstDef.unDeleteAndSave() as pdw.Def;
+
+/**
+ * Update Props, don't save yet
+*/
+let modified = firstDef.setProps({_lbl: 'DEF ONE'}) as pdw.Def;
+
+/**
+ * Save after updating
+*/
+modified.save();
+let defs = pdwRef.getDefs({did: 'aaaa'})
+let balls = 'sack'
+//    expect(firstDef.)
 
 // importFromFile('data-files/OutJSON.json');
 // altTempImport('data-files/SmallNested.yaml');

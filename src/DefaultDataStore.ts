@@ -53,13 +53,13 @@ export class DefaultDataStore implements pdw.DataStore {
     getEntries(params: pdw.SanitizedParams): pdw.EntryLike[] {
         const allMatches = this.entries.filter(entry => entry.passesFilters(params));
         let noDupes = new Set(allMatches);
-        return Array.from(noDupes).map(entry => new pdw.Entry(entry));
+        return Array.from(noDupes).map(entry => new pdw.Entry(entry, false));
     }
 
     getTags(params: pdw.SanitizedParams): pdw.TagLike[] {
         const allMatches = this.tags.filter(tag => tag.passesFilters(params));
         let noDupes = new Set(allMatches);
-        return Array.from(noDupes).map(tag => new pdw.Tag(tag));
+        return Array.from(noDupes).map(tag => new pdw.Tag(tag, false));
     }
 
     /**
@@ -71,35 +71,33 @@ export class DefaultDataStore implements pdw.DataStore {
     setElementsInRepo(elementsIn: pdw.Element[], elementRepo: pdw.ElementLike[]) {
         let newElements: pdw.Element[] = [];
         elementsIn.forEach(el => {
-            // if (el.__isNew) {
-            //     newElements.push(el);
-            //     return;
-            // }
-            let existing = elementRepo.find(existingElement => existingElement._deleted === false && existingElement.sameIdAs(el));
-            if (existing !== undefined) {
+            //if we're *only* deleting or undeleting, this should find match.
+            let sameUid = elementRepo.find(existingElement => existingElement._uid == el._uid);
+            if(sameUid !== undefined){
                 //only replace if the setDefs def is newer, necessary for StorageConnector merges
-                if (existing.shouldBeReplacedWith(el)) {
-                    existing._deleted = true;
-                    existing._updated = pdw.makeEpochStr();
-                    if (!el._deleted)
-                        newElements.push(el); //don't duplicate in case of calling setElement purely to delete
+                if (sameUid.isOlderThan(el)) {
+                    sameUid._deleted = el._deleted;
+                    sameUid._updated = el._updated;
+                }
+                return
+            }
+            
+            //if we're *updating* then we need to find based on the same element ID
+            let sameId = elementRepo.find(existingElement => existingElement._deleted === false && existingElement.sameIdAs(el));
+            if (sameId !== undefined) {
+                //only replace if the setDefs def is newer, necessary for StorageConnector merges
+                if (sameId.isOlderThan(el)) {
+                    sameId._deleted = true;
+                    sameId._updated = pdw.makeEpochStr();
+                    newElements.push(el);
                 }
             } else {
                 newElements.push(el);
             }
         });
 
-        //ensure what's in the repo isn't linked by reference to what was sent in
-        // const staticCopies = newElements.map(ele => makeStaticCopy(ele))
-        // elementRepo.push(...staticCopies);
         elementRepo.push(...newElements);
         return elementsIn;
-
-        // function makeStaticCopy(elementInstance: pdw.Element): pdw.ElementLike {
-
-
-        //     return JSON.parse(JSON.stringify(elementInstance));
-        // }
     }
 
     setDefs(defsIn: pdw.Def[]): pdw.Def[] {

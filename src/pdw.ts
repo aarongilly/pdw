@@ -4,13 +4,13 @@ import { DefaultDataStore } from "./DefaultDataStore.js";
 //#region ### TYPES ###
 
 /**
- * A synonym for string, implying one with the structure of:
+ * A alias for string, implying one with the structure of:
  * {@link EpochStr}-{@link SmallID}
  */
 export type UID = string;
 
 /**
- * A synonym for string, a string of 4 random characters
+ * A alias for string, a string of 4 random characters
  */
 export type SmallID = string;
 
@@ -29,12 +29,12 @@ export type EpochStr = string;
 export type DurationStr = string;
 
 /**
- * A synonym for string, any valid Period.stringify string
+ * A alias for string, any valid Period.stringify string
  */
 export type PeriodStr = string;
 
 /**
- * A String that is likely to be markdown-enabled in use
+ * An alias for string, intended to be markdown-enabled in use
  */
 export type Markdown = string
 
@@ -320,11 +320,6 @@ export interface DefLike extends ElementLike {
      * The points on the definition
      */
     _pts?: PointDefLike[];
-    /**
-     * Tags for grouping similar definitions easier in filters,
-     * An array of _tid
-     */
-    _tags?: SmallID[];
 }
 
 export interface PointDefLike {
@@ -360,7 +355,7 @@ export interface PointDefLike {
      * Select & Multiselect options. Associated with a {@link Tag} '_tid.
      * An array of _tid
      */
-    _opts?: OptKeyVal[];
+    _opts?: Opt[];
 }
 
 export interface EntryLike extends ElementLike {
@@ -393,21 +388,6 @@ export interface EntryLike extends ElementLike {
     _pts?: PidKeyVal[]
 }
 
-/**
- * A key/value pair for an Entry Point, key = _pid of the PointDef
- */
-export interface PidKeyVal {
-    [pid: string]: any
-}
-
-/**
- * A key/value pair for an PointDef._opt array member, key = smallID, val = label
- * No longer going to be stored as a Tag, I guess.
- */
-export interface OptKeyVal {
-    [key: SmallID]: string
-}
-
 export interface TagLike extends ElementLike {
     /**
      * Like the Definition ID, the ID of the Tag
@@ -417,6 +397,24 @@ export interface TagLike extends ElementLike {
      * Text
      */
     _lbl?: string;
+    /**
+     * Tags for grouping similar definitions easier in filters,
+     * An array of _did
+     */
+    _dids?: SmallID[];
+}
+
+/**
+ * A key/value pair for an Entry Point, key = _pid of the PointDef
+ */
+export interface PidKeyVal {
+    [pid: string]: any
+}
+
+export interface Opt {
+    _oid: SmallID;
+    _text: string;
+    _active: boolean
 }
 
 export interface QueryParams {
@@ -827,18 +825,21 @@ export abstract class Element implements ElementLike {
     /**
      * Sets _deleted & _updated and updates DataStores
      */
-    deleteAndSave(): Entry | Def | Tag {
+    deleteAndSave(isUndelete = false): Entry | Def | Tag {
         const type = this.getType();
         const pdwRef = PDW.getInstance();
 
+        this._deleted = !isUndelete;
+        this._updated = makeEpochStr();
+
         if(type === 'DefLike'){
-            return pdwRef.setDefs([{_uid: this._uid, _deleted: true}])[0];
+            return pdwRef.setDefs([this])[0];
         }
         if(type === 'EntryLike'){
-            return pdwRef.setEntries([{_uid: this._uid, _deleted: true}])[0];
+            return pdwRef.setEntries([this])[0];
         }
         if(type === 'TagLike'){
-            return pdwRef.setTags([{_uid: this._uid, _deleted: true}])[0];
+            return pdwRef.setTags([this])[0];
         }
         throw new Error('Type was not found')
     }
@@ -846,20 +847,32 @@ export abstract class Element implements ElementLike {
     /**
      * Sets _deleted & _updated and updates DataStores
      */
-    unDeleteAndSave() {
+    unDeleteAndSave(): Entry | Def | Tag   {
+        return this.deleteAndSave(true);
+    }
+
+    setProps(newPropsMap: DefLike | EntryLike | TagLike): Entry | Def | Tag {
         const type = this.getType();
         const pdwRef = PDW.getInstance();
 
-        if(type === 'DefLike'){
-            return pdwRef.setAll({'defs':[{_uid: this._uid, _deleted: false}]})
-        }
-        if(type === 'EntryLike'){
-            return pdwRef.setAll({'entries':[{_uid: this._uid, _deleted: false}]})
-        }
-        if(type === 'TagLike'){
-            return pdwRef.setAll({'tags':[{_uid: this._uid, _deleted: false}]})
-        }
-        throw new Error('Type was not found')
+        if(typeof newPropsMap !== 'object') throw new Error('Element.setProps() expects an object with key/value pairs to set')
+        
+        let newElementData: any = Element.toData(this)
+        
+        let newKeys = Object.keys(newPropsMap);
+
+        newKeys.forEach(key=>{
+            if(key === '_uid' || key === '_eid' || key === '_did' || key === '_tid'){
+                console.warn('Tried to update prop ' + key + ', but ID properties cannot be updated. ID will not be updated.')
+                return
+            }
+            newElementData[key] = newPropsMap[key];
+        })
+
+        if(type === 'DefLike') return new Def(newElementData);
+        if(type === 'EntryLike') return new Entry(newElementData);
+        if(type === 'TagLike') return new Tag(newElementData);
+        throw new Error('type was not matched, this error shouldnt happen unless you refactored')
     }
 
     /**
@@ -994,6 +1007,37 @@ export abstract class Element implements ElementLike {
 
     //#TODO - fallsInPeriod(period: Period): boolean
 
+    /**
+     * Create an object that is a non-referenced copy of the Element
+     */
+    static toData(elementIn: any): ElementLike{
+        if(typeof elementIn !== 'object') return elementIn;
+
+        let cloneData: ElementLike = {};
+
+        let oldKeys = Object.keys(elementIn);
+
+        //make clone object
+        oldKeys.forEach(key=>{
+            //don't copy double-underscored keys
+            if(key.substring(0,2) === "__") return
+
+            let keyVal = elementIn[key];
+
+            if(typeof keyVal === 'object'){
+                if(Array.isArray(keyVal)){
+                    cloneData[key] = keyVal.map(val=> Element.toData(val))
+                }else{
+                    cloneData[key] = Element.toData(keyVal);
+                }
+            }else{
+                cloneData[key] = keyVal
+            }
+        })
+
+        return cloneData
+    }
+
     private static getTypeOfElementLike(data: ElementLike) {
         if (data.hasOwnProperty("_tid")) return "TagLike"
         if (data.hasOwnProperty("_eid")) return "EntryLike"
@@ -1067,7 +1111,6 @@ export class Def extends Element implements DefLike {
     readonly _desc: string;
     readonly _emoji: string;
     readonly _scope: Scope;
-    readonly _tags: SmallID[];
     readonly _pts: PointDef[];
     constructor(defData: DefLike, lookForExisting = true) {
         if (defData._scope !== undefined && !Def.isValidScope(defData._scope)) throw new Error('Invalid scope supplied when creating Def: ' + defData._scope);
@@ -1088,7 +1131,6 @@ export class Def extends Element implements DefLike {
         this._desc = defData._desc ?? 'Set a description';
         this._emoji = defData._emoji ?? '🆕';
         this._scope = defData._scope ?? Scope.SECOND;
-        this._tags = defData._tags ?? [];
 
         let pointsToSanitize = defData._pts ?? [];
         //spawn new PointDefs for any non-underscore-prefixed keys
@@ -1118,16 +1160,17 @@ export class Def extends Element implements DefLike {
      * @returns the new Tag
      */
     addTag(tid: string): Tag {
-        let pdwRef = PDW.getInstance();
-        let tagArr = pdwRef.getTags({ tid: tid });
-        if (tagArr.length === 0) throw new Error('No tag def found for ' + tid);
-        let tag = tagArr[0];
-        if (this._tags.some(t => t === tid)) {
-            console.warn('Tried adding a tag to a Def that already had that tag');
-        } else {
-            this._tags.push(tag._tid);
-        }
-        return tag
+        throw new Error('fix this')
+        // let pdwRef = PDW.getInstance();
+        // let tagArr = pdwRef.getTags({ tid: tid });
+        // if (tagArr.length === 0) throw new Error('No tag def found for ' + tid);
+        // let tag = tagArr[0];
+        // if (this._tags.some(t => t === tid)) {
+        //     console.warn('Tried adding a tag to a Def that already had that tag');
+        // } else {
+        //     this._tags.push(tag._tid);
+        // }
+        // return tag
     }
 
     newEntry(entryData: EntryLike): Entry {
@@ -1174,7 +1217,7 @@ export class PointDef implements PointDefLike {
     readonly _type: PointType;
     readonly _rollup: Rollup;
     readonly _active: boolean;
-    readonly _opts?: OptKeyVal[];
+    readonly _opts?: Opt[];
     readonly _pid: string;
     readonly __def: Def;
     constructor(newPointDefData: PointDefLike, def: Def) {
@@ -1203,11 +1246,37 @@ export class PointDef implements PointDefLike {
         this._emoji = newPointDefData._emoji ?? '🆕';
         this._rollup = newPointDefData._rollup ?? Rollup.COUNT;
         this._active = newPointDefData._active ?? true;
-        if (this.shouldHaveOptsProp()) this._opts = newPointDefData._opts ?? [];
+        if (this.shouldHaveOptsProp()){
+            if(newPointDefData._opts !== undefined){
+                this._opts = PointDef.validateOptsArray(newPointDefData._opts);
+            }else{
+                this._opts = [];
+            }
+        }
 
         this.__def = def;
 
         if (!PointDef.isPointDefLike(this)) throw new Error('Mal-formed PointDef')
+    }
+
+    private static validateOptsArray(optsArr: Opt[]){
+        if(!Array.isArray(optsArr)){
+            optsArr = [optsArr]
+        }
+        optsArr.forEach(opt=>{
+            //not modifiying, just looking for errors
+            if(
+                !opt.hasOwnProperty('_oid') || 
+                !opt.hasOwnProperty('_text') ||
+                !opt.hasOwnProperty('_active')
+            ) throw new Error("Option wasn't formatted like an 'opt' due to missing property")
+            if(typeof opt._oid !== 'string') throw new Error("Option ID wasn't a string")
+            if(typeof opt._text !== 'string') throw new Error("Option text wasn't a string")
+            if(typeof opt._active !== 'boolean') throw new Error("Option active wasn't a boolean")
+        })
+        //you *could* create new array of objects explicitly only keeping the 3 desired keys,
+        //but you're not.
+        return optsArr
     }
 
     /**
@@ -1224,16 +1293,17 @@ export class PointDef implements PointDefLike {
 
     /**
      * Creates a new TagDef and a Tag assigning it to this point
-     * @param lbl label to use for the TagDef
+     * @param text label to use for the TagDef
      * @param oid optional, option ID
      * @returns the Tag (you can use Tag.getDef() to get to the TagDef)
      */
-    addEnumOption(lbl: string, oid?: string) {
+    addEnumOption(text: string, oid?: string) {
         if (!this.shouldHaveOptsProp()) throw new Error('Attempted to add an enum option to a point of type: ' + this._type);
+        if(oid === undefined) oid = makeSmallID();
         if (this._opts?.some(o => Object.keys(o)[0] === oid)) {
             console.warn('Tried adding already-existing option to PointDef')
         } else {
-            this._opts?.push({ newOid: lbl });
+            this._opts?.push({ _oid: oid, _text: text, _active: true });
         }
     };
 
@@ -1530,6 +1600,7 @@ export class Entry extends Element implements EntryLike {
 export class Tag extends Element implements TagLike {
     readonly _tid: string;
     readonly _lbl: string;
+    readonly _dids: SmallID[]
     constructor(tagDefData: TagLike, lookForExisting = true) {
         if (lookForExisting) {
             let existing = Element.findExistingData(tagDefData, 'Tag');
@@ -1540,6 +1611,7 @@ export class Tag extends Element implements TagLike {
         super(tagDefData);
         this._tid = tagDefData._tid ?? makeSmallID();
         this._lbl = tagDefData._lbl ?? 'Unlabeled Tag with _tid = ' + this._tid;
+        this._dids = tagDefData._dids ?? [];
         if (!Tag.isTagDefLike(this)) {
             throw new Error('TagDef created is not TagDefLike');
         }
@@ -1552,6 +1624,7 @@ export class Tag extends Element implements TagLike {
         if (typeof data._deleted !== 'boolean') return false
         if (typeof data._tid !== 'string') return false
         if (typeof data._lbl !== 'string') return false
+        if (!Array.isArray(data._defs)) return false
         return true;
     }
 
