@@ -8,45 +8,42 @@ import { importFirestore, importMongo, importOldV9, importOldest } from './oneti
 
 const pdwRef = pdw.PDW.getInstance();
 
-const origUid = pdw.makeUID();
 
-let firstDef = pdwRef.newDef({
-    _uid: origUid,
-    _did: 'aaaa',
-    _lbl: 'Def 1',
-    _desc: 'Def Desc',
-    _pts: [
-        {       
-            _pid: 'a111',
-            _lbl: 'Def 1 point 1',
-            _desc: 'Point Desc'
-        }
-    ]
-});
+let origUid = pdw.makeUID();
 
-/**
- * Element.deleteAndSave()
- */
-firstDef = firstDef.deleteAndSave() as pdw.Def;
-let savedDef = pdwRef.getDefs({includeDeleted: 'yes'});
+    let firstDef = pdwRef.newDef({
+        _uid: origUid,
+        _did: 'aaaa',
+        _lbl: 'Def 1',
+        _desc: 'Def Desc',
+        _pts: [
+            {
+                _pid: 'a111',
+                _lbl: 'Def 1 point 1',
+                _desc: 'Point Desc'
+            },
+            {
+                _pid: 'a222',
+                _lbl: 'Def 1 point 2',
+                _desc: 'Numero Dos'
+            }
+        ]
+    });
 
-/**
- * Element.unDeleteAndSave()
- */
-firstDef = firstDef.unDeleteAndSave() as pdw.Def;
+    /**
+     * Element.deleteAndSave()
+     */
+    firstDef.deleteAndSave() as pdw.Def;
+    let defs = pdwRef.getDefs({includeDeleted: 'only'});
+    console.log(defs);
+    
 
-/**
- * Update Props, don't save yet
-*/
-let modified = firstDef.setProps({_lbl: 'DEF ONE'}) as pdw.Def;
-
-/**
- * Save after updating
-*/
-modified.save();
-let defs = pdwRef.getDefs({did: 'aaaa'})
-let balls = 'sack'
-//    expect(firstDef.)
+// expect(entry.__tempCreated.epochMilliseconds).toBeGreaterThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString()) - 5000) //created not long ago...
+// expect(entry.__tempCreated.epochMilliseconds).toBeLessThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString())) //...but not in the future
+// expect(entry._period).toBe(sameSecond); //technically could fail every 1000 or so runs
+// expect(entry._pts.length).toBe(0); //points weren't supplied, they aren't generated
+// expect(entry._note).toBe(''); //default
+// expect(entry._source).toBe(''); //default
 
 // importFromFile('data-files/OutJSON.json');
 // altTempImport('data-files/SmallNested.yaml');

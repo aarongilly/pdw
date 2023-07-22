@@ -26,7 +26,7 @@ export class DefaultDataStore implements pdw.DataStore {
         this.tags = [];
     }
 
-    query(params: pdw.QueryParams): pdw.QueryResponse {
+    query(params: pdw.SanitizedParams): pdw.QueryResponse {
         throw new Error("Method not implemented.");
     }
 
@@ -41,7 +41,7 @@ export class DefaultDataStore implements pdw.DataStore {
     getDefs(params: pdw.SanitizedParams): pdw.DefLike[] {
         const allMatches = this.defs.filter(def => def.passesFilters(params));
         let noDupes = new Set(allMatches);
-        return Array.from(noDupes).map(def => new pdw.Def(def, false))
+        return Array.from(noDupes).map(def => def.makeStaticCopy())
     }
 
     /**
@@ -89,10 +89,10 @@ export class DefaultDataStore implements pdw.DataStore {
                 if (sameId.isOlderThan(el)) {
                     sameId._deleted = true;
                     sameId._updated = pdw.makeEpochStr();
-                    newElements.push(el);
+                    newElements.push(el.makeStaticCopy());
                 }
             } else {
-                newElements.push(el);
+                newElements.push(el.makeStaticCopy());
             }
         });
 

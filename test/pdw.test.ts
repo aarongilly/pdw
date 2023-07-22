@@ -6,7 +6,11 @@ import { importFromFile } from '../src/dataStores/fileAsyncDataStores';
 
 const pdwRef = pdw.PDW.getInstance();
 
-test('Def Setting and Getting', () => {
+function resetTestDataset() {
+    (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
+}
+
+test('Def Creation and Getting', () => {
     /**
      * Most Basic Def Creation
     */
@@ -59,7 +63,25 @@ test('Def Setting and Getting', () => {
     expect(firstDef.shouldBeReplacedWith(secondDef)).toBe(false); //not the same _did
     expect(firstDef.sameIdAs(secondDef)).toBe(false); //not the same _did
     expect(firstDef.sameTypeAs(secondDef)).toBe(true); //both 'DefLike'
-    
+    expect(pdw.Def.toData(secondDef)).toEqual({
+        _created: "lhv25fo0", //converted from date string in Element constructor
+        _updated: "lhv25fo0", //converted from date string in Element constructor
+        _deleted: false,
+        _emoji: '🌭',
+        _scope: pdw.Scope.DAY,
+        _uid: 'handjammed-30so',
+        _did: 'gggg',
+        _lbl: 'Second Def',
+        _desc: 'Test Desc',
+        _pts: [] //added as default
+    });
+    let copy = firstDef.makeStaticCopy() as pdw.Def;
+    expect(copy).toEqual(firstDef); //copies start off equal
+    //@ts-expect-error - ts warns about setting a read-only prop, nice
+    copy._lbl = 'changed.'
+    expect(copy._lbl).toBe('changed.'); //copy IS changed.
+    expect(firstDef._lbl).toBe('Unlabeled Definition aaaa'); //original is NOT changed
+
     /**
     * Wide-open getter
     */
@@ -102,14 +124,15 @@ test('Def Setting and Getting', () => {
      * Invalid Scope Error
      */
     expect(() => pdwRef.newDef(
-        { 
-            _lbl: 'invalid scope test', 
+        {
+            _lbl: 'invalid scope test',
             //@ts-expect-error // luckily typescript warns me on this
-            _scope: 'millisecond' 
+            _scope: 'millisecond'
         }
     )).toThrowError('Invalid scope supplied when creating Def: millisecond');
 
-    (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
+    //###### reset datasets for fresh testing below #######
+    resetTestDataset();
 
     /**
      * Setting Def with explicity ._pts PointDefs 
@@ -137,7 +160,7 @@ test('Def Setting and Getting', () => {
     expect(firstDef._pts.length).toBe(2);
     expect(firstDef._pts[0]._lbl).toBe('Def 1 point 1');
     expect(firstDef._pts[1]._lbl).toBe('Def 1 point 2');
-    
+
     /**
      * Setting Def with implicit Points
      */
@@ -220,6 +243,14 @@ test('Def Setting and Getting', () => {
     point = firstDef.getPoint('Def 1 point 2');
     expect(point._type).toBe(pdw.PointType.BOOL);
 
+
+    /**
+     * Def.getPoint() that doesn't exist
+     */
+    expect(() => {
+        firstDef.getPoint('NO SUCH POINT')
+    }).toThrowError()
+
     /**
      * Point.getDef
      */
@@ -242,11 +273,11 @@ test('Def Setting and Getting', () => {
 
     /**
      * Invalid PointDef (bad Type)
-     */    
-    expect(()=>{
+     */
+    expect(() => {
         pdwRef.newDef({
             _did: 'test',
-            _pts:[
+            _pts: [
                 {
                     _pid: 'test',
                     //@ts-expect-error //nice
@@ -255,17 +286,17 @@ test('Def Setting and Getting', () => {
             ]
         })
     }).toThrowError('Cannot parse point type Invalid type')
-    
+
     /**
      * Invalid PointDef (bad Rollup)
-    */    
-   expect(()=>{
-       pdwRef.newDef({
-           _did: 'test',
-           _pts:[
-               {
-                   _pid: 'test',
-                   //@ts-expect-error //nice
+    */
+    expect(() => {
+        pdwRef.newDef({
+            _did: 'test',
+            _pts: [
+                {
+                    _pid: 'test',
+                    //@ts-expect-error //nice
                     _rollup: 'Invalid rollup'
                 }
             ]
@@ -284,112 +315,46 @@ test('Def Setting and Getting', () => {
     expect(pdw.PointDef.isPointDefLike(point)).toBe(true);
     expect(pdw.PointDef.isPointDefLike(firstDef)).toBe(false);
 
-})
-
-test('Update Logic', ()=>{
-    (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
-
-    let origUid = pdw.makeUID();
-
-    let firstDef = pdwRef.newDef({
-        _uid: origUid,
-        _did: 'aaaa',
-        _lbl: 'Def 1',
-        _desc: 'Def Desc',
+    /**
+     * PointDef with _opts Options
+     */
+    const defWithOptions = pdwRef.newDef({
+        _did: 'ffff',
         _pts: [
-            {       
-                _pid: 'a111',
-                _lbl: 'Def 1 point 1',
-                _desc: 'Point Desc'
+            {
+                _pid: 'aaaa',
+                _type: pdw.PointType.SELECT,
+                _opts: [
+                    {
+                        _oid: '1111',
+                        _lbl: 'Opt 1'
+                    },
+                    {
+                        _oid: '2222',
+                        _lbl: 'Opt 2'
+                    }
+                ]
+
             }
         ]
     });
+    const pointWithOptions = defWithOptions.getPoint('aaaa');
+    expect(pointWithOptions._opts!.length).toBe(2);
+    expect(pointWithOptions._opts![0]._lbl).toBe('Opt 1');
+    expect(pointWithOptions._opts![1]._lbl).toBe('Opt 2');
+    expect(pointWithOptions.getOpts().length).toBe(2);
 
-    expect(pdwRef.getDefs({did: 'aaaa'})[0]._lbl).toBe('Def 1');
-    
-    /**
-     * Element.deleteAndSave()
-     */
-    firstDef = firstDef.deleteAndSave() as pdw.Def;
-    expect(firstDef._deleted).toBe(true);
-    expect(pdwRef.getDefs({includeDeleted: 'yes'}).length).toBe(1);
-    expect(pdwRef.getDefs({includeDeleted: 'only'}).length).toBe(1);
-    expect(pdwRef.getDefs({includeDeleted: 'only'})[0]).toEqual(firstDef);
-    
-    /**
-     * Element.unDeleteAndSave()
-     */
-    firstDef = firstDef.unDeleteAndSave() as pdw.Def;
-    expect(firstDef._deleted).toBe(false);
-    expect(pdwRef.getDefs({includeDeleted: 'yes'}).length).toBe(1);
-    expect(pdwRef.getDefs({includeDeleted: 'no'}).length).toBe(1);
-    
-    /**
-     * Update Props, don't save yet
-     */
-    let modified = firstDef.setProps({_lbl: 'DEF ONE'}) as pdw.Def;
-    expect(modified._lbl).toBe('DEF ONE'); //new object created
-    expect(firstDef._lbl).toBe('Def 1'); //original object unchanged
-    expect(modified._desc).toEqual(firstDef._desc); //unchanged props inherited
-    expect(pdwRef.getDefs({includeDeleted: 'yes'}).length).toBe(1); //DataStore not changed yet
-
-    /**
-     * Save to DataStore after updating
-     */
-    modified.save();
-    expect(pdwRef.getDefs({includeDeleted: 'yes'}).length).toBe(2);
-    expect(pdwRef.getDefs({includeDeleted: 'no'}).length).toBe(1);
-    let defs = pdwRef.getDefs({did: 'aaaa', includeDeleted: 'yes'});
-    expect(defs.length).toBe(2);
-    expect(defs.find(def=>def._deleted)!._lbl).toBe('Def 1'); //deleted one unchanged
-    expect(defs.find(def=>!def._deleted)!._lbl).toBe('DEF ONE'); //new one reflects change
-
-    /**
-     * Set a few props & save
-     */
-    modified = modified.setProps({_desc: 'New Description', _emoji: '🧠'}).save() as pdw.Def;
-    expect(pdwRef.getDefs({did: 'aaaa', includeDeleted: 'yes'}).length).toBe(3);
-    expect(pdwRef.getDefs({did: 'aaaa', includeDeleted: 'no'}).length).toBe(1);
-    let fromStore = pdwRef.getDefs({did: 'aaaa', includeDeleted: 'no'})[0];
-    // expect(modified).toEqual(fromStore); //_tempUpdated is slightly off? Weird.
-    expect(modified._updated).toEqual(fromStore._updated);
-    expect(fromStore._desc).toBe("New Description");
-    expect(fromStore._emoji).toBe("🧠");
-    let overwritenFromStore = pdwRef.getDefs({did: 'aaaa', includeDeleted: 'only'});
-    expect(overwritenFromStore.length).toBe(2);
-    expect(overwritenFromStore[0]._desc).toBe('Def Desc');
-    expect(overwritenFromStore[0]._emoji).toBe("🆕");
-    expect(overwritenFromStore[1]._desc).toBe('Def Desc');
-    expect(overwritenFromStore[1]._emoji).toBe("🆕");
-
-    /**
-     * setting no props doesn't change datastore
-     */
-    expect(pdwRef.getDefs({includeDeleted: 'yes'}).length).toBe(3);
-    modified.setProps({});
-    expect(pdwRef.getDefs({includeDeleted: 'yes'}).length).toBe(3);
-    
-    /**
-     * Cannot set ID-like props
-    */
-   modified = modified.setProps({_did: 'bbbb'}) as pdw.Def; //should log warning about not updating ID
-   expect(modified._did).toBe('aaaa');
-   origUid = modified._uid;
-   modified = modified.setProps({_uid: 'whatever'}) as pdw.Def; //should log warning about not updating ID
-   expect(modified._uid).toBe(origUid);
-
-   //#### Updating PointDef stuff ####
-    
 })
 
-test.skip('Entry Basics', () => {
-    (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
+test('Entry Creation and Getting', () => {
+    resetTestDataset();
 
     const testDef = pdwRef.newDef({
         _did: 'aaaa',
         _lbl: 'Default Scope test',
         'yyyy': {
-            _lbl: 'Point A'
+            _lbl: 'Point A',
+            _desc: 'Test point desc'
         },
         'zzzz': {
             _lbl: 'Point B',
@@ -406,12 +371,16 @@ test.skip('Entry Basics', () => {
     });
     let entries = pdwRef.getEntries();
     expect(entries.length).toBe(1);
-    expect(entries[0]._tempCreated.epochMilliseconds).toBeGreaterThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString()) - 5000) //created not long ago...
-    expect(entries[0]._tempCreated.epochMilliseconds).toBeLessThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString())) //...but not in the future
-    expect(entries[0]._period).toBe(sameSecond); //technically could fail every 1000 or so runs
-
+    let entry = entries[0];
+    expect(entry.__tempCreated.epochMilliseconds).toBeGreaterThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString()) - 5000) //created not long ago...
+    expect(entry.__tempCreated.epochMilliseconds).toBeLessThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString())) //...but not in the future
+    expect(entry._period).toBe(sameSecond); //technically could fail every 1000 or so runs
+    expect(entry.getPoints().length).toBe(0); //points weren't supplied, they aren't generated
+    expect(entry._note).toBe(''); //default
+    expect(entry._source).toBe(''); //default
+    
     /**
-     * Create Entry with Points
+     * Create Entry with explicit Points
     */
     let testEntry = pdwRef.newEntry({
         _did: 'aaaa',
@@ -420,24 +389,38 @@ test.skip('Entry Basics', () => {
     })
     entries = pdwRef.getEntries();
     expect(entries.length).toBe(2);
+    entry = entries[1];
     expect(testEntry._did).toBe('aaaa');
-    let points = entries[1].getPoints();
+    //checking values - the typical, easy way
+    expect(entry['yyyy']).toBe('Text value');
+    expect(entry['zzzz']).toBe(true);
+
+    /**
+     * Entry.getPoints
+     */
+    //getPoints returns an object with these keys
+    let points = entry.getPoints();
     expect(points.length).toBe(2);
+    let entryPointObj = points.find(point=>point.pid==='yyyy')!;
+    expect(entryPointObj.pointDef._desc).toBe('Test point desc');
+    expect(entryPointObj.pid).toBe('yyyy');
+    expect(entryPointObj.lbl).toBe('Point A');
+    expect(entryPointObj.val).toBe('Text value');
 
     /**
-     * Entry.getPoint with pid
+     * Entry.getPoint with pid and with lbl
      */
-    let point = testEntry.getPoint('yyyy');
-    expect(point!._val).toBe('Text value');
+    //getPoint returns the same keys, but for only the point specified by pid or lbl
+    expect(entry.getPoint('yyyy')).toEqual(entryPointObj);
+    expect(entry.getPoint('yyyy')).toEqual(entry.getPoint('Point A'));
 
     /**
-     * Entry.getPoint with pointLbl
+     * Entry.getPoint for a non-existnt point
      */
-    point = testEntry.getPoint('Point B');
-    expect(point!._val).toBe(true);
-
+    expect(entry.getPoint('zzzz not real')).toBeUndefined();
+    
     /**
-    * Direct Entry Creation    
+    * Full Entry Creation    
     */
     let epochStr = pdw.makeEpochStr();
     testEntry = pdwRef.setEntries([{
@@ -478,46 +461,17 @@ test.skip('Entry Basics', () => {
     /**
      * Def.newEntry method
      */
+    expect(pdwRef.getEntries().length).toBe(3);
     testEntry = testDef.newEntry({});
+    expect(pdwRef.getEntries().length).toBe(4);
     expect(testEntry._did).toBe('aaaa');
-
-    /**
-     * Entry.getPoints for an Entry with no EntryPoints
-     */
-    points = testEntry.getPoints();
-    expect(points.length).toBe(0);
-
-    /**
-     * Entry.getPoint for an Entry without that DataPoint
-     */
-    expect(testEntry.getPoint('zzzz')).toBe(null);
-
-    /**
-     * Entry.setPoint method for EntryPoint creation
-     */
-    testEntry.setPoint('zzzz', false);
-    let testPoint = testEntry.getPoint('zzzz');
-    expect(testPoint!._val).toBe(false);
-
-    /**
-     * Entry.setPoint for EntryPoint overwrite
-     */
-    testEntry.setPoint('zzzz', true);
-    testPoint = testEntry.getPoint('zzzz');
-    expect(testPoint!._val).toBe(true);
-
-    /**
-     * Ensure the overwritten EntryPoint wasn't erased
-     */
-    expect(testEntry.getPoints().length).toBe(1);
-    expect(testEntry.getPoints(true).length).toBe(2);
 
     /**
      * Create entry with bad point value types
      */
     expect(() => pdwRef.newEntry({
         _did: 'aaaa',
-        'yyyy': { 'an': 'Object can be converted to strings but...' },
+        'yyyy': { 'an': 'Object is implicitly coerced to string but...' },
         'zzzz': { '...this bool': 'should fail' }
     })).toThrowError();
 
@@ -527,9 +481,7 @@ test.skip('Entry Basics', () => {
     expect(() => {
         pdwRef.newEntry({
             _did: 'aaaa',
-            'bbbb': { 'a': 'non-existant pointDef value' },
-            'yyyy': 'Testing failure given an extra point supplied (bbbb)',
-            'zzzz': true
+            'bbbb': { 'a': 'non-existant pointDef value' }
         })
     }).toThrowError()
 
@@ -552,7 +504,7 @@ test.skip('Entry Basics', () => {
         'rvew': 10
     });
     expect(pdw.Period.inferScope(testDayEntry._period)).toBe(pdw.Scope.DAY);
-    expect(testDayEntry.getPoint('rvew')!._val).toBe(10)
+    expect(testDayEntry.getPoint('rvew')!.val).toBe(10)
 
     /**
      * Specified period with correct scope
@@ -563,7 +515,7 @@ test.skip('Entry Basics', () => {
     expect(testDayEntry._period).toBe('2023-06-03');
 
     /**
-     * Scope too granular
+     * Scope too granular, zooms out to correct level
      */
     testDayEntry = dayScopeDef.newEntry({
         _period: '2023-06-03T12:24:49'
@@ -579,24 +531,85 @@ test.skip('Entry Basics', () => {
     expect(testEntry._period).toBe('2023-06-03T00:00:00');
 
     /**
-     * Entry.setPeriod
+     * OPTS
      */
-    let updatedTestDayEntry = testDayEntry.setPeriod('2023-06-04');
-    expect(updatedTestDayEntry._period).toBe('2023-06-04');
-    expect(testDayEntry._period).toBe('2023-06-03'); //original isn't changed
-    expect(testDayEntry._deleted).toBe(true); //...but is marked deleted
-    expect(testDayEntry._eid).toBe(updatedTestDayEntry._eid);
-
+    let defWithOpts = pdwRef.newDef({
+        _did: 'bbbb',
+        _pts: [
+            {
+                _pid: 'b111',
+                _lbl: 'Select Point',
+                _type: pdw.PointType.SELECT,
+                _opts: [
+                    {
+                        _oid: 'bbb1',
+                        _lbl: 'Opt 1'
+                    },
+                    {
+                        _oid: 'bbb2',
+                        _lbl: 'Opt 2'
+                    }
+                ]
+            }
+        ]
+    })
     /**
-     * Entry.setNote
+     * Basic creation of entry with a Select
      */
-    updatedTestDayEntry = updatedTestDayEntry.setNote('Now with note');
-    expect(updatedTestDayEntry._note).toBe('Now with note');
+    let entryWithOpts = defWithOpts.newEntry({
+        _note: 'Setting Opt 1',
+        'b111': 'bbb1' //weird, but how it has to work
+    })
+    expect(entryWithOpts.getPoint('Select Point')?.val).toBe('bbb1');
+    expect(entryWithOpts.getPoint('b111')?.pointDef.getOpt('bbb1')?._lbl).toBe('Opt 1');
+    
+    /**
+     * Select Opts are not validated! It's not worth doing.
+     * Just check that the result is defined when running pointDef.getOpt()
+     */
+    entryWithOpts = defWithOpts.newEntry({
+        _note: 'Setting Non-existant opt',
+        'b111': 'fake oid'
+    })
+    let point = entryWithOpts.getPoint('b111')!;
+    expect(point.val).toBe('fake oid'); //no errors thrown
+    expect(point.pointDef.getOpt('fake oid')).toBeUndefined(); //is undefined
 
+    let defWithMultiselect = pdwRef.newDef({
+        _did: 'cccc',
+        _pts: [
+            {
+                _pid: 'c111',
+                _type: pdw.PointType.MULTISELECT,
+                _opts: [
+                    {
+                        _oid: 'ccc1',
+                        _lbl: 'One',
+                    },
+                    {
+                        _oid: 'ccc2',
+                        _lbl: 'Two',
+                    }
+                ]
+            }
+        ]
+    })
+    let none = defWithMultiselect.newEntry({
+        'c111': []
+    });
+    let one = defWithMultiselect.newEntry({
+        'c111': ['ccc1']
+    });
+    let both = defWithMultiselect.newEntry({
+        'c111': ['ccc1','ccc2']
+    });
+    expect(none.getPoint('c111')?.val).toEqual([]);
+    expect(one.getPoint('c111')?.val).toEqual(['ccc1']);
+    expect(both.getPoint('c111')?.val).toEqual(['ccc1', 'ccc2']);
 })
 
 test.skip('Tag Basics', () => {
-    (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
+    resetTestDataset();
 
     let testDef = pdwRef.newDef({
         _did: 'aaaa'
@@ -605,148 +618,453 @@ test.skip('Tag Basics', () => {
     /**
      * PDW.newTagDef
      */
-    let tagDefA = pdwRef.newTagDef({
+    let tagDefA = pdwRef.newTag({
         _lbl: 'test tag',
         _tid: 'taga'
     })
-    expect(pdwRef.getTagDefs()[0]).toEqual(tagDefA);
+    expect(pdwRef.getTags()[0]).toEqual(tagDefA);
 
-    /**
-     * Indirect tag creation
-     */
-    let tagDefB = pdwRef.setTagDefs([{
-        _lbl: 'tag b',
-        _tid: 'tagb'
-    }])[0]
-    expect(tagDefB._lbl).toBe('tag b');
+    // /**
+    //  * Indirect tag creation
+    //  */
+    // let tagDefB = pdwRef.setTagDefs([{
+    //     _lbl: 'tag b',
+    //     _tid: 'tagb'
+    // }])[0]
+    // expect(tagDefB._lbl).toBe('tag b');
 
-    /**
-     * Indirect tag label update
-     */
-    let tagBNew = pdwRef.setTagDefs([{
-        _lbl: 'Tag B',
-        _tid: 'tagb'
-    }])[0]
-    expect(tagDefB._deleted).toBe(true);
-    expect(tagDefB._lbl).toBe('tag b');
-    expect(tagBNew._lbl).toBe('Tag B');
+    // /**
+    //  * Indirect tag label update
+    //  */
+    // let tagBNew = pdwRef.setTagDefs([{
+    //     _lbl: 'Tag B',
+    //     _tid: 'tagb'
+    // }])[0]
+    // expect(tagDefB._deleted).toBe(true);
+    // expect(tagDefB._lbl).toBe('tag b');
+    // expect(tagBNew._lbl).toBe('Tag B');
 
-    /**
-     * TagDef type error test
-     */
-    expect(() => {
-        pdwRef.newTagDef({
-            //@ts-expect-error
-            _lbl: 5, //wrong type, should error
-        })
-    }).toThrowError('TagDef created is not TagDefLik');
+    // /**
+    //  * TagDef type error test
+    //  */
+    // expect(() => {
+    //     pdwRef.newTagDef({
+    //         //@ts-expect-error
+    //         _lbl: 5, //wrong type, should error
+    //     })
+    // }).toThrowError('TagDef created is not TagDefLik');
 
-    /**
-     * Indirectly create Tag on a Def
-     */
-    let tagA = pdwRef.newTag({
+    // /**
+    //  * Indirectly create Tag on a Def
+    //  */
+    // let tagA = pdwRef.newTag({
+    //     _did: 'aaaa',
+    //     _tid: 'taga'
+    // });
+    // expect(tagA._did).toBe('aaaa');
+    // expect(tagA._tid).toBe('taga');
+    // expect(pdwRef.getTags({ tid: 'taga' })[0]).toEqual(tagA);
+
+    // /**
+    //  * Def.addTag method 
+    //  */
+    // let tagB = testDef.addTag('tagb');
+    // expect(pdwRef.getTags({ did: 'aaaa' }).length).toBe(2);
+    // expect(pdwRef.getTags({ did: 'aaaa', tid: 'tagb' })[0]).toEqual(tagB);
+
+    // /**
+    //  * TagDef.getTaggedDefs
+    //  */
+    // let tAndD = tagDefA.getTagsAndDefs();
+    // expect(tAndD.defs[0]).toEqual(testDef);
+    // expect(tAndD.tags[0]).toEqual(tagA);
+
+    // /**
+    //  * TagDef.addTag
+    //  */
+    // tagDefB.addTag('aaaa')
+    // expect(pdwRef.getTags({ did: 'aaaa' }).length).toBe(2);
+
+    // /**
+    //  * Don't create duplicates
+    //  */
+    // let numBefore = pdwRef.getTags({ includeDeleted: 'only' }).length
+    // testDef.addTag('taga') //already exists
+    // //creates a new Tag, but deletes the old one, even though they're the same content
+    // expect(pdwRef.getTags({ includeDeleted: 'only' }).length).toBe(numBefore + 1);
+
+    // //Enumerations
+    // //Create Definition with a Select type
+    // let defWithEnum = pdwRef.newDef({
+    //     _did: 'bbbb',
+    //     _lbl: 'Def with an Enum Point',
+    //     'bbaa': {
+    //         _pid: 'bbaa',
+    //         _lbl: 'Enum PointDef',
+    //         _type: pdw.PointType.SELECT
+    //     }
+    // });
+
+    // let enumPoint = defWithEnum.getPointsAsArray()[0];
+    // expect(enumPoint._lbl).toBe('Enum PointDef');
+
+    // /**
+    //  * Indirectly add 2 choices
+    //  */
+    // numBefore = pdwRef.getTagDefs().length;
+    // pdwRef.setTagDefs([
+    //     {
+    //         _lbl: 'Choice A',
+    //         _tid: 'Axxx'
+    //     },
+    //     {
+    //         _lbl: 'Choice B',
+    //         _tid: 'Bxxx'
+    //     }
+    // ])
+    // expect(pdwRef.getTagDefs().length).toBe(numBefore + 2);
+    // numBefore = pdwRef.getTags().length;
+    // pdwRef.setTags([
+    //     {
+    //         _tid: 'Axxx',
+    //         _did: 'bbbb',
+    //         _pid: 'bbaa'
+    //     },
+    //     {
+    //         _tid: 'Bxxx',
+    //         _did: 'bbbb',
+    //         _pid: 'bbaa'
+    //     }
+    // ])
+    // expect(pdwRef.getTags().length).toBe(numBefore + 2);
+
+    // /**
+    //  * PointDef.getEnumOptions
+    //  */
+    // let enumTags = enumPoint.getEnumOptions();
+    // expect(enumTags.length).toBe(2);
+
+    // /**
+    //  * PointDef.addEnumOption
+    //  */
+    // enumPoint.addEnumOption('Choice C');
+    // enumTags = enumPoint.getEnumOptions();
+    // expect(enumTags.length).toBe(3);
+    // expect(enumTags.map(t => t.getLbl())).toEqual(['Choice A', 'Choice B', 'Choice C']);
+    // let tagDef = pdwRef.getTagDefs({ tagLbl: 'Choice C' })[0];
+    // let tagC = pdwRef.getTags({ tid: tagDef._tid })[0];
+    // expect(tagC.getDef()._lbl).toBe('Choice C'); //tagDef was created
+
+    // /**
+    //  * Tag.setLbl && Tag.getLbl
+    //  */
+    // tagC.setLbl('CHOICE C'); //updates the TagDef
+    // expect(tagC.getLbl()).toBe('CHOICE C'); //will pull the newly updated TagDef. Nice.
+});
+
+test('Update Logic', () => {
+    resetTestDataset();
+    
+    let origUid = pdw.makeUID();
+
+    let firstDef = pdwRef.newDef({
+        _uid: origUid,
         _did: 'aaaa',
-        _tid: 'taga'
-    });
-    expect(tagA._did).toBe('aaaa');
-    expect(tagA._tid).toBe('taga');
-    expect(pdwRef.getTags({ tid: 'taga' })[0]).toEqual(tagA);
-
-    /**
-     * Def.addTag method 
-     */
-    let tagB = testDef.addTag('tagb');
-    expect(pdwRef.getTags({ did: 'aaaa' }).length).toBe(2);
-    expect(pdwRef.getTags({ did: 'aaaa', tid: 'tagb' })[0]).toEqual(tagB);
-
-    /**
-     * TagDef.getTaggedDefs
-     */
-    let tAndD = tagDefA.getTagsAndDefs();
-    expect(tAndD.defs[0]).toEqual(testDef);
-    expect(tAndD.tags[0]).toEqual(tagA);
-
-    /**
-     * TagDef.addTag
-     */
-    tagDefB.addTag('aaaa')
-    expect(pdwRef.getTags({ did: 'aaaa' }).length).toBe(2);
-
-    /**
-     * Don't create duplicates
-     */
-    let numBefore = pdwRef.getTags({ includeDeleted: 'only' }).length
-    testDef.addTag('taga') //already exists
-    //creates a new Tag, but deletes the old one, even though they're the same content
-    expect(pdwRef.getTags({ includeDeleted: 'only' }).length).toBe(numBefore + 1);
-
-    //Enumerations
-    //Create Definition with a Select type
-    let defWithEnum = pdwRef.newDef({
-        _did: 'bbbb',
-        _lbl: 'Def with an Enum Point',
-        'bbaa': {
-            _pid: 'bbaa',
-            _lbl: 'Enum PointDef',
-            _type: pdw.PointType.SELECT
-        }
+        _lbl: 'Def 1',
+        _desc: 'Def Desc',
+        _pts: [
+            {
+                _pid: 'a111',
+                _lbl: 'Def 1 point 1',
+                _desc: 'Point Desc'
+            },
+            {
+                _pid: 'a222',
+                _lbl: 'Def 1 point 2',
+                _desc: 'Numero Dos'
+            }
+        ]
     });
 
-    let enumPoint = defWithEnum.getPointsAsArray()[0];
-    expect(enumPoint._lbl).toBe('Enum PointDef');
+    /**
+     * Element.deleteAndSave()
+     */
+    firstDef.deleteAndSave() as pdw.Def;
+    expect(firstDef._deleted).toBe(true);
+    expect(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(1);
+    expect(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(1); //WHAT? 
+    /**
+     * note to self here - the above line works if ONLY THIS TEST is being run, 
+     * but BREAKS if any other test swuit is being run... and for some reason it's *just* this line.
+     */
+    expect(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(0);
+    //doing element.toData because __tempUpdated is 1 millisecond off & toData nukes metaproperties
+    expect(pdw.Element.toData(pdwRef.getDefs({ includeDeleted: 'only' })[0])).toEqual(pdw.Element.toData(firstDef));
 
     /**
-     * Indirectly add 2 choices
+     * Element.unDeleteAndSave()
      */
-    numBefore = pdwRef.getTagDefs().length;
-    pdwRef.setTagDefs([
-        {
-            _lbl: 'Choice A',
-            _tid: 'Axxx'
-        },
-        {
-            _lbl: 'Choice B',
-            _tid: 'Bxxx'
-        }
-    ])
-    expect(pdwRef.getTagDefs().length).toBe(numBefore + 2);
-    numBefore = pdwRef.getTags().length;
-    pdwRef.setTags([
-        {
-            _tid: 'Axxx',
-            _did: 'bbbb',
-            _pid: 'bbaa'
-        },
-        {
-            _tid: 'Bxxx',
-            _did: 'bbbb',
-            _pid: 'bbaa'
-        }
-    ])
-    expect(pdwRef.getTags().length).toBe(numBefore + 2);
+    firstDef.unDeleteAndSave() as pdw.Def;
+    expect(firstDef._deleted).toBe(false);
+    expect(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(1);
+    expect(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(0);
+    expect(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(1);
 
     /**
-     * PointDef.getEnumOptions
+     * Update Props, don't save yet
      */
-    let enumTags = enumPoint.getEnumOptions();
-    expect(enumTags.length).toBe(2);
+    firstDef.setProps({ _lbl: 'DEF ONE' });
+    expect(firstDef._lbl).toBe('DEF ONE');
+    let unmodified = pdwRef.getDefs()[0];
+    expect(unmodified._lbl).toBe('Def 1');
+    expect(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(1); //DataStore not changed yet
 
     /**
-     * PointDef.addEnumOption
+     * Save to DataStore after updating
      */
-    enumPoint.addEnumOption('Choice C');
-    enumTags = enumPoint.getEnumOptions();
-    expect(enumTags.length).toBe(3);
-    expect(enumTags.map(t => t.getLbl())).toEqual(['Choice A', 'Choice B', 'Choice C']);
-    let tagDef = pdwRef.getTagDefs({ tagLbl: 'Choice C' })[0];
-    let tagC = pdwRef.getTags({ tid: tagDef._tid })[0];
-    expect(tagC.getDef()._lbl).toBe('Choice C'); //tagDef was created
+    firstDef.save();
+    expect(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(2);
+    expect(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(1);
+    let defs = pdwRef.getDefs({ did: 'aaaa', includeDeleted: 'yes' });
+    expect(defs.length).toBe(2);
+    expect(defs.find(def => def._deleted)!._lbl).toBe('Def 1'); //deleted one unchanged
+    expect(defs.find(def => !def._deleted)!._lbl).toBe('DEF ONE'); //new one reflects change
 
     /**
-     * Tag.setLbl && Tag.getLbl
+     * Set a few props & save
      */
-    tagC.setLbl('CHOICE C'); //updates the TagDef
-    expect(tagC.getLbl()).toBe('CHOICE C'); //will pull the newly updated TagDef. Nice.
+    firstDef.setProps({ _desc: 'New Description', _emoji: '🧠' }).save() as pdw.Def;
+    expect(pdwRef.getDefs({ did: 'aaaa', includeDeleted: 'yes' }).length).toBe(3);
+    expect(pdwRef.getDefs({ did: 'aaaa', includeDeleted: 'no' }).length).toBe(1);
+    let fromStore: any = pdwRef.getDefs({ did: 'aaaa', includeDeleted: 'no' })[0];
+    // expect(modified).toEqual(fromStore); //_tempUpdated is slightly off? Weird.
+    expect(firstDef._updated).toEqual(fromStore._updated);
+    expect(fromStore._desc).toBe("New Description");
+    expect(fromStore._emoji).toBe("🧠");
+    let overwritenFromStore = pdwRef.getDefs({ did: 'aaaa', includeDeleted: 'only' });
+    expect(overwritenFromStore.length).toBe(2);
+    expect(overwritenFromStore[0]._desc).toBe('Def Desc');
+    expect(overwritenFromStore[0]._emoji).toBe("🆕");
+    expect(overwritenFromStore[1]._desc).toBe('Def Desc');
+    expect(overwritenFromStore[1]._emoji).toBe("🆕");
+
+    /**
+     * Set single prop - calls "setProps" internally
+     */
+    firstDef.setProp('_lbl', 'New Label');
+    expect(firstDef._lbl).toBe('New Label');
+
+    /**
+     * setting no props doesn't change datastore
+     */
+    expect(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(3);
+    firstDef.setProps({});
+    expect(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(3);
+
+    /**
+     * Cannot set ID-like props
+    */
+    firstDef.setProps({ _did: 'bbbb' }) as pdw.Def; //should log warning about not updating ID
+    expect(firstDef._did).toBe('aaaa');
+    origUid = firstDef._uid;
+    firstDef = firstDef.setProps({ _uid: 'whatever' }) as pdw.Def; //should log warning about not updating ID
+    expect(firstDef._uid).toBe(origUid);
+
+    /**
+     * Data validation for Emoji
+     */
+    expect(firstDef._emoji).toBe("🧠");
+    firstDef.setEmoji("not an emoji");
+    expect(firstDef._emoji).toBe("🧠"); //won't update
+    firstDef.setProps({_emoji: 'also not an emoji'}); //setProps forwards to setEmoji
+    expect(firstDef._emoji).toBe("🧠"); 
+    firstDef.setEmoji("🌭");
+    expect(firstDef._emoji).toBe("🌭"); //does work, though
+
+    /**
+     * Data validation for _updated & _created
+     */
+    let stringDate = '2023-07-22T15:55:27'; //plaindatetime string
+    firstDef.setProps({_created: stringDate});
+    expect(firstDef._created).toBe('lkehoqoo') //lkehoqoo is right
+    //console.log(pdw.parseTemporalFromEpochStr('lkehoqoo').toPlainDateTime().toString());
+    let date = new Date();
+    //firstDef.setProps({_created: date}); //also works, but difficult to prove again and again
+
+    //#### Updating PointDef stuff ####
+    /**
+     * Def.setPointProps()
+     */
+    let def = pdwRef.getDefs({ did: 'aaaa' })[0];
+    def.setPointProps('a111', { _desc: 'Updated Description' })
+    expect(def.getPoint('a111')._desc).toBe('Updated Description');
+    fromStore = pdwRef.getDefs({ did: 'aaaa', includeDeleted: 'no' })[0];
+    expect(fromStore.getPoint('a111')._desc).toBe('Point Desc'); //change isn't saved yet
+    def.save();
+    fromStore = pdwRef.getDefs({ did: 'aaaa', includeDeleted: 'no' })[0];
+    expect(fromStore.getPoint('a111')._desc).toBe('Updated Description'); //change is now saved
+
+    /**
+     * PointDef.setProps()
+    */
+    let point = def.getPoint('a111');
+    point.setProps({ _desc: 'Updated Description Again' });
+    expect(def.getPoint('a111')._desc).toBe('Updated Description Again');
+    //would need to save() to save changes to DataStore
+
+    /**
+     * PointDef.setProp - calls setProps() internally
+     */
+    point.setProp('_desc', 'Updated again again');
+    expect(point._desc).toBe('Updated again again');
+
+    /**
+     * Data Validation on PointDef.setProps on emoji, rollup, and type
+     */
+    expect(point._emoji).toBe('🆕');
+    point.setProps({_emoji: 'Invalid emoji'})
+    expect(point._emoji).toBe('🆕'); //no change
+    expect(point._rollup).toBe(pdw.Rollup.COUNT);
+    //@ts-expect-error - typescript warning, nice
+    point.setProps({_rollup: 'Invalid rollup'})
+    expect(point._rollup).toBe(pdw.Rollup.COUNT); //no change
+    expect(point._type).toBe(pdw.PointType.TEXT);
+    //@ts-expect-error - typescript warning, nice
+    point.setProps({_type: 'Invalid type'})
+    expect(point._type).toBe(pdw.PointType.TEXT); //no change
+
+    /**
+     * Def.deactivatePoint()
+     */
+    expect(def._pts.length).toBe(2);
+    expect(def._pts.filter(p => p._active).length).toBe(2);
+    def.deactivatePoint('a222');
+    expect(def._pts.length).toBe(2); //still got 2
+    expect(def._pts.filter(p => p._active).length).toBe(1); //but only 1 is active
+    point = def.getPoint('a111');
+    def.deactivatePoint(point);
+    expect(def._pts.length).toBe(2); //still got 2
+    expect(def._pts.filter(p => p._active).length).toBe(0); //but neither is active
+    expect(def.getPoint('a111')._lbl).toBe('Def 1 point 1'); //inactive points can still be got
+    expect(def.getPoint('a222')._active).toBe(false); //...they're just inactive
+    //would need to save() to save changes to DataStore
+
+    /**
+     * Def.reactivatePoint()
+     */
+    expect(def._pts.length).toBe(2);
+    expect(def._pts.filter(p => p._active).length).toBe(0);
+    def.reactivatePoint('a222');
+    expect(def._pts.length).toBe(2); //still got 2
+    expect(def._pts.filter(p => p._active).length).toBe(1); //but 1 is active again
+    //would need to save() to save changes to DataStore
+
+    /**
+     * Def.newPoint()
+     */
+    expect(def._pts.length).toBe(2);
+    expect(def._pts.filter(p => p._active).length).toBe(1);
+    def.addPoint({_desc: '3rd Point', _pid: 'a333', _type: pdw.PointType.SELECT});
+    expect(def._pts.length).toBe(3);
+    expect(def._pts.filter(p => p._active).length).toBe(2);
+    expect(def.getPoint('a333')._desc).toBe('3rd Point');
+    def.save();
+
+    /**
+     * Opts
+     */
+    let optsPoint = def.getPoint('a333');
+    expect(optsPoint.shouldHaveOptsProp()).toBe(true);
+    optsPoint.addOpt('Option 1', 'o111'); //specified _oid
+    expect(optsPoint._opts?.length).toBe(1);
+    optsPoint.addOpt('Option 2'); //unspecified _oid => one is made for it
+    expect(optsPoint._opts?.length).toBe(2);
+    optsPoint.addOpt('Option 3', 'o333'); //needed for later
+    optsPoint.setOpt('o111','New Title');
+    expect(optsPoint.getOpt('o111')?._lbl).toBe('New Title'); //get by opt._oid
+    expect(optsPoint.getOpt('Option 2')?._lbl).toBe('Option 2'); //get by opt._lbl
+    optsPoint.removeOpt('Option 2');
+    optsPoint.setOpt('o333', 'New Option 2'); //a common real world use case, I imagine
+    expect(optsPoint._opts!.length).toBe(2);
+    expect(optsPoint._opts![0]._lbl).toBe('New Title');
+
+    /**
+     * Entries
+     */
+    let entry = pdwRef.newEntry({
+        _did: def._did,
+        'a333': 'o111',
+        'a222': 'Point value'
+    });
+
+    /**
+     * Base entry props updating
+     */
+    expect(entry._note).toBe('');
+    expect(entry['a222']).toBe('Point value');
+    entry.setProps({_note: 'Added note', _source: 'Test procedure'});
+    expect(entry._note).toBe('Added note');
+    expect(entry._source).toBe('Test procedure');
+    expect(entry['a222']).toBe('Point value');
+
+    entry.setProps({_period: '2023-07-21T14:04:33'});
+    expect(entry._period).toBe('2023-07-21T14:04:33');
+    let updated = pdwRef.getEntries()[0];
+    expect(updated._note).toBe(''); //store not updated yet
+    entry.save(); //update stored entry
+    updated = pdwRef.getEntries({includeDeleted: 'no'})[0];
+    expect(updated._note).toBe('Added note'); //store updated with new entry
+    expect(updated['a222']).toBe('Point value'); //point is retained
+    let original = pdwRef.getEntries({includeDeleted: 'only'})[0];
+    expect(original._note).toBe(''); //original entry retained unchanged
+    expect(original._uid !== updated._uid).toBe(true); //uid is different
+    expect(original._eid === updated._eid).toBe(true); //eid is the same
+
+    /**
+     * Entry Point Values
+     */
+    entry.setPointVals([
+        {'a333': 'o333'},
+        {'a222': 'Other point new value!'}
+    ]);
+    expect(entry.getPoint('a222')!.val).toBe('Other point new value!');
+    expect(entry.getPoint('a333')!.val).toBe('o333');
+    //or set one at a time:
+    entry.setPointVal('a333','o111');
+    expect(entry.getPoint('a333')!.val).toBe('o111');
+
+    /**
+     * Multiselect Opts
+     */
+    def.addPoint({
+        _pid: 'a444',
+        _lbl: 'Multiselect Test',
+        _type: pdw.PointType.MULTISELECT,
+        _opts: [
+            {
+                _lbl: 'A',
+                _oid: 'aaaa'
+            },
+            {
+                _lbl: 'B',
+                _oid: 'bbbb'
+            }
+        ]
+    }).save(); //must save to make the new point available to new entries
+    entry = def.newEntry({
+        'a444': []
+    });
+    expect(entry.getPoint('Multiselect Test')!.val).toEqual([]);
+    entry.setPointVal('a444',['aaaa','bbbb']); //change multiselect selections
+    expect(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa','bbbb']); //works
+
+    /**
+     * Entry Period scope protection
+     */
+    entry.setProps({_period: '2023-07-21'});
+    expect(entry._period).toBe('2023-07-21T00:00:00');
+
+
 })
 
 test.skip('Query Basics', () => {
