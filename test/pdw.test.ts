@@ -608,158 +608,42 @@ test('Entry Creation and Getting', () => {
     expect(both.getPoint('c111')?.val).toEqual(['ccc1', 'ccc2']);
 })
 
-test.skip('Tag Basics', () => {
+test('Tag Basics', () => {
     resetTestDataset();
 
-    let testDef = pdwRef.newDef({
-        _did: 'aaaa'
+    pdwRef.newDef({
+        _did: 'aaaa',
+        _lbl: 'for tagging'
     })
 
     /**
      * PDW.newTagDef
      */
-    let tagDefA = pdwRef.newTag({
+    let tagA = pdwRef.newTag({
         _lbl: 'test tag',
         _tid: 'taga'
     })
-    expect(pdwRef.getTags()[0]).toEqual(tagDefA);
-
-    // /**
-    //  * Indirect tag creation
-    //  */
-    // let tagDefB = pdwRef.setTagDefs([{
-    //     _lbl: 'tag b',
-    //     _tid: 'tagb'
-    // }])[0]
-    // expect(tagDefB._lbl).toBe('tag b');
-
-    // /**
-    //  * Indirect tag label update
-    //  */
-    // let tagBNew = pdwRef.setTagDefs([{
-    //     _lbl: 'Tag B',
-    //     _tid: 'tagb'
-    // }])[0]
-    // expect(tagDefB._deleted).toBe(true);
-    // expect(tagDefB._lbl).toBe('tag b');
-    // expect(tagBNew._lbl).toBe('Tag B');
-
-    // /**
-    //  * TagDef type error test
-    //  */
-    // expect(() => {
-    //     pdwRef.newTagDef({
-    //         //@ts-expect-error
-    //         _lbl: 5, //wrong type, should error
-    //     })
-    // }).toThrowError('TagDef created is not TagDefLik');
-
-    // /**
-    //  * Indirectly create Tag on a Def
-    //  */
-    // let tagA = pdwRef.newTag({
-    //     _did: 'aaaa',
-    //     _tid: 'taga'
-    // });
-    // expect(tagA._did).toBe('aaaa');
-    // expect(tagA._tid).toBe('taga');
-    // expect(pdwRef.getTags({ tid: 'taga' })[0]).toEqual(tagA);
-
-    // /**
-    //  * Def.addTag method 
-    //  */
-    // let tagB = testDef.addTag('tagb');
-    // expect(pdwRef.getTags({ did: 'aaaa' }).length).toBe(2);
-    // expect(pdwRef.getTags({ did: 'aaaa', tid: 'tagb' })[0]).toEqual(tagB);
-
-    // /**
-    //  * TagDef.getTaggedDefs
-    //  */
-    // let tAndD = tagDefA.getTagsAndDefs();
-    // expect(tAndD.defs[0]).toEqual(testDef);
-    // expect(tAndD.tags[0]).toEqual(tagA);
-
-    // /**
-    //  * TagDef.addTag
-    //  */
-    // tagDefB.addTag('aaaa')
-    // expect(pdwRef.getTags({ did: 'aaaa' }).length).toBe(2);
-
-    // /**
-    //  * Don't create duplicates
-    //  */
-    // let numBefore = pdwRef.getTags({ includeDeleted: 'only' }).length
-    // testDef.addTag('taga') //already exists
-    // //creates a new Tag, but deletes the old one, even though they're the same content
-    // expect(pdwRef.getTags({ includeDeleted: 'only' }).length).toBe(numBefore + 1);
-
-    // //Enumerations
-    // //Create Definition with a Select type
-    // let defWithEnum = pdwRef.newDef({
-    //     _did: 'bbbb',
-    //     _lbl: 'Def with an Enum Point',
-    //     'bbaa': {
-    //         _pid: 'bbaa',
-    //         _lbl: 'Enum PointDef',
-    //         _type: pdw.PointType.SELECT
-    //     }
-    // });
-
-    // let enumPoint = defWithEnum.getPointsAsArray()[0];
-    // expect(enumPoint._lbl).toBe('Enum PointDef');
-
-    // /**
-    //  * Indirectly add 2 choices
-    //  */
-    // numBefore = pdwRef.getTagDefs().length;
-    // pdwRef.setTagDefs([
-    //     {
-    //         _lbl: 'Choice A',
-    //         _tid: 'Axxx'
-    //     },
-    //     {
-    //         _lbl: 'Choice B',
-    //         _tid: 'Bxxx'
-    //     }
-    // ])
-    // expect(pdwRef.getTagDefs().length).toBe(numBefore + 2);
-    // numBefore = pdwRef.getTags().length;
-    // pdwRef.setTags([
-    //     {
-    //         _tid: 'Axxx',
-    //         _did: 'bbbb',
-    //         _pid: 'bbaa'
-    //     },
-    //     {
-    //         _tid: 'Bxxx',
-    //         _did: 'bbbb',
-    //         _pid: 'bbaa'
-    //     }
-    // ])
-    // expect(pdwRef.getTags().length).toBe(numBefore + 2);
-
-    // /**
-    //  * PointDef.getEnumOptions
-    //  */
-    // let enumTags = enumPoint.getEnumOptions();
-    // expect(enumTags.length).toBe(2);
-
-    // /**
-    //  * PointDef.addEnumOption
-    //  */
-    // enumPoint.addEnumOption('Choice C');
-    // enumTags = enumPoint.getEnumOptions();
-    // expect(enumTags.length).toBe(3);
-    // expect(enumTags.map(t => t.getLbl())).toEqual(['Choice A', 'Choice B', 'Choice C']);
-    // let tagDef = pdwRef.getTagDefs({ tagLbl: 'Choice C' })[0];
-    // let tagC = pdwRef.getTags({ tid: tagDef._tid })[0];
-    // expect(tagC.getDef()._lbl).toBe('Choice C'); //tagDef was created
-
-    // /**
-    //  * Tag.setLbl && Tag.getLbl
-    //  */
-    // tagC.setLbl('CHOICE C'); //updates the TagDef
-    // expect(tagC.getLbl()).toBe('CHOICE C'); //will pull the newly updated TagDef. Nice.
+    let tag = pdwRef.getTags()[0]
+    expect(tag).toEqual(tagA);
+    expect(tag._lbl).toBe('test tag');
+    expect(tag._tid).toBe('taga');
+    expect(tag._dids).toEqual([]);
+    expect(pdw.Tag.isTagLike(tag)).toBe(true);
+    
+    let tagB = pdwRef.newTag({
+        _lbl: 'tag with content!',
+        _tid: 'tagb',
+        _dids: ['aaaa']
+    })
+    expect(tagB._dids).toEqual(['aaaa']);
+    expect(tagB.getDefs().length).toBe(1);
+    expect(tagB.getDefs()[0]._lbl).toBe('for tagging');
+    
+    let tagC = pdwRef.newTag({
+        _dids: ['zzzz']
+    })
+    expect(tagC._dids).toEqual(['zzzz']); //non-existant _dids may live amongst your _dids
+    //... I guess there's not a lot else to them outside of updates
 });
 
 test('Update Logic', () => {
@@ -1057,13 +941,73 @@ test('Update Logic', () => {
     expect(entry.getPoint('Multiselect Test')!.val).toEqual([]);
     entry.setPointVal('a444',['aaaa','bbbb']); //change multiselect selections
     expect(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa','bbbb']); //works
-
+    entry.setPointVal('a444','aaaa, bbbb, cccc'); //can also just have comma-delimited string
+    expect(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa','bbbb','cccc']); //works, doesn't care about the non-existant 'cccc' opt
+    entry.setPointVal('a444','aaaa,bbbb'); //spacing on a comma-delimited string is ignored
+    expect(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa','bbbb']); //works
+    entry.setPointVal('a444','aaaa'); //and a single string value is converted to an array
+    expect(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa']); //works
+    
     /**
      * Entry Period scope protection
      */
     entry.setProps({_period: '2023-07-21'});
     expect(entry._period).toBe('2023-07-21T00:00:00');
 
+    let tag = pdwRef.newTag({
+        _tid: 'taga',
+        _lbl: 'My tag',
+        _dids: []
+    });
+    tag.setProp('_dids',[def._did]);
+    expect(tag._dids).toEqual([def._did]);
+    fromStore = pdwRef.getTags()[0];
+    expect(fromStore._dids).toEqual([]); //stores not updated yet.
+    tag.save();
+    fromStore = pdwRef.getTags()[0];
+    expect(fromStore._dids).toEqual([def._did]); //now it is
+
+    let tagTwo = pdwRef.newTag({
+        _tid: 'tagb',
+        _lbl: 'Other tag'
+    })
+    /**
+     * Adding and removing defs
+     */
+    tagTwo.addDef(def); //by def ref
+    expect(tagTwo._dids).toEqual([def._did]);
+    tagTwo.removeDef(def); //by def ref
+    expect(tagTwo._dids).toEqual([]);
+    tagTwo.addDef(def._did); //by _did
+    expect(tagTwo._dids).toEqual([def._did]);
+    tagTwo.addDef(def._did); //adding the same did doesn't create a duplicate entry
+    expect(tagTwo._dids).toEqual([def._did]); 
+    tagTwo.removeDef(def._did); //by _did
+    expect(tagTwo._dids).toEqual([]);
+
+    /**
+     * Tagging Def *from the Def*
+     */
+    def.addTag(tagTwo); //by tag ref
+    expect(tagTwo.getDefs()[0]._lbl).toBe(def._lbl);
+    def.removeTag(tagTwo); //by tag ref
+    expect(tagTwo.getDefs().length).toBe(0);
+    
+    def.addTag(tagTwo._tid); //by tid
+    tagTwo = pdwRef.getTags({tid: 'tagb'})[0]; //updated tag object is in stores
+    expect(tagTwo.getDefs()[0]._lbl).toBe(def._lbl);
+    
+    def.removeTag(tagTwo._tid); //by tid
+    tagTwo = pdwRef.getTags({tid: 'tagb'})[0];
+    expect(tagTwo.getDefs().length).toBe(0);
+    
+    def.addTag(tagTwo._lbl); //by tag label
+    expect(tagTwo.getDefs()[0]._lbl).toBe(def._lbl);
+    tagTwo = pdwRef.getTags({tid: 'tagb'})[0];
+
+    def.removeTag(tagTwo._lbl); //by tag label
+    tagTwo = pdwRef.getTags({tid: 'tagb'})[0];
+    expect(tagTwo.getDefs().length).toBe(0);
 
 })
 

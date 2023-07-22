@@ -869,7 +869,7 @@ export abstract class Element implements ElementLike {
 
         if(type === 'DefLike' && !Def.isDefLike(this)) throw new Error('You updates made a Def not DefLike');
         if(type === 'EntryLike' && !Entry.isEntryLike(this)) throw new Error('You updates made a Entry not EntryLike');
-        if(type === 'TagLike' && !Tag.isTagDefLike(this)) throw new Error('You updates made a Tag not TagLike');
+        if(type === 'TagLike' && !Tag.isTagLike(this)) throw new Error('You updates made a Tag not TagLike');
         return this
     }
 
@@ -1177,18 +1177,31 @@ export class Def extends Element implements DefLike {
      * @param tid of EXISTING Tag
      * @returns the new Tag
      */
-    addTag(tid: string): Tag {
-        throw new Error('fix this')
-        // let pdwRef = PDW.getInstance();
-        // let tagArr = pdwRef.getTags({ tid: tid });
-        // if (tagArr.length === 0) throw new Error('No tag def found for ' + tid);
-        // let tag = tagArr[0];
-        // if (this._tags.some(t => t === tid)) {
-        //     console.warn('Tried adding a tag to a Def that already had that tag');
-        // } else {
-        //     this._tags.push(tag._tid);
-        // }
-        // return tag
+    addTag(tidLblOrTag: Tag | string, isRemove = false): Tag {
+        let tag: Tag | undefined;
+        if(Tag.isTagLike(tidLblOrTag)){
+            tag = tidLblOrTag as Tag;
+        }else{
+            let pdwRef = PDW.getInstance();
+            let foundTags = pdwRef.getTags({tid: tidLblOrTag as string});
+            if(foundTags.length !== 1){
+                foundTags = pdwRef.getTags({tagLbl: tidLblOrTag as string});
+                if(foundTags.length !== 1) throw new Error('No such tag found');
+            }
+            tag = foundTags[0];
+        }
+        if(tag===undefined) throw new Error('Tag was undefined')
+        if(isRemove){
+            tag.removeDef(this._did);
+        }else{
+            tag.addDef(this._did);
+        }
+        tag.save();
+        return tag
+    }
+
+    removeTag(tidLblOrTag: Tag | string): Tag{
+        return this.addTag(tidLblOrTag, true);
     }
 
     setPointProps(pointIdentifier: string | PointDef, newPropsMap: DefLike | EntryLike | TagLike): Element {
@@ -1292,20 +1305,6 @@ export class PointDef implements PointDefLike {
     readonly __def: Def;
     constructor(newPointDefData: PointDefLike, def: Def) {
         if (newPointDefData._pid === undefined) throw new Error("No PointDef _pid supplied.");
-
-        // if (newPointDefData.__isNew !== true) {
-        //     let existing = Element.findExistingData(newPointDefData);
-        //     if (existing !== undefined) {
-        //         if (newPointDefData._active === undefined) newPointDefData._active = existing._active;
-        //         if (newPointDefData._desc === undefined) newPointDefData._desc = existing._desc;
-        //         if (newPointDefData._emoji === undefined) newPointDefData._emoji = existing._emoji;
-        //         if (newPointDefData._lbl === undefined) newPointDefData._lbl = existing._lbl;
-        //         if (newPointDefData._type === undefined) newPointDefData._type = existing._type;
-        //         if (newPointDefData._rollup === undefined) newPointDefData._rollup = existing._rollup;
-        //         if (newPointDefData._opts === undefined) newPointDefData._opts = existing._opts;
-        //     }
-        // }
-
         if (newPointDefData._type !== undefined && !PointDef.isValidType(newPointDefData._type)) throw new Error('Cannot parse point type ' + newPointDefData._type);
         if (newPointDefData._rollup !== undefined && !PointDef.isValidRollup(newPointDefData._rollup)) throw new Error('Cannot parse point rollup ' + newPointDefData._rollup);
 
@@ -1560,7 +1559,7 @@ export class PointDef implements PointDefLike {
         }
         if (_type === PointType.MULTISELECT) {
             if (Array.isArray(_val)) return _val;
-            if (typeof _val === 'string') return [_val];
+            if (typeof _val === 'string') return _val.split(',').map(text=>text.trim());
             throw new Error(`Cannot convert this to multiselect:` + _val)
         }
         if (_type === PointType.NUMBER) {
@@ -1774,7 +1773,6 @@ export class Tag extends Element implements TagLike {
     readonly _tid: string;
     readonly _lbl: string;
     readonly _dids: SmallID[]
-    __defs: Def[];
     constructor(tagDefData: TagLike, lookForExisting = true) {
         if (lookForExisting) {
             let existing = Element.findExistingData(tagDefData, 'Tag');
@@ -1786,44 +1784,52 @@ export class Tag extends Element implements TagLike {
         this._tid = tagDefData._tid ?? makeSmallID();
         this._lbl = tagDefData._lbl ?? 'Unlabeled Tag with _tid = ' + this._tid;
         this._dids = tagDefData._dids ?? [];
-        //#TODO - figure out how to handle situaitons where _dids and __defs are supplied but dont' agree
-        this.__defs = tagDefData.__defs ?? [];
         
-        if (!Tag.isTagDefLike(this)) {
+        if (!Tag.isTagLike(this)) {
             throw new Error('TagDef created is not TagDefLike');
         }
     }
 
-    static isTagDefLike(data: any): boolean {
+    static isTagLike(data: any): boolean {
         if (typeof data._uid !== 'string') return false
         if (typeof data._created !== 'string') return false
         if (typeof data._updated !== 'string') return false
         if (typeof data._deleted !== 'boolean') return false
         if (typeof data._tid !== 'string') return false
         if (typeof data._lbl !== 'string') return false
-        if (!Array.isArray(data.__defs)) return false
         return true;
     }
 
-    // getDefs(includeDeleted = false): { tags: Tag[], defs: Def[] } {
-    //     const pdwRef = PDW.getInstance();
-    //     let tags = pdwRef.getTags({ tid: this._tid });
-    //     let tagsAndDefs: any = { tags: [], defs: [] };
-    //     tags.forEach(tag => {
-    //         let result = pdwRef.getDefs({ did: tag._did });
-    //         result.forEach(inner => {
-    //             if (!tagsAndDefs.defs.some((d: any) => d._uid === inner._uid)) {
-    //                 tagsAndDefs.defs.push(inner);
-    //                 tagsAndDefs.tags.push(tag);
-    //             }
-    //         })
-    //     })
-    //     return tagsAndDefs
-    // }
+    addDef(defOrDid: Def | string){
+        let did = defOrDid as string;
+        if(typeof did !== 'string' && Def.isDefLike(defOrDid)){
+            did = (<Def>defOrDid)._did
+        }
+        if(this._dids.indexOf(did)===-1) this._dids.push(did);
+        return this
+    }
 
-    //getOpts(){
-    // 
-    // }
+    removeDef(defOrDid: Def | string){
+        if(Def.isDefLike(defOrDid)){
+            //@ts-expect-error
+            this._dids = this._dids.filter(d=>d!==((<Def>defOrDid)._did));
+        }else{
+            //@ts-expect-error
+            this._dids = this._dids.filter(d=>d!==((<string>defOrDid)));
+        }
+        return this
+    }
+
+    getDefs(includeDeleted = false): Def[]{
+        const pdwRef = PDW.getInstance();
+        const includeDeletedText = includeDeleted ? 'yes' : 'no';
+        let defs: Def[]= [];
+        this._dids.forEach(did=>{
+            let def = pdwRef.getDefs({did: did, includeDeleted: includeDeletedText});
+            if(def!==undefined) defs.push(def[0]);
+        })
+        return defs
+    }
 }
 
 /**
@@ -2214,7 +2220,7 @@ function maybeGetOnlyResult(arrayOfOneElement: any[]): any {
  * Used for .csv outputs, and probably SQL when I get around to that.
  * This is the order of all the headers.
  */
-export const canonicalHeaders = [
+export const canonicalHeaders = [ //#TODO - fix eventually
     '_uid',
     '_created',
     '_updated',
