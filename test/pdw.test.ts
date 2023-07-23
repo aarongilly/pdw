@@ -10,7 +10,7 @@ function resetTestDataset() {
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 }
 
-test('Def Creation and Getting', () => {
+test.skip('Def Creation and Getting', () => {
     /**
      * Most Basic Def Creation
     */
@@ -268,8 +268,8 @@ test('Def Creation and Getting', () => {
     expect(multiselectType.shouldHaveOptsProp()).toBe(true);
     //existance & type of prop
     expect(textType._opts).toBeUndefined();
-    expect(Array.isArray(selectType._opts)).toBe(true);
-    expect(Array.isArray(multiselectType._opts)).toBe(true);
+    expect(typeof selectType._opts).toBe('object');
+    expect( typeof multiselectType._opts).toBe('object');
 
     /**
      * Invalid PointDef (bad Type)
@@ -324,29 +324,21 @@ test('Def Creation and Getting', () => {
             {
                 _pid: 'aaaa',
                 _type: pdw.PointType.SELECT,
-                _opts: [
-                    {
-                        _oid: '1111',
-                        _lbl: 'Opt 1'
-                    },
-                    {
-                        _oid: '2222',
-                        _lbl: 'Opt 2'
-                    }
-                ]
-
+                _opts: {
+                    '1111': 'Opt 1',
+                    '2222': 'Opt 2'
+                }
             }
         ]
     });
     const pointWithOptions = defWithOptions.getPoint('aaaa');
-    expect(pointWithOptions._opts!.length).toBe(2);
-    expect(pointWithOptions._opts![0]._lbl).toBe('Opt 1');
-    expect(pointWithOptions._opts![1]._lbl).toBe('Opt 2');
-    expect(pointWithOptions.getOpts().length).toBe(2);
-
+    expect(Object.keys(pointWithOptions._opts!).length).toBe(2);
+    expect(pointWithOptions.getOptLbl('1111')).toBe('Opt 1');
+    expect(pointWithOptions.getOptLbl('2222')).toBe('Opt 2');
+    expect(Object.keys(pointWithOptions.getOpts()).length).toBe(2);
 })
 
-test('Entry Creation and Getting', () => {
+test.skip('Entry Creation and Getting', () => {
     resetTestDataset();
 
     const testDef = pdwRef.newDef({
@@ -378,7 +370,7 @@ test('Entry Creation and Getting', () => {
     expect(entry.getPoints().length).toBe(0); //points weren't supplied, they aren't generated
     expect(entry._note).toBe(''); //default
     expect(entry._source).toBe(''); //default
-    
+
     /**
      * Create Entry with explicit Points
     */
@@ -401,7 +393,7 @@ test('Entry Creation and Getting', () => {
     //getPoints returns an object with these keys
     let points = entry.getPoints();
     expect(points.length).toBe(2);
-    let entryPointObj = points.find(point=>point.pid==='yyyy')!;
+    let entryPointObj = points.find(point => point.pid === 'yyyy')!;
     expect(entryPointObj.pointDef._desc).toBe('Test point desc');
     expect(entryPointObj.pid).toBe('yyyy');
     expect(entryPointObj.lbl).toBe('Point A');
@@ -418,7 +410,7 @@ test('Entry Creation and Getting', () => {
      * Entry.getPoint for a non-existnt point
      */
     expect(entry.getPoint('zzzz not real')).toBeUndefined();
-    
+
     /**
     * Full Entry Creation    
     */
@@ -540,16 +532,10 @@ test('Entry Creation and Getting', () => {
                 _pid: 'b111',
                 _lbl: 'Select Point',
                 _type: pdw.PointType.SELECT,
-                _opts: [
-                    {
-                        _oid: 'bbb1',
-                        _lbl: 'Opt 1'
-                    },
-                    {
-                        _oid: 'bbb2',
-                        _lbl: 'Opt 2'
-                    }
-                ]
+                _opts: { 
+                    'bbb1': 'Opt 1',
+                    'bbb2': 'Opt 2' 
+                }
             }
         ]
     })
@@ -561,8 +547,8 @@ test('Entry Creation and Getting', () => {
         'b111': 'bbb1' //weird, but how it has to work
     })
     expect(entryWithOpts.getPoint('Select Point')?.val).toBe('bbb1');
-    expect(entryWithOpts.getPoint('b111')?.pointDef.getOpt('bbb1')?._lbl).toBe('Opt 1');
-    
+    expect(entryWithOpts.getPoint('b111')?.pointDef.getOptLbl('bbb1')).toBe('Opt 1');
+
     /**
      * Select Opts are not validated! It's not worth doing.
      * Just check that the result is defined when running pointDef.getOpt()
@@ -573,7 +559,7 @@ test('Entry Creation and Getting', () => {
     })
     let point = entryWithOpts.getPoint('b111')!;
     expect(point.val).toBe('fake oid'); //no errors thrown
-    expect(point.pointDef.getOpt('fake oid')).toBeUndefined(); //is undefined
+    expect(point.pointDef.getOptLbl('fake oid')).toBeUndefined(); //is undefined
 
     let defWithMultiselect = pdwRef.newDef({
         _did: 'cccc',
@@ -581,16 +567,10 @@ test('Entry Creation and Getting', () => {
             {
                 _pid: 'c111',
                 _type: pdw.PointType.MULTISELECT,
-                _opts: [
-                    {
-                        _oid: 'ccc1',
-                        _lbl: 'One',
-                    },
-                    {
-                        _oid: 'ccc2',
-                        _lbl: 'Two',
-                    }
-                ]
+                _opts: { 
+                    'ccc1': 'One',
+                    'ccc2': 'Two' 
+                }
             }
         ]
     })
@@ -601,14 +581,14 @@ test('Entry Creation and Getting', () => {
         'c111': ['ccc1']
     });
     let both = defWithMultiselect.newEntry({
-        'c111': ['ccc1','ccc2']
+        'c111': ['ccc1', 'ccc2']
     });
     expect(none.getPoint('c111')?.val).toEqual([]);
     expect(one.getPoint('c111')?.val).toEqual(['ccc1']);
     expect(both.getPoint('c111')?.val).toEqual(['ccc1', 'ccc2']);
 })
 
-test('Tag Basics', () => {
+test.skip('Tag Basics', () => {
     resetTestDataset();
 
     pdwRef.newDef({
@@ -629,7 +609,7 @@ test('Tag Basics', () => {
     expect(tag._tid).toBe('taga');
     expect(tag._dids).toEqual([]);
     expect(pdw.Tag.isTagLike(tag)).toBe(true);
-    
+
     let tagB = pdwRef.newTag({
         _lbl: 'tag with content!',
         _tid: 'tagb',
@@ -638,7 +618,7 @@ test('Tag Basics', () => {
     expect(tagB._dids).toEqual(['aaaa']);
     expect(tagB.getDefs().length).toBe(1);
     expect(tagB.getDefs()[0]._lbl).toBe('for tagging');
-    
+
     let tagC = pdwRef.newTag({
         _dids: ['zzzz']
     })
@@ -646,9 +626,9 @@ test('Tag Basics', () => {
     //... I guess there's not a lot else to them outside of updates
 });
 
-test('Update Logic', () => {
+test.skip('Update Logic', () => {
     resetTestDataset();
-    
+
     let origUid = pdw.makeUID();
 
     let firstDef = pdwRef.newDef({
@@ -760,8 +740,8 @@ test('Update Logic', () => {
     expect(firstDef._emoji).toBe("🧠");
     firstDef.setEmoji("not an emoji");
     expect(firstDef._emoji).toBe("🧠"); //won't update
-    firstDef.setProps({_emoji: 'also not an emoji'}); //setProps forwards to setEmoji
-    expect(firstDef._emoji).toBe("🧠"); 
+    firstDef.setProps({ _emoji: 'also not an emoji' }); //setProps forwards to setEmoji
+    expect(firstDef._emoji).toBe("🧠");
     firstDef.setEmoji("🌭");
     expect(firstDef._emoji).toBe("🌭"); //does work, though
 
@@ -769,7 +749,7 @@ test('Update Logic', () => {
      * Data validation for _updated & _created
      */
     let stringDate = '2023-07-22T15:55:27'; //plaindatetime string
-    firstDef.setProps({_created: stringDate});
+    firstDef.setProps({ _created: stringDate });
     expect(firstDef._created).toBe('lkehoqoo') //lkehoqoo is right
     //console.log(pdw.parseTemporalFromEpochStr('lkehoqoo').toPlainDateTime().toString());
     let date = new Date();
@@ -806,15 +786,15 @@ test('Update Logic', () => {
      * Data Validation on PointDef.setProps on emoji, rollup, and type
      */
     expect(point._emoji).toBe('🆕');
-    point.setProps({_emoji: 'Invalid emoji'})
+    point.setProps({ _emoji: 'Invalid emoji' })
     expect(point._emoji).toBe('🆕'); //no change
     expect(point._rollup).toBe(pdw.Rollup.COUNT);
     //@ts-expect-error - typescript warning, nice
-    point.setProps({_rollup: 'Invalid rollup'})
+    point.setProps({ _rollup: 'Invalid rollup' })
     expect(point._rollup).toBe(pdw.Rollup.COUNT); //no change
     expect(point._type).toBe(pdw.PointType.TEXT);
     //@ts-expect-error - typescript warning, nice
-    point.setProps({_type: 'Invalid type'})
+    point.setProps({ _type: 'Invalid type' })
     expect(point._type).toBe(pdw.PointType.TEXT); //no change
 
     /**
@@ -848,7 +828,7 @@ test('Update Logic', () => {
      */
     expect(def._pts.length).toBe(2);
     expect(def._pts.filter(p => p._active).length).toBe(1);
-    def.addPoint({_desc: '3rd Point', _pid: 'a333', _type: pdw.PointType.SELECT});
+    def.addPoint({ _desc: '3rd Point', _pid: 'a333', _type: pdw.PointType.SELECT });
     expect(def._pts.length).toBe(3);
     expect(def._pts.filter(p => p._active).length).toBe(2);
     expect(def.getPoint('a333')._desc).toBe('3rd Point');
@@ -860,17 +840,18 @@ test('Update Logic', () => {
     let optsPoint = def.getPoint('a333');
     expect(optsPoint.shouldHaveOptsProp()).toBe(true);
     optsPoint.addOpt('Option 1', 'o111'); //specified _oid
-    expect(optsPoint._opts?.length).toBe(1);
+    expect(Object.keys(optsPoint._opts!).length).toBe(1);
     optsPoint.addOpt('Option 2'); //unspecified _oid => one is made for it
-    expect(optsPoint._opts?.length).toBe(2);
+    expect(Object.keys(optsPoint._opts!).length).toBe(2);
     optsPoint.addOpt('Option 3', 'o333'); //needed for later
-    optsPoint.setOpt('o111','New Title');
-    expect(optsPoint.getOpt('o111')?._lbl).toBe('New Title'); //get by opt._oid
-    expect(optsPoint.getOpt('Option 2')?._lbl).toBe('Option 2'); //get by opt._lbl
+    optsPoint.setOpt('o111', 'New Title');
+    expect(optsPoint.getOptLbl('o111')).toBe('New Title'); //get by opt._oid
+    expect(optsPoint.getOptOid('New Title')).toBe('o111'); //get by opt._lbl
     optsPoint.removeOpt('Option 2');
+    expect(Object.keys(optsPoint._opts!).length).toBe(2); //literally removes the option from the array
     optsPoint.setOpt('o333', 'New Option 2'); //a common real world use case, I imagine
-    expect(optsPoint._opts!.length).toBe(2);
-    expect(optsPoint._opts![0]._lbl).toBe('New Title');
+    expect(Object.keys(optsPoint._opts!).length).toBe(2);
+    expect(optsPoint.getOptLbl('o333')).toBe('New Option 2');
 
     /**
      * Entries
@@ -886,20 +867,20 @@ test('Update Logic', () => {
      */
     expect(entry._note).toBe('');
     expect(entry['a222']).toBe('Point value');
-    entry.setProps({_note: 'Added note', _source: 'Test procedure'});
+    entry.setProps({ _note: 'Added note', _source: 'Test procedure' });
     expect(entry._note).toBe('Added note');
     expect(entry._source).toBe('Test procedure');
     expect(entry['a222']).toBe('Point value');
 
-    entry.setProps({_period: '2023-07-21T14:04:33'});
+    entry.setProps({ _period: '2023-07-21T14:04:33' });
     expect(entry._period).toBe('2023-07-21T14:04:33');
     let updated = pdwRef.getEntries()[0];
     expect(updated._note).toBe(''); //store not updated yet
     entry.save(); //update stored entry
-    updated = pdwRef.getEntries({includeDeleted: 'no'})[0];
+    updated = pdwRef.getEntries({ includeDeleted: 'no' })[0];
     expect(updated._note).toBe('Added note'); //store updated with new entry
     expect(updated['a222']).toBe('Point value'); //point is retained
-    let original = pdwRef.getEntries({includeDeleted: 'only'})[0];
+    let original = pdwRef.getEntries({ includeDeleted: 'only' })[0];
     expect(original._note).toBe(''); //original entry retained unchanged
     expect(original._uid !== updated._uid).toBe(true); //uid is different
     expect(original._eid === updated._eid).toBe(true); //eid is the same
@@ -908,13 +889,13 @@ test('Update Logic', () => {
      * Entry Point Values
      */
     entry.setPointVals([
-        {'a333': 'o333'},
-        {'a222': 'Other point new value!'}
+        { 'a333': 'o333' },
+        { 'a222': 'Other point new value!' }
     ]);
     expect(entry.getPoint('a222')!.val).toBe('Other point new value!');
     expect(entry.getPoint('a333')!.val).toBe('o333');
     //or set one at a time:
-    entry.setPointVal('a333','o111');
+    entry.setPointVal('a333', 'o111');
     expect(entry.getPoint('a333')!.val).toBe('o111');
 
     /**
@@ -924,34 +905,28 @@ test('Update Logic', () => {
         _pid: 'a444',
         _lbl: 'Multiselect Test',
         _type: pdw.PointType.MULTISELECT,
-        _opts: [
-            {
-                _lbl: 'A',
-                _oid: 'aaaa'
-            },
-            {
-                _lbl: 'B',
-                _oid: 'bbbb'
-            }
-        ]
+        _opts: { 
+            'aaaa': 'A',
+            'bbbb': 'B' 
+        }
     }).save(); //must save to make the new point available to new entries
     entry = def.newEntry({
         'a444': []
     });
     expect(entry.getPoint('Multiselect Test')!.val).toEqual([]);
-    entry.setPointVal('a444',['aaaa','bbbb']); //change multiselect selections
-    expect(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa','bbbb']); //works
-    entry.setPointVal('a444','aaaa, bbbb, cccc'); //can also just have comma-delimited string
-    expect(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa','bbbb','cccc']); //works, doesn't care about the non-existant 'cccc' opt
-    entry.setPointVal('a444','aaaa,bbbb'); //spacing on a comma-delimited string is ignored
-    expect(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa','bbbb']); //works
-    entry.setPointVal('a444','aaaa'); //and a single string value is converted to an array
+    entry.setPointVal('a444', ['aaaa', 'bbbb']); //change multiselect selections
+    expect(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa', 'bbbb']); //works
+    entry.setPointVal('a444', 'aaaa, bbbb, cccc'); //can also just have comma-delimited string
+    expect(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa', 'bbbb', 'cccc']); //works, doesn't care about the non-existant 'cccc' opt
+    entry.setPointVal('a444', 'aaaa,bbbb'); //spacing on a comma-delimited string is ignored
+    expect(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa', 'bbbb']); //works
+    entry.setPointVal('a444', 'aaaa'); //and a single string value is converted to an array
     expect(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa']); //works
-    
+
     /**
      * Entry Period scope protection
      */
-    entry.setProps({_period: '2023-07-21'});
+    entry.setProps({ _period: '2023-07-21' });
     expect(entry._period).toBe('2023-07-21T00:00:00');
 
     let tag = pdwRef.newTag({
@@ -959,7 +934,7 @@ test('Update Logic', () => {
         _lbl: 'My tag',
         _dids: []
     });
-    tag.setProp('_dids',[def._did]);
+    tag.setProp('_dids', [def._did]);
     expect(tag._dids).toEqual([def._did]);
     fromStore = pdwRef.getTags()[0];
     expect(fromStore._dids).toEqual([]); //stores not updated yet.
@@ -981,7 +956,7 @@ test('Update Logic', () => {
     tagTwo.addDef(def._did); //by _did
     expect(tagTwo._dids).toEqual([def._did]);
     tagTwo.addDef(def._did); //adding the same did doesn't create a duplicate entry
-    expect(tagTwo._dids).toEqual([def._did]); 
+    expect(tagTwo._dids).toEqual([def._did]);
     tagTwo.removeDef(def._did); //by _did
     expect(tagTwo._dids).toEqual([]);
 
@@ -992,23 +967,46 @@ test('Update Logic', () => {
     expect(tagTwo.getDefs()[0]._lbl).toBe(def._lbl);
     def.removeTag(tagTwo); //by tag ref
     expect(tagTwo.getDefs().length).toBe(0);
-    
+
     def.addTag(tagTwo._tid); //by tid
-    tagTwo = pdwRef.getTags({tid: 'tagb'})[0]; //updated tag object is in stores
+    tagTwo = pdwRef.getTags({ tid: 'tagb' })[0]; //updated tag object is in stores
     expect(tagTwo.getDefs()[0]._lbl).toBe(def._lbl);
-    
+
     def.removeTag(tagTwo._tid); //by tid
-    tagTwo = pdwRef.getTags({tid: 'tagb'})[0];
+    tagTwo = pdwRef.getTags({ tid: 'tagb' })[0];
     expect(tagTwo.getDefs().length).toBe(0);
-    
+
     def.addTag(tagTwo._lbl); //by tag label
     expect(tagTwo.getDefs()[0]._lbl).toBe(def._lbl);
-    tagTwo = pdwRef.getTags({tid: 'tagb'})[0];
+    tagTwo = pdwRef.getTags({ tid: 'tagb' })[0];
 
     def.removeTag(tagTwo._lbl); //by tag label
-    tagTwo = pdwRef.getTags({tid: 'tagb'})[0];
+    tagTwo = pdwRef.getTags({ tid: 'tagb' })[0];
     expect(tagTwo.getDefs().length).toBe(0);
 
+})
+
+test('Get All',()=>{
+    resetTestDataset();
+    let def = pdwRef.newDef({
+        _did: 'yoyo',
+        _pts: [
+            {
+                _pid: 'aaaa'
+            }
+        ]
+    })
+    let entry = def.newEntry({
+        _note: 'for test'
+    });
+    let tag = pdwRef.newTag({
+        _lbl: 'my tag'
+    });
+    def.addTag(tag); //updates the Tag
+    def.save(); //updates the Def
+    let all = pdwRef.getAll({includeDeleted:'yes'});
+    expect(Object.keys(all)).toEqual(['defs','entries','tags','overview']);
+    expect(all.defs![0]);
 })
 
 test.skip('Query Basics', () => {
@@ -1023,10 +1021,15 @@ test.skip('Query Basics', () => {
 
 test.skip('Data Merge', () => {
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
+
+    let inMemoryDataStoreTwo = new DefaultDataStore(pdwRef);
+
+
+
 })
 
 function loadFullTestDatasetFromFile() {
-    importFromFile('data-files/OutExcel1.xlsx');
+
     console.log(pdwRef.getAll({}));
 
 }

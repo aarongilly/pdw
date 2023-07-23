@@ -355,8 +355,12 @@ export interface PointDefLike {
      * Select & Multiselect options. Associated with a {@link Tag} '_tid.
      * An array of _tid
      */
-    _opts?: Opt[];
+    _opts?: OptMap;
     
+    /**
+     * Metaproperty reference to the Def
+     */
+    __def?: Def
     // [x: string]: any;
 }
 
@@ -406,9 +410,11 @@ export interface TagLike extends ElementLike {
     _dids?: SmallID[];
 }
 
-export interface Opt {
-    _oid: SmallID;
-    _lbl: string;
+/**
+ * Option object, map with key = _oid, val = text label for option
+ */
+export interface OptMap {
+    [_oid: SmallID]: string;
 }
 
 export interface QueryResponse {
@@ -820,7 +826,7 @@ export abstract class Element implements ElementLike {
     }
 
     setProp(key: keyof DefLike | keyof TagLike | keyof EntryLike, val: any){
-        this.setProps({[key]: val})
+        return this.setProps({[key]: val})
     }
 
     setProps(newPropsMap: DefLike | EntryLike | TagLike): Element {
@@ -915,6 +921,10 @@ export abstract class Element implements ElementLike {
      */
     isOlderThan(elementData: ElementLike) {
         return this._updated < elementData._updated!;
+        //ran into a situation one time where I saved something twice on successive
+        //lines nad only the first one was taken due to the "strictly olderthan",
+        //but I don't want mass overwrites of the same data, so I'm living with
+        //that for now.
     }
 
     /**
@@ -1172,7 +1182,7 @@ export class Def extends Element implements DefLike {
 
     /**
      * Associates an Existing Tag with this Def
-     * Doesn't work for Enum values, I think.
+     * SAVES the Tag with the modification.
      * 
      * @param tid of EXISTING Tag
      * @returns the new Tag
@@ -1300,7 +1310,7 @@ export class PointDef implements PointDefLike {
     readonly _type: PointType;
     readonly _rollup: Rollup;
     readonly _active: boolean;
-    readonly _opts?: Opt[];
+    readonly _opts?: OptMap;
     readonly _pid: string;
     readonly __def: Def;
     constructor(newPointDefData: PointDefLike, def: Def) {
@@ -1319,7 +1329,7 @@ export class PointDef implements PointDefLike {
             if(newPointDefData._opts !== undefined){
                 this._opts = PointDef.validateOptsArray(newPointDefData._opts);
             }else{
-                this._opts = [];
+                this._opts = {};
             }
         }
 
@@ -1415,17 +1425,14 @@ export class PointDef implements PointDefLike {
      * @returns 
      */
     setOpt(oid: string, newLbl: string){
-        let opt = this._opts?.find(o=>o._oid===oid);
-        if(opt === undefined){
+        if(!Object.hasOwn(this._opts!, oid)){
             console.warn('Tried to setOpt with a non-existant oid. If trying to create a new one, use addOpt().');
             return this
         }
-        opt._lbl = newLbl;
+        this._opts![oid] = newLbl;
         this.__def._updated = makeEpochStr();
         return this
     }
-
-
     
     /**
      * Passes along the save to the Def that owns this.
@@ -1434,22 +1441,19 @@ export class PointDef implements PointDefLike {
         this.__def.save();
     }
 
-    private static validateOptsArray(optsArr: Opt[]){
-        if(!Array.isArray(optsArr)){
-            optsArr = [optsArr]
-        }
-        optsArr.forEach(opt=>{
+    private static validateOptsArray(optsMap: OptMap){
+        if(typeof optsMap !== 'object') throw new Error('optsMap not an object');
+        let keys = Object.keys(optsMap)
+        keys.forEach(key=>{
             //not modifiying, just looking for errors
             if(
-                !opt.hasOwnProperty('_oid') || 
-                !opt.hasOwnProperty('_lbl')
-            ) throw new Error("Option wasn't formatted like an 'opt' due to missing property")
-            if(typeof opt._oid !== 'string') throw new Error("Option ID wasn't a string")
-            if(typeof opt._lbl !== 'string') throw new Error("Option text wasn't a string")
+                typeof key !== 'string' ||
+                typeof optsMap[key] !== 'string'
+            ) throw new Error("Option wasn't formatted like an 'opt'")
         })
         //you *could* create new array of objects explicitly only keeping the 3 desired keys,
         //but you're not.
-        return optsArr
+        return optsMap
     }
 
     addOpt(lbl: string, oid?: string){
@@ -1458,40 +1462,41 @@ export class PointDef implements PointDefLike {
             return
         }
         if(oid=== undefined) oid = makeSmallID();
-        this._opts?.push({
-            _oid: oid,
-            _lbl: lbl
-        })
+        this._opts![oid] = lbl;
         this.__def._updated = makeEpochStr();
         return this;
     }
 
-    removeOpt(oidOrLbl:string): PointDef{
-        let opt = this.getOpt(oidOrLbl);
-        if(opt!==undefined){
-            //@ts-expect-error
-            this._opts = this._opts?.filter(o=>o._oid!==opt?._oid);
+    removeOpt(lbl?:string, oid?: string): PointDef{
+        if(lbl===undefined && oid === undefined) throw new Error("must supply either a label or option ID");
+        if(oid===undefined){
+            oid = this.getOptOid(lbl!);
+        }
+        if(this._opts![oid!] !== undefined){
+            delete this._opts![oid!]
         }
         this.__def._updated = makeEpochStr();
         return this
     }
 
-    getOpt(oidOrLbl:string): Opt | undefined{
+    getOptLbl(oid: string): string | undefined{
         if(this._opts === undefined) return undefined
-        let opt = this._opts.find(o=>o._oid === oidOrLbl);
-        if(opt !== undefined) return opt;
-        return this._opts.find(o=>o._lbl === oidOrLbl);
+        return this._opts![oid];
     }
 
-    getOpts(): Opt[]{
+    getOptOid(lbl:string): string | undefined{
+        if(this._opts === undefined) return undefined
+        let opt = Object.keys(this._opts!).find(key => this._opts![key] === lbl);
+        return opt
+    }
+
+    getOpts(): OptMap{
         if(!this.shouldHaveOptsProp()){
             console.warn('Tried getting Options for a PointDef that should not have any');
-            return [];
+            return {};
         }
-        return this._opts ?? [];
+        return this._opts ?? {};
     }
-
-
 
     /**
      * The Def that contains this PointDef.

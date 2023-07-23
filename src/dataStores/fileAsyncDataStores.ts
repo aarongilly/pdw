@@ -63,17 +63,12 @@ export class AsyncCSV implements pdw.AsyncDataStore {
         })
 
         pdwRef.setDefs((<pdw.DefLike[]>defs))
-        pdwRef.setPointDefs((<pdw.PointDefLike[]>pointDefs))
         pdwRef.setEntries((<pdw.EntryLike[]>entries))
-        pdwRef.setEntryPoints((<pdw.EntryPointLike[]>entryPoints))
-        pdwRef.setTagDefs((<pdw.TagDefLike[]>tagDefs))
         pdwRef.setTags((<pdw.TagLike[]>tags))
 
         return {
             defs: defs,
-            pointDefs: pointDefs,
             entries: entries,
-            entryPoints: entryPoints,
             tagDefs: tagDefs,
             tags: tags
         }
@@ -637,19 +632,13 @@ export class AsyncYaml implements pdw.AsyncDataStore {
         const file = YAML.parse(fs.readFileSync(filepath).toString());
         let returnData: pdw.CompleteDataset = {
             defs: file.defs,
-            pointDefs: file.pointDefs,
             entries: file.entries,
-            entryPoints: file.entryPoints,
-            tagDefs: file.tagDefs,
             tags: file.tags
         }
         this.translateFromYamlFormat(returnData);
         const pdwRef = pdw.PDW.getInstance();
         if (returnData.defs !== undefined) pdwRef.setDefs(returnData.defs);
-        if (returnData.pointDefs !== undefined) pdwRef.setPointDefs(returnData.pointDefs);
         if (returnData.entries !== undefined) pdwRef.setEntries(returnData.entries);
-        if (returnData.entryPoints !== undefined) pdwRef.setEntryPoints(returnData.entryPoints);
-        if (returnData.tagDefs !== undefined) pdwRef.setTagDefs(returnData.tagDefs);
         if (returnData.tags !== undefined) pdwRef.setTags(returnData.tags);
 
         returnData = pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
@@ -665,17 +654,8 @@ export class AsyncYaml implements pdw.AsyncDataStore {
         if (data.defs !== undefined) {
             data.defs = data.defs.map(def => this.translateElementFromYaml(def)) as unknown as pdw.DefLike[];
         }
-        if (data.pointDefs !== undefined) {
-            data.pointDefs = data.pointDefs.map(element => this.translateElementFromYaml(element)) as unknown as pdw.PointDefLike[];
-        }
         if (data.entries !== undefined) {
             data.entries = data.entries.map(element => this.translateElementFromYaml(element)) as unknown as pdw.EntryLike[];
-        }
-        if (data.entryPoints !== undefined) {
-            data.entryPoints = data.entryPoints.map(element => this.translateElementFromYaml(element)) as unknown as pdw.EntryPointLike[];
-        }
-        if (data.tagDefs !== undefined) {
-            data.tagDefs = data.tagDefs.map(element => this.translateElementFromYaml(element)) as unknown as pdw.TagDefLike[];
         }
         if (data.tags !== undefined) {
             data.tags = data.tags.map(element => this.translateElementFromYaml(element)) as unknown as pdw.TagLike[];
@@ -702,7 +682,28 @@ export class AsyncYaml implements pdw.AsyncDataStore {
         if (element.rlp !== undefined) returnObj._rollup = element.rlp
         if (element.per !== undefined) returnObj._period = element.per
         if (element.nte !== undefined) returnObj._note = element.nte
-        if (element.val !== undefined) returnObj._val = element.val
+        if (element.dids !== undefined) returnObj._dids = element.dids
+        if (element.pts !== undefined) returnObj._pts = element.pts.map((pt: any) => translatePointDefFromYaml(pt))
+        if (element.ep !== undefined) {        
+            Object.keys(element.ep).forEach(key => {
+                returnObj[key] = element.ep[key];
+            })
+        }
+
+
+        function translatePointDefFromYaml(pd: any): any {
+            let returnObj: any = {};
+            if (pd.dsc !== undefined) returnObj._desc = pd.dsc
+            if (pd.pid !== undefined) returnObj._pid = pd.pid
+            if (pd.lbl !== undefined) returnObj._lbl = pd.lbl
+            if (pd.emo !== undefined) returnObj._emoji = pd.emo
+            if (pd.typ !== undefined) returnObj._type = pd.typ;
+            if (pd.rlp !== undefined) returnObj._rollup = pd.rlp
+            if (pd.act !== undefined) returnObj._active = pd.act
+            if (pd.opts !== undefined) returnObj._opts = pd.opts
+            return returnObj;
+        }
+
         return returnObj
     }
 
@@ -719,24 +720,20 @@ export class AsyncYaml implements pdw.AsyncDataStore {
         if (data.defs !== undefined) {
             data.defs = data.defs.map(def => this.translateElementToYaml(def)) as unknown as pdw.DefLike[];
         }
-        if (data.pointDefs !== undefined) {
-            data.pointDefs = data.pointDefs.map(element => this.translateElementToYaml(element)) as unknown as pdw.PointDefLike[];
-        }
         if (data.entries !== undefined) {
-            data.entries = data.entries.map(element => this.translateElementToYaml(element)) as unknown as pdw.EntryLike[];
-        }
-        if (data.entryPoints !== undefined) {
-            data.entryPoints = data.entryPoints.map(element => this.translateElementToYaml(element)) as unknown as pdw.EntryPointLike[];
-        }
-        if (data.tagDefs !== undefined) {
-            data.tagDefs = data.tagDefs.map(element => this.translateElementToYaml(element)) as unknown as pdw.TagDefLike[];
+            data.entries = data.entries.map(entry => this.translateElementToYaml(entry)) as unknown as pdw.EntryLike[];
         }
         if (data.tags !== undefined) {
-            data.tags = data.tags.map(element => this.translateElementToYaml(element)) as unknown as pdw.TagLike[];
+            data.tags = data.tags.map(tag => this.translateElementToYaml(tag)) as unknown as pdw.TagLike[];
         }
         return data;
     }
 
+    /**
+     * Translates any kind of Element into a Yaml-approved format.
+     * @param element tag, def, or entry
+     * @returns an object with Yaml-expeted formatting
+     */
     translateElementToYaml(element: any): any {
         if (element._tempCreated !== undefined) delete element._tempCreated
         if (element._tempUpdated !== undefined) delete element._tempUpdated
@@ -748,18 +745,41 @@ export class AsyncYaml implements pdw.AsyncDataStore {
         }
         if (element._desc !== undefined) returnObj.dsc = element._desc
         if (element._did !== undefined) returnObj.did = element._did
-        if (element._eid !== undefined) returnObj.eid = element._eid
         if (element._pid !== undefined) returnObj.pid = element._pid
         if (element._lbl !== undefined) returnObj.lbl = element._lbl
-        if (element._tid !== undefined) returnObj.tid = element._tid
         if (element._emoji !== undefined) returnObj.emo = element._emoji
         if (element._scope !== undefined) returnObj.scp = element._scope
-        if (element._type !== undefined) returnObj.typ = element._type
-        if (element._rollup !== undefined) returnObj.rlp = element._rollup
+        if (element._pts !== undefined) returnObj.pts = element._pts.map((pt: any) => translatePointDefToYaml(pt));
+        if (element._eid !== undefined) returnObj.eid = element._eid
         if (element._period !== undefined) returnObj.per = element._period
+        if (element._source !== undefined) returnObj.src = element._source
         if (element._note !== undefined) returnObj.nte = element._note
-        if (element._val !== undefined) returnObj.val = element._val
+        if (element._tid !== undefined) returnObj.tid = element._tid;
+        if (element._dids !== undefined) returnObj.dids = element._dids;
+
+        let entryPoints: any = Object.keys(element).filter(key => key.substring(0, 1) !== '_')
+        if (entryPoints.length > 0) {
+            returnObj.ep = {};
+            entryPoints.forEach((key: any) => {
+                returnObj.ep[key] = element[key];
+            })
+        }
+
         return returnObj
+
+        function translatePointDefToYaml(pd: pdw.PointDefLike): any {
+            if (pd.__def !== undefined) delete pd.__def
+            let returnObj: any = {};
+            if (pd._desc !== undefined) returnObj.dsc = pd._desc
+            if (pd._pid !== undefined) returnObj.pid = pd._pid
+            if (pd._lbl !== undefined) returnObj.lbl = pd._lbl
+            if (pd._emoji !== undefined) returnObj.emo = pd._emoji
+            if (pd._type !== undefined) returnObj.typ = pd._type;
+            if (pd._rollup !== undefined) returnObj.rlp = pd._rollup
+            if (pd._active !== undefined) returnObj.act = pd._active
+            if (pd._opts !== undefined) returnObj.opts = pd._opts
+            return returnObj;
+        }
     }
 }
 
@@ -768,14 +788,14 @@ export class AsyncYaml implements pdw.AsyncDataStore {
  */
 export class AsyncNestedYaml implements pdw.AsyncDataStore {
     exportTo(data: pdw.CompleteDataset, filepath: string) {
-        if (data.defs === undefined || 
-            data.entries === undefined || 
-            data.entryPoints === undefined || 
-            data.pointDefs === undefined || 
-            data.tagDefs === undefined || 
+        if (data.defs === undefined ||
+            data.entries === undefined ||
+            data.entryPoints === undefined ||
+            data.pointDefs === undefined ||
+            data.tagDefs === undefined ||
             data.tags === undefined) {
-                throw new Error("Data supplied must have an arrays for defs, pointDefs, tags, tagDefs, entries, and entryPoints'");
-            }
+            throw new Error("Data supplied must have an arrays for defs, pointDefs, tags, tagDefs, entries, and entryPoints'");
+        }
 
         let activeByDef: any = {};
         let deleted: pdw.ElementLike[] = [];
@@ -805,15 +825,15 @@ export class AsyncNestedYaml implements pdw.AsyncDataStore {
             activeByDef[def._did] = defMember;
         })
 
-        data.pointDefs.forEach(pd=>{
-            if(pd._deleted){
+        data.pointDefs.forEach(pd => {
+            if (pd._deleted) {
                 deleted.push(pd);
                 return;
             }
-            if(pd._did === undefined) throw new Error("pointDef has no _did, yo");
+            if (pd._did === undefined) throw new Error("pointDef has no _did, yo");
             let assDef = activeByDef[pd._did];
-            if(assDef === undefined) throw new Error('Could not find Def associated with PointDef with _did = ' + pd._did);
-            
+            if (assDef === undefined) throw new Error('Could not find Def associated with PointDef with _did = ' + pd._did);
+
             let pdMember: any = {};
 
             // if (pd._created !== undefined) pdMember.cre = pd._created; //not in nested form
@@ -830,14 +850,14 @@ export class AsyncNestedYaml implements pdw.AsyncDataStore {
             assDef.points[pd._pid] = pdMember;
         })
 
-        data.entries.forEach(entry=>{
-            if(entry._deleted){
+        data.entries.forEach(entry => {
+            if (entry._deleted) {
                 deleted.push(entry);
                 return;
             }
-            if(entry._did === undefined) throw new Error("entry has no _did, yo");
+            if (entry._did === undefined) throw new Error("entry has no _did, yo");
             let assDef = activeByDef[entry._did];
-            if(assDef === undefined) throw new Error('Could not find Def associated with Entry with _did = ' + entry._did);
+            if (assDef === undefined) throw new Error('Could not find Def associated with Entry with _did = ' + entry._did);
 
             let entMember: any = {};
 
@@ -852,38 +872,38 @@ export class AsyncNestedYaml implements pdw.AsyncDataStore {
             assDef.entries.push(entMember);
         })
 
-        data.entryPoints.forEach(ep=>{
-            if(ep._deleted){
+        data.entryPoints.forEach(ep => {
+            if (ep._deleted) {
                 deleted.push(ep);
                 return;
             }
-            if(ep._did === undefined) throw new Error("entryPoint has no _did, yo");
-            if(ep._eid === undefined) throw new Error("entryPoint has no _eid, yo");
+            if (ep._did === undefined) throw new Error("entryPoint has no _did, yo");
+            if (ep._eid === undefined) throw new Error("entryPoint has no _eid, yo");
             let assDef = activeByDef[ep._did];
-            if(assDef === undefined) throw new Error('Could not find Def associated with EntryPoint with _did = ' + ep._did);
-            let assEntry = assDef.entries.find((ent: any )=> ent.eid == ep._eid)
-            if(assEntry === undefined) throw new Error("Couldn't find an Entry for the EntryPoint with _eid = " + ep._eid);
-            
+            if (assDef === undefined) throw new Error('Could not find Def associated with EntryPoint with _did = ' + ep._did);
+            let assEntry = assDef.entries.find((ent: any) => ent.eid == ep._eid)
+            if (assEntry === undefined) throw new Error("Couldn't find an Entry for the EntryPoint with _eid = " + ep._eid);
+
             assEntry[ep._pid] = ep._val;
         })
 
-        data.tags.forEach(tag=>{
-            if(tag._deleted){
+        data.tags.forEach(tag => {
+            if (tag._deleted) {
                 deleted.push(tag);
                 return;
             }
-            if(tag._did === undefined) throw new Error("tag has no _did, yo");
+            if (tag._did === undefined) throw new Error("tag has no _did, yo");
             let assDef = activeByDef[tag._did];
-            if(assDef === undefined) throw new Error('Could not find Def associated with Tag with _did = ' + tag._did);
-            let assPointDef = data.tagDefs?.find(tagDef=>tagDef._tid === tag._tid && tagDef._deleted === false);
-            if(assPointDef === undefined) throw new Error("Couldn't find associated TagDef for tag with _tid " + tag._tid);
-            
+            if (assDef === undefined) throw new Error('Could not find Def associated with Tag with _did = ' + tag._did);
+            let assPointDef = data.tagDefs?.find(tagDef => tagDef._tid === tag._tid && tagDef._deleted === false);
+            if (assPointDef === undefined) throw new Error("Couldn't find associated TagDef for tag with _tid " + tag._tid);
+
             let tagMember: any = {};
             if (tag._created !== undefined) tagMember.cre = pdw.parseTemporalFromEpochStr(tag._created).toString().split('[')[0];
             if (tag._updated !== undefined) tagMember.upd = pdw.parseTemporalFromEpochStr(tag._updated).toString().split('[')[0];
             if (tag._uid !== undefined) tagMember.uid = tag._uid;
             if (tag._lbl !== undefined) tagMember.lbl = tag._lbl;
-            
+
             assDef.tags[tag._tid] = tagMember;
         })
 
