@@ -4,13 +4,13 @@ import { DefaultDataStore } from "./DefaultDataStore.js";
 //#region ### TYPES ###
 
 /**
- * A synonym for string, implying one with the structure of:
+ * A alias for string, implying one with the structure of:
  * {@link EpochStr}-{@link SmallID}
  */
 export type UID = string;
 
 /**
- * A synonym for string, a string of 4 random characters
+ * A alias for string, a string of 4 random characters
  */
 export type SmallID = string;
 
@@ -29,12 +29,12 @@ export type EpochStr = string;
 export type DurationStr = string;
 
 /**
- * A synonym for string, any valid Period.stringify string
+ * A alias for string, any valid Period.stringify string
  */
 export type PeriodStr = string;
 
 /**
- * A String that is likely to be markdown-enabled in use
+ * An alias for string, intended to be markdown-enabled in use
  */
 export type Markdown = string
 
@@ -83,7 +83,6 @@ export enum PointType {
      * A url to a photo?
      */
     PHOTO = 'PHOTO', //url?
-
     /**
      * Literally JSON
      */
@@ -107,7 +106,7 @@ export enum Rollup {
     SUM = 'SUM',
     AVERAGE = 'AVERAGE',
     COUNTOFEACH = 'COUNTOFEACH',
-    AVERAGEABOUT4AM = 'AVERAGEABOUT4AM' //for type =  TYPE.TIME
+    AVERAGEABOUT430AM = 'AVERAGEABOUT430AM' //for type =  TYPE.TIME
 }
 
 //#endregion
@@ -127,15 +126,9 @@ export interface DataStore {
 
     getDefs(params: SanitizedParams): DefLike[];
 
-    getPointDefs(params: SanitizedParams): PointDefLike[];
-
     getEntries(params: SanitizedParams): EntryLike[];
 
-    getEntryPoints(params: SanitizedParams): EntryPointLike[];
-
     getTags(params: SanitizedParams): TagLike[];
-
-    getTagDefs(params: SanitizedParams): TagDefLike[];
 
     getAll(params: SanitizedParams): CompleteDataset;
 
@@ -143,21 +136,15 @@ export interface DataStore {
 
     setDefs(defs: Def[]): Def[];
 
-    setPointDefs(pointDefs: PointDef[]): any
-
     setEntries(entries: Entry[]): Entry[];
 
-    setEntryPoints(entryPointData: MinimumEntryPoint[]): EntryPointLike[];
-
     setTags(tagData: Tag[]): TagLike[];
-
-    setTagDefs(tagData: TagDef[]): TagDefLike[];
 
     setAll(completeDataset: CompleteDataset): CompleteDataset;
 
 
 
-    query(params: QueryParams): QueryResponse;
+    query(params: SanitizedParams): QueryResponse;
 
     getOverview(): DataStoreOverview;
 
@@ -266,10 +253,7 @@ export interface SanitizedParams {
 export interface CompleteDataset {
     overview?: DataStoreOverview;
     defs?: DefLike[];
-    pointDefs?: PointDefLike[];
     entries?: EntryLike[];
-    entryPoints?: EntryPointLike[];
-    tagDefs?: TagDefLike[];
     tags?: TagLike[];
 }
 
@@ -281,24 +265,24 @@ export interface ElementLike {
     /**
      * Universal ID - uniquely identifies an INSTANCE of any element.
      */
-    _uid: UID;
+    _uid?: UID;
     /**
      * Was the element marked as deleted?
      * For things like "_did" or "_pid", "_tid", you may have multiple
      * instances with the same value, but you'll tell them apart using
      * the _uid --- and only **one** will have _deleted == false
      */
-    _deleted: boolean;
+    _deleted?: boolean;
     /**
      * When the element was created
      */
-    _created: EpochStr;
+    _created?: EpochStr;
     /**
      * When the element was updated, usually lines up with "_created"
      * unless the instance of the element was created via updating a 
      * previous instance
      */
-    _updated: EpochStr;
+    _updated?: EpochStr;
     /**
      * other key/value pairs will attempt to find
      * the PointDef who's _pid == the key and spin
@@ -315,62 +299,65 @@ export interface DefLike extends ElementLike {
     /**
      * Definition ID - the type of the thing.
      */
-    _did: string;
+    _did?: string;
     /**
      * The label for the definition
      */
-    _lbl: string;
+    _lbl?: string;
     /**
      * A text string describing what the definition is for
      */
-    _desc: string;
+    _desc?: string;
     /**
      * A shorthand for the definition
      */
-    _emoji: string;
+    _emoji?: string;
     /**
      * Scope of the definition (e.g. "day", "week"...)
      */
-    _scope: Scope;
-    /**
-     * Tags for grouping similar definitions easier in filters
-     */
-    // _tags?: TagLike[];
+    _scope?: Scope;
     /**
      * The points on the definition
      */
-    // _points?: PointDefLike[];
+    _pts?: PointDefLike[];
 }
 
-export interface PointDefLike extends ElementLike {
+export interface PointDefLike {
     /**
-     * Definition ID - the type of the thing.
+     * Point Definition ID.
      */
-    _did: SmallID;
-    /**
-     * Point ID, a tiny ID
-     */
-    _pid: SmallID;
+    _pid?: SmallID
     /**
     * Label for the point
     */
-    _lbl: string;
+    _lbl?: string;
     /**
     * Point description
     */
-    _desc: string;
+    _desc?: string;
     /**
      * Shorthand for the point in the UI
      */
-    _emoji: string;
+    _emoji?: string;
     /**
     * Point type
     */
-    _type: PointType;
+    _type?: PointType;
     /**
      * Default rollup type
      */
-    _rollup: Rollup;
+    _rollup?: Rollup;
+    /**
+     * PointDefs cannot be *deleted*, only deactivated
+     */
+    _active?: boolean;
+    /**
+     * Select & Multiselect options. Associated with a {@link Tag} '_tid.
+     * An array of _tid
+     */
+    _opts?: Opt[];
+    
+    // [x: string]: any;
 }
 
 export interface EntryLike extends ElementLike {
@@ -379,302 +366,49 @@ export interface EntryLike extends ElementLike {
      * _eid is not updated when an entry is updated. A new _uid is created
      * for the updated Entry, but they will share _eid values.
      */
-    _eid: UID,
+    _eid?: UID,
     /**
      * A generic note about an entry, all entries can have them
      */
-    _note: string,
+    _note?: string,
     /**
      * When the entry is for
      */
-    _period: PeriodStr,
+    _period?: PeriodStr,
     /**
      * Associated definition ID
      */
-    _did: SmallID,
+    _did?: SmallID,
     /**
      * For tracking where the tracking is coming from
      */
-    _source: string,
-}
+    _source?: string,
 
-export interface EntryPointLike extends ElementLike {
     /**
-     * The Entry the Point is Associated With
+     * _pid keys, with the value of the EntryPoint
      */
-    _eid: UID,
-    /**
-     * Definition ID of the Entry
-     */
-    _did: SmallID,
-    /**
-     * Associated Point Definition ID
-     */
-    _pid: SmallID,
-    /**
-     * The actual value of the entry
-     */
-    _val: any
-}
-
-export interface TagDefLike extends ElementLike {
-    /**
-     * Like the Definition ID, the ID of the Tag
-     */
-    _tid: string;
-    /**
-     * Human-readable tag
-     */
-    _lbl: string;
+    [_pid: string]: any
 }
 
 export interface TagLike extends ElementLike {
     /**
      * Like the Definition ID, the ID of the Tag
      */
-    _tid: SmallID;
-    /**
-     * The Definition the tag is associated with
-     */
-    _did: SmallID
-    /**
-     * The Point ID for 'Select'-type Points to
-     * use as a select option. (Like an Enum)
-     */
-    _pid?: SmallID
-}
-
-/**
- * All properties in here are optional in all uses.
- */
-export interface MinimumElement {
-    /**
-     * Unique ID
-     * Defaults to a new UID
-     */
-    _uid?: UID;
-    /**
-     * Sets based on `typeof` your inputVal
-     * if undefined => false
-     * if boolean => inputVal
-     * if string => inputVal.toUpperCase() === 'TRUE'
-     * if number => inputVal === 1 ? true : false
-     * else throw error
-     */
-    _deleted?: boolean | boolean | number;
-    /**
-     * EpochStr for when this was updated. Will geenrate for you.  
-     */
-    _created?: EpochStr;
-    /**
-     * EpochStr for when this was updated. Will geenrate for you.
-     */
-    _updated?: EpochStr;
-    /**
-     * Additional arbitrary key/value pairs are allowed
-     */
-    [x: string]: any;
-}
-
-/**
- * required: _lbl
- * optional: all others
- */
-export interface MinimumDef extends MinimumElement {
-    /**
-     * To create a brand new definition, this is the **only** required field.
-     * All other fields *can* be provided, but will set to default if not provided.
-     */
-    _lbl?: string;
-    /**
-     * Definition ID
-     * Defaults to a new smallID
-     */
-    _did?: SmallID;
-    /**
-     * Description
-     * Defaults to 'Set a description'
-     */
-    _desc?: string;
-    /**
-     * Emoji
-     * Defaults to 🆕
-     */
-    _emoji?: string;
-    /**
-     * Scope
-     * Defaults to SECOND
-     */
-    _scope?: Scope;
-    /**
-     * other key/value pairs will attempt to set
-     * up a {@link PointDef} with the embedded info 
-     * the value
-     */
-    [x: string]: any;
-    /**
-     * Tags
-     * Defaults to empty array
-     */
-    // _tags?: TagDefLike[];
-    /**
-     * Point Definitions
-     * Defaults to empty array
-     */
-    // _points?: PointDefLike[];
-}
-
-/**
- * required: _did
- * optoinal: all others
- */
-export interface MinimumPointDef extends MinimumElement {
-    /**
-     * Label for the points, defaults to "Label Unset"
-     */
-    _lbl?: string;
-    /**
-     * To create a brand new PointDef, you must provide a label, did, & type
-     */
-    _did: SmallID;
-    /**
-     * Point type, defaults to {@link PointType.TEXT}
-     */
-    _type?: PointType;
-    /**
-     * Point ID
-     * Defaults to a new smallID
-     */
-    _pid?: SmallID;
-    /**
-     * Description
-     * Defaults to 'Set a description'
-     */
-    _desc?: string;
-    /**
-     * Emoji
-     * Defaults to 🆕
-     */
-    _emoji?: string;
-    /**
-     * Rollup Type
-     * Defaults to {@link Rollup.COUNT}
-     */
-    _rollup?: Rollup;
-}
-
-/**
- * required: _did OR/AND _eid
- * optional: all others
- */
-export interface MinimumEntry extends MinimumElement {
-    /**
-     * When the Entry took place
-     * if blank, will default to 'now'
-     * in accordnce with the definition's scope
-     */
-    _period?: PeriodStr;
-    /**
-     * What kind of entry it is
-     */
-    _did?: SmallID;
-    /**
-     * Entry ID
-     */
-    _eid?: UID;
-    /**
-     * Note about the entry
-     */
-    _note?: Markdown;
-    /**
-     * Where did the data come from?
-     */
-    _source?: string;
-}
-
-/**
- * required: _pid, _val, and _eid
- */
-export interface MinimumEntryPoint extends MinimumElement {
-    /**
-     * What kind of entry it is
-     * Can be inferred
-     */
-    _did?: SmallID;
-    /**
-     * Which Point is it
-     */
-    _pid: SmallID;
-    /**
-     * What Entry is it associated with?
-     */
-    _eid: SmallID;
-    /**
-     * What is the entry value?
-     */
-    _val: string | number | boolean | object;
-}
-
-/**
- * required: _lbl
- * optional: _tid
- */
-export interface MinimumTagDef extends MinimumElement {
-    /**
-     * Label to be applied to the tag
-     */
-    _lbl: string
-    /**
-     * Tag ID, if known.
-     * Defaults to a new {@link SmallID}
-     */
     _tid?: SmallID;
+    /**
+     * Text
+     */
+    _lbl?: string;
+    /**
+     * Tags for grouping similar definitions easier in filters,
+     * An array of _did
+     */
+    _dids?: SmallID[];
 }
 
-/**
- * required: _did, _tid,
- * required if for select: _pid
- */
-export interface MinimumTag extends MinimumElement {
-    /**
-     * Definition to apply to
-     */
-    _did: SmallID;
-    /**
-     * Tag ID to attach to the Definition (as a tag) 
-     * or to the PointDefinition (as a select value)
-     */
-    _tid: SmallID;
-    /**
-     * When used as a select value, a _pid is required
-     */
-    _pid?: SmallID;
-}
-
-export interface QueryParams {
-    from?: PeriodStr;
-    to?: PeriodStr;
-    updatedAfter?: PeriodStr;
-    updatedBefore?: PeriodStr;
-    did?: string | string[];
-    eid?: string | string[];
-    pid?: string | string[];
-    tag?: string | string[];
-    search?: string | string[];
-    searchIn?: string | string[];
-    includeDeleted?: boolean;
-    limit?: number;
-    today?: any;
-    thisWeek?: any;
-    thisMonth?: any;
-    /**
-     * MoA - map of Arrays
-     * NestPoints - Entrys with _points: [EntryPoints], Defs with _points: [PointDefs]
-     * ByEntry - Entries with _points: [EntryPoints] & _defs: [Def], where Def has Tags & PointDefs
-     * ByDef - Defs with _entries: [Entry] & _points: [PointDefs
-     * MyPeriod - Periods with _entries: [ByEntry]
-     */
-    shape?: 'MoA' | 'NestPoints'
+export interface Opt {
+    _oid: SmallID;
+    _lbl: string;
 }
 
 export interface QueryResponse {
@@ -699,28 +433,11 @@ interface CurrentAndDeletedCounts {
 export interface DataStoreOverview {
     storeName?: string;
     defs: CurrentAndDeletedCounts;
-    pointDefs: CurrentAndDeletedCounts;
     entries: CurrentAndDeletedCounts;
-    entryPoints: CurrentAndDeletedCounts
-    tagDefs: CurrentAndDeletedCounts;
     tags: CurrentAndDeletedCounts;
     lastUpdated: EpochStr;
 }
 
-// export interface NestedByDef {
-//     //#UNTESTED
-//     [did: string]: Def & {points: PointDef[], entries: (Entry & {points: EntryPoint[]})[]}
-// }
-
-export interface AssociatedElementMap {
-    existing: Def | PointDef | Entry | EntryPoint | Tag | TagDef;
-    def: Def;
-    pointDef: PointDef;
-    entry: Entry;
-    //entryPoint --- don't think I want these
-    //tag --- don't think I want these
-    //tagDef --- don't think I want these
-}
 //#endregion
 
 //#region ### CLASSES ###
@@ -758,10 +475,7 @@ export class PDW {
 
         let data = {
             defs: this.dataStores[0].getDefs(params),
-            pointDefs: this.dataStores[0].getPointDefs(params),
             entries: this.dataStores[0].getEntries(params),
-            entryPoints: this.dataStores[0].getEntryPoints(params),
-            tagDefs: this.dataStores[0].getTagDefs(params),
             tags: this.dataStores[0].getTags(params),
         }
         return PDW.addOverviewToCompleteDataset(data);
@@ -804,44 +518,6 @@ export class PDW {
         return combinedDefs;
     }
 
-    getPointDefs(rawParams?: StandardParams): PointDef[] {
-        if (rawParams === undefined) rawParams = {};
-        const params = PDW.sanitizeParams(rawParams)
-
-        //if there's only DataStore, bypass the combining stuff to save time
-        if (this.dataStores.length == 1) {
-            let pointDefLikes = this.dataStores[0].getPointDefs(params)
-            return pointDefLikes.map(dl => new PointDef(dl));
-        }
-
-        throw new Error('Multiple stores not implemented yet');
-        // //multiple DataStores need to be all pulled, then deconflicted
-        // let combinedDefs: Def[] = [];
-        // //compile defs from all attached DataStores
-        // this.dataStores.forEach(dataStore => {
-        //     let thisStoreDefLikes = dataStore.getDefs(didPidOrLbls as string[], includeDeleted);
-        //     let thisStoreDefs = thisStoreDefLikes.map(tsdl => new Def(tsdl));
-        //     thisStoreDefs.forEach(def => {
-        //         let existingCopy = combinedDefs.find(cd => cd.sameIdAs(def));
-        //         if (existingCopy !== undefined) {
-        //             //duplicate found, determine which is newer & keep only it
-        //             if (existingCopy.shouldBeReplacedWith(def)) {
-        //                 //find & remove exising
-        //                 const ind = combinedDefs.findIndex(el => el._uid === existingCopy!._uid)
-        //                 combinedDefs.splice(ind);
-        //                 //add replacement
-        //                 combinedDefs.push(def);
-        //             
-
-        //             //else{ignore it. don't do anything}
-        //         } else {
-        //             combinedDefs.push(def);
-        //         }
-        //     })
-        // })
-        // return combinedDefs;
-    }
-
     getEntries(rawParams?: StandardParams): Entry[] {
         if (rawParams === undefined) rawParams = {};
         const params = PDW.sanitizeParams(rawParams)
@@ -849,31 +525,6 @@ export class PDW {
         if (this.dataStores.length == 1) {
             let entries = this.dataStores[0].getEntries(params);
             return entries.map(entry => new Entry(entry));
-        }
-
-        throw new Error('Multiple datastores not yet implemented');
-    }
-
-    getEntryPoints(rawParams?: StandardParams): EntryPoint[] {
-        if (rawParams === undefined) rawParams = {};
-        const params = PDW.sanitizeParams(rawParams)
-
-        if (this.dataStores.length == 1) {
-            let entryPoints = this.dataStores[0].getEntryPoints(params);
-            return entryPoints.map(entry => new EntryPoint(entry));
-        }
-        throw new Error('You did not build this, do you need it?')
-    }
-
-
-    getTagDefs(rawParams?: StandardParams): TagDef[] {
-        if (rawParams === undefined) rawParams = {};
-        const params = PDW.sanitizeParams(rawParams)
-
-        //if there's only DataStore, bypass the combining stuff to save time
-        if (this.dataStores.length == 1) {
-            let tagDefLikes = this.dataStores[0].getTagDefs(params)
-            return tagDefLikes.map(tdl => new TagDef(tdl));
         }
 
         throw new Error('Multiple datastores not yet implemented');
@@ -892,8 +543,7 @@ export class PDW {
         throw new Error('Multiple datastores not yet implemented');
     }
 
-
-    setDefs(defsIn: MinimumDef[]): Def[] {
+    setDefs(defsIn: DefLike[]): Def[] {
         let defs: Def[] = defsIn.map(defLike => new Def(defLike));
         this.dataStores.forEach(connection => {
             connection.setDefs(defs)
@@ -901,40 +551,15 @@ export class PDW {
         return defs
     }
 
-
-    setPointDefs(pointDefsIn: MinimumPointDef[]): PointDef[] {
-        let pointDefs: PointDef[] = pointDefsIn.map(minimumPD => new PointDef(minimumPD));
-        this.dataStores.forEach(connection => {
-            connection.setPointDefs(pointDefs)
-        })
-        return pointDefs
-    }
-
-    setEntries(entryData: MinimumEntry[]): Entry[] {
-        let entries: Entry[] = entryData.map(minimumEntry => new Entry(minimumEntry));
+    setEntries(entryData: EntryLike[]): Entry[] {
+        let entries: Entry[] = entryData.map(EntryLike => new Entry(EntryLike));
         this.dataStores.forEach(connection => {
             connection.setEntries(entries)
         })
         return entries
     }
 
-    setEntryPoints(entryPointData: MinimumEntryPoint[]): EntryPoint[] {
-        let entryPoints: EntryPoint[] = entryPointData.map(minimumEntryPoint => new EntryPoint(minimumEntryPoint));
-        this.dataStores.forEach(connection => {
-            connection.setEntryPoints(entryPoints)
-        })
-        return entryPoints
-    }
-
-    setTagDefs(tagDefsIn: MinimumTagDef[]): TagDef[] {
-        let tagDefs: TagDef[] = tagDefsIn.map(tagDef => new TagDef(tagDef));
-        this.dataStores.forEach(connection => {
-            connection.setTagDefs(tagDefs)
-        })
-        return tagDefs
-    }
-
-    setTags(tagsIn: MinimumTag[]): Tag[] {
+    setTags(tagsIn: TagLike[]): Tag[] {
         let tags: Tag[] = tagsIn.map(tag => new Tag(tag));
         this.dataStores.forEach(connection => {
             connection.setTags(tags)
@@ -942,69 +567,43 @@ export class PDW {
         return tags
     }
 
-    setAll(completeDataset: CompleteDataset): CompleteDataset {
-        throw new Error("Method not implemented")
+    setAll(completeDataset: CompleteDataset) {
+        if(completeDataset.defs !== undefined) this.setDefs(completeDataset.defs);
+        if(completeDataset.entries !== undefined) this.setEntries(completeDataset.entries);
+        if(completeDataset.tags !== undefined) this.setTags(completeDataset.tags);
     }
 
     /**
-     * Creates a new definition from {@link MinimumDef} components
+     * Creates a new definition from {@link DefLike} components
      * and adds it to the definition manifest of the connected DataStore.
      * @param defInfo 
      * @returns the newly created Definition
     */
-    newDef(defInfo: MinimumDef): Def {
-        let newDef = new Def(defInfo);
+    newDef(defInfo: DefLike): Def {
+        let newDef = new Def(defInfo, false);
         this.dataStores.forEach(connection => {
             connection.setDefs([newDef])
         })
         return newDef
     }
 
-    /**
-     * Creates a new definition from {@link MinimumDef} components
-     * and adds it to the definition manifest of the connected DataStore
-     * @param pointDefInfo 
-     * @returns the newly created Point Definition
-    */
-    newPointDef(pointDefInfo: MinimumPointDef): PointDef {
-        let newPointDef = new PointDef(pointDefInfo);
-        this.dataStores.forEach(connection => {
-            connection.setPointDefs([newPointDef])
-        })
-        return newPointDef;
-    }
-
-    newEntry(entryInfo: MinimumEntry): Entry {
-        let newEntry = new Entry(entryInfo);
+    newEntry(entryInfo: EntryLike): Entry {
+        let newEntry = new Entry(entryInfo, false);
         this.dataStores.forEach(connection => {
             connection.setEntries([newEntry])
         })
         return newEntry;
     }
 
-    newEntryPoint(entryPointInfo: MinimumEntryPoint): EntryPoint {
-        let newEntryPoint = new EntryPoint(entryPointInfo);
-        this.dataStores.forEach(connection => {
-            connection.setEntryPoints([newEntryPoint])
-        })
-        return newEntryPoint;
-    }
-
-    newTagDef(tagDefInfo: MinimumTagDef): TagDef {
-        let newTagDef = new TagDef(tagDefInfo);
-        this.dataStores.forEach(connection => {
-            connection.setTagDefs([newTagDef])
-        })
-        return newTagDef;
-    }
-
-    newTag(tagInfo: MinimumTag): Tag {
-        let newTag = new Tag(tagInfo);
+    newTag(tagInfo: TagLike): Tag {
+        let newTag = new Tag(tagInfo, false);
         this.dataStores.forEach(connection => {
             connection.setTags([newTag])
         })
         return newTag;
     }
+
+
 
     /**
      * Enforces defaults. Sanity check some types.
@@ -1086,12 +685,9 @@ export class PDW {
     static getDatasetLastUpdate(dataset: CompleteDataset): string {
         let recents: ElementLike[] = [];
         if (dataset.defs !== undefined && dataset.defs.length > 0) recents.push(Element.getMostRecent(dataset.defs)!)
-        if (dataset.pointDefs !== undefined && dataset.pointDefs.length > 0) recents.push(Element.getMostRecent(dataset.pointDefs)!)
         if (dataset.entries !== undefined && dataset.entries.length > 0) recents.push(Element.getMostRecent(dataset.entries)!)
-        if (dataset.entryPoints !== undefined && dataset.entryPoints.length > 0) recents.push(Element.getMostRecent(dataset.entryPoints)!)
-        if (dataset.tagDefs !== undefined && dataset.tagDefs.length > 0) recents.push(Element.getMostRecent(dataset.tagDefs)!)
         if (dataset.tags !== undefined && dataset.tags.length > 0) recents.push(Element.getMostRecent(dataset.tags)!)
-        return Element.getMostRecent(recents)!._updated
+        return Element.getMostRecent(recents)!._updated!
     }
 
     static addOverviewToCompleteDataset(data: CompleteDataset, storeName?: string): CompleteDataset {
@@ -1104,21 +700,9 @@ export class PDW {
                 current: data.defs?.filter(element => element._deleted === false).length,
                 deleted: data.defs?.filter(element => element._deleted).length
             },
-            pointDefs: {
-                current: data.pointDefs?.filter(element => element._deleted === false).length,
-                deleted: data.pointDefs?.filter(element => element._deleted).length
-            },
             entries: {
                 current: data.entries?.filter(element => element._deleted === false).length,
                 deleted: data.entries?.filter(element => element._deleted).length
-            },
-            entryPoints: {
-                current: data.entryPoints?.filter(element => element._deleted === false).length,
-                deleted: data.entryPoints?.filter(element => element._deleted).length
-            },
-            tagDefs: {
-                current: data.tagDefs?.filter(element => element._deleted === false).length,
-                deleted: data.tagDefs?.filter(element => element._deleted).length
             },
             tags: {
                 current: data.tags?.filter(element => element._deleted === false).length,
@@ -1129,30 +713,16 @@ export class PDW {
         if (storeName) data.overview!.storeName = storeName
         return data
     }
-
-    //#TODO --- NestByWhatever functions
-    // static formatCompleteDataset(data: CompleteDataset, by: 'def'|'entry'): any{
-    //     if(by==='def') return this.formatCompleteDatasetByDef(data)
-    //     if(by==='entry') return this.formatCompleteDatasetByEntry(data)
-    //     throw new Error('Unhandled param provided to formatCompleteDataset: ' + by)
-    // }
-
-    // private static formatCompleteDatasetByDef(data: CompleteDataset){
-    //     let returnObj: any = {};
-    //     data.defs?.forEach(def =>{
-    //         // returnObj[def._did] = 
-    //     })
-    // }
-
-    // private static formatCompleteDatasetByEntry(data: CompleteDataset){
-
-    // }
 }
 
 /**
  * Base class 
  */
 export abstract class Element implements ElementLike {
+    /**
+     * Unique identifier for the Element
+     */
+    _uid: string;
     /**
      * Do not update me directly!
      * Call method {@link markDeleted} or {@link markUndeleted}
@@ -1163,24 +733,29 @@ export abstract class Element implements ElementLike {
      * Call method markDeleted or markUndeleted
      */
     _updated: EpochStr;
-    readonly _uid: string;
-    readonly _created: EpochStr;
-    readonly _tempCreated: Temporal.ZonedDateTime;
-    readonly _tempUpdated: Temporal.ZonedDateTime;
-
     /**
-     * Meta-property - not stored
+     * Read-only - when the Element was created.
+     * Stored as an {@link EpochStr}
      */
-    __isNew?: boolean;
+    readonly _created: EpochStr;
+    /**
+     * For convenience only - a ZonedDateTime representation
+     * of _created.
+     */
+    readonly __tempCreated: Temporal.ZonedDateTime;
+    /**
+     * For convenience only - a ZonedDateTime representation
+     * of _updated.
+     */
+    readonly __tempUpdated: Temporal.ZonedDateTime;
 
-    constructor(inputData: MinimumElement) {//, associatedElements: AssociatedElementMap) {
+    constructor(inputData: ElementLike) {//, associatedElements: AssociatedElementMap) {
         this._uid = inputData._uid ?? makeUID();
         this._deleted = this.handleDeletedInputVariability(inputData._deleted);
         this._created = this.handleEpochStrInputVariability(inputData._created);
         this._updated = this.handleEpochStrInputVariability(inputData._updated);
-        this._tempCreated = parseTemporalFromEpochStr(this._created);
-        this._tempUpdated = parseTemporalFromEpochStr(this._updated);
-        if (inputData.__isNew !== undefined) this.__isNew = inputData.__isNew;
+        this.__tempCreated = parseTemporalFromEpochStr(this._created);
+        this.__tempUpdated = parseTemporalFromEpochStr(this._updated);
     }
 
     /**
@@ -1216,21 +791,121 @@ export abstract class Element implements ElementLike {
     }
 
     /**
-     * Sets _deleted & _updated.
-     * Does **NOT** write to DataStores
+     * Sets _deleted & _updated and updates DataStores
      */
-    markDeleted() {
-        this._deleted = true;
+    deleteAndSave(isUndelete = false): Entry | Def | Tag {
+        const type = this.getType();
+        const pdwRef = PDW.getInstance();
+
+        this._deleted = !isUndelete;
         this._updated = makeEpochStr();
+
+        if(type === 'DefLike'){
+            return pdwRef.setDefs([this])[0];
+        }
+        if(type === 'EntryLike'){
+            return pdwRef.setEntries([this])[0];
+        }
+        if(type === 'TagLike'){
+            return pdwRef.setTags([this])[0];
+        }
+        throw new Error('Type was not found')
     }
 
     /**
-     * Sets _deleted & _updated.
-     * Does **NOT** write to DataStores
+     * Sets _deleted & _updated and updates DataStores
      */
-    markUndeleted() {
-        this._deleted = false;
+    unDeleteAndSave(): Entry | Def | Tag   {
+        return this.deleteAndSave(true);
+    }
+
+    setProp(key: keyof DefLike | keyof TagLike | keyof EntryLike, val: any){
+        this.setProps({[key]: val})
+    }
+
+    setProps(newPropsMap: DefLike | EntryLike | TagLike): Element {
+        const type = this.getType();
+        
+        if(typeof newPropsMap !== 'object') throw new Error('Element.setProps() expects an object with key/value pairs to set')
+        
+        // let newElementData: any = Element.toData(this)
+        
+        let newKeys = Object.keys(newPropsMap);
+
+        newKeys.forEach(key=>{
+            if(key === '_uid' || key === '_eid' || key === '_did' || key === '_tid'){
+                console.warn('Tried to update prop ' + key + ', but ID properties cannot be updated. ID will not be updated.')
+                return
+            }
+            if(key === '_scope'){
+                console.warn('Cannot change a Definition Scope after it is established');
+                return
+            }
+            //protecting against bad inputs
+            if(key === '_updated' || key === '_created'){
+                if(!isValidEpochStr(newPropsMap[key]!)){
+                    let epochStr = this.handleEpochStrInputVariability(newPropsMap[key])
+                    newPropsMap[key] = epochStr;
+                }
+            }
+            //intercept known properties and set to subclass dedicated handler
+            if(key === '_emoji'){
+                (<Def>(<unknown>this)).setEmoji(newPropsMap[key]);
+                return
+            }
+            if(key === '_period'){
+                (<Entry>(<unknown>this)).setPeriod(newPropsMap[key]);
+                return
+            }
+
+            //all other cases, assume good!
+            //@ts-expect-error
+            this[key] = newPropsMap[key];
+            
+        })
+
+
         this._updated = makeEpochStr();
+
+        if(type === 'DefLike' && !Def.isDefLike(this)) throw new Error('You updates made a Def not DefLike');
+        if(type === 'EntryLike' && !Entry.isEntryLike(this)) throw new Error('You updates made a Entry not EntryLike');
+        if(type === 'TagLike' && !Tag.isTagDefLike(this)) throw new Error('You updates made a Tag not TagLike');
+        return this
+    }
+
+    /**
+     * Marks the existing Element as deleted and sends a copy of it with
+     * its current property values and a new _uid to the connected {@link DataStore}(s)
+     * @returns this
+     */
+    save(){
+        const oldId = this._uid;
+        const changeTime = makeEpochStr();
+        
+        const deletionMessage = {
+            _uid: oldId,
+            _deleted: true,
+            _updated: changeTime
+        }
+        
+        const newId = makeUID();
+        this._updated = changeTime;
+        this._uid = newId;
+
+        const elementType = this.getType();
+        if(elementType === 'DefLike'){
+            PDW.getInstance().setDefs([this, deletionMessage])
+            return this
+        }
+        if(elementType === 'EntryLike'){
+            PDW.getInstance().setEntries([this, deletionMessage])
+            return this
+        }
+        if(elementType === 'TagLike'){
+            PDW.getInstance().setTags([this, deletionMessage])
+            return this
+        }
+        throw new Error('What kind of element is this anyway? ' + elementType)
     }
 
     /**
@@ -1239,7 +914,7 @@ export abstract class Element implements ElementLike {
      * @returns true if argument is updated more recently than this
      */
     isOlderThan(elementData: ElementLike) {
-        return this._updated < elementData._updated;
+        return this._updated < elementData._updated!;
     }
 
     /**
@@ -1255,11 +930,10 @@ export abstract class Element implements ElementLike {
     }
 
     /**
-     * Get the type of an element. Not sure if I'll use this outside
-     * of the 
+     * Get the type of an Element.
      * @returns string representing the type of element
      */
-    getType(): 'DefLike' | 'PointDefLike' | 'EntryLike' | 'EntryPointLike' | 'TagDefLike' | 'TagLike' | null {
+    getType(): 'DefLike' | 'EntryLike' | 'TagLike' | null {
         return Element.getTypeOfElementLike(this)!
     }
 
@@ -1274,13 +948,7 @@ export abstract class Element implements ElementLike {
         //@ts-expect-error
         if (type === 'DefLike') return this._did === comparison._did;
         //@ts-expect-error
-        if (type === 'PointDefLike') return this._did === comparison._did && this._pid === comparison._pid;
-        //@ts-expect-error
         if (type === 'EntryLike') return this._eid === comparison._eid;
-        //@ts-expect-error
-        if (type === 'EntryPointLike') return this._eid === comparison._eid && this._pid === comparison._pid;
-        //@ts-expect-error
-        if (type === 'TagDefLike') return this._tid === comparison._tid;
         if (type === 'TagLike') {
             //@ts-expect-error
             if (this._pid === undefined) return this._tid === comparison._tid && this._did === comparison._did;
@@ -1297,8 +965,6 @@ export abstract class Element implements ElementLike {
     }
 
     passesFilters(params: SanitizedParams) {
-        const type = this.getType()!;
-
         if (params.uid !== undefined && !params.uid.some(uid => uid === this._uid)) return false;
         //@ts-expect-error
         if (params.did !== undefined && this._did !== undefined && !params.did.some(did => did === this._did)) return false;
@@ -1308,17 +974,15 @@ export abstract class Element implements ElementLike {
         if (params.tid !== undefined && this._tid != undefined && !params.tid.some(tid => tid === this._tid)) return false;
         //@ts-expect-error
         if (params.pid !== undefined && this._pid !== undefined && !params.pid.some(pid => pid === this._pid)) return false;
+        
+        const type = this.getType()!;
 
         //@ts-expect-error
         if (params.defLbl !== undefined && type === 'DefLike' && !params.defLbl.some(lbl => lbl === this._lbl)) return false;
         //@ts-expect-error
         if (params.tagLbl !== undefined && type.substring(0, 3) === 'Tag' && !params.tagLbl.some(lbl => lbl === this._lbl)) return false;
-        //@ts-expect-error
-        if (params.pointLbl !== undefined && type === 'PointDefLike' && !params.pointLbl.some(lbl => lbl === this._lbl)) return false;
-        if (params.pointLbl !== undefined && type === 'EntryPointLike') {
-            const assPointDef = PDW.getInstance().getPointDefs({ pointLbl: params.pointLbl });
-            if (!assPointDef.some(pd => pd._deleted !== true && params.pointLbl?.includes(pd._lbl))) return false;
-        }
+        ////@ts-expect-error
+        // if (params.pointLbl !== undefined && type === 'PointDefLike' && !params.pointLbl.some(lbl => lbl === this._lbl)) return false;
 
         // I don't **THINK** I should ever need the native Temporal compare here? It works, but... sanitized params should always have the epochstr
         // if (params.createdBefore !== undefined && Temporal.ZonedDateTime.compare(params.createdBefore, this._tempCreated) === -1) return false;
@@ -1341,12 +1005,50 @@ export abstract class Element implements ElementLike {
 
     //#TODO - fallsInPeriod(period: Period): boolean
 
+    /**
+     * Create an object that is a non-referenced copy of the Element.
+     * Also strips out meta-properties (those starting with double underscores).
+     */
+    static toData(elementIn: any): ElementLike{
+        if(typeof elementIn !== 'object') return elementIn;
+
+        let cloneData: ElementLike = {};
+
+        let oldKeys = Object.keys(elementIn);
+
+        //make clone object
+        oldKeys.forEach(key=>{
+            //don't copy double-underscored keys
+            if(key.substring(0,2) === "__") return
+
+            let keyVal = elementIn[key];
+
+            if(typeof keyVal === 'object'){
+                if(Array.isArray(keyVal)){
+                    cloneData[key] = keyVal.map(val=> Element.toData(val))
+                }else{
+                    cloneData[key] = Element.toData(keyVal);
+                }
+            }else{
+                cloneData[key] = keyVal
+            }
+        });
+
+        return cloneData
+    }
+
+    makeStaticCopy(): Tag | Def | Entry{
+        const type = Element.getTypeOfElementLike(this);
+        const data = Element.toData(this);
+        if(type === 'DefLike') return new Def(data, false);
+        if(type === 'EntryLike') return new Entry(data, false);
+        if(type === 'TagLike') return new Tag(data, false);
+        throw new Error('What type was this? ' + type);
+    }
+
     private static getTypeOfElementLike(data: ElementLike) {
-        if (data.hasOwnProperty("_tid") && data.hasOwnProperty('_did')) return "TagLike"
-        if (data.hasOwnProperty("_tid")) return "TagDefLike"
-        if (data.hasOwnProperty("_eid") && data.hasOwnProperty('_pid')) return "EntryPointLike"
+        if (data.hasOwnProperty("_tid")) return "TagLike"
         if (data.hasOwnProperty("_eid")) return "EntryLike"
-        if (data.hasOwnProperty("_did") && data.hasOwnProperty('_pid')) return "PointDefLike"
         if (data.hasOwnProperty("_did")) return "DefLike"
         return null
     }
@@ -1358,7 +1060,7 @@ export abstract class Element implements ElementLike {
      * @param ofType optional, allows you to override what the dataIn would suggest it should be
      * @returns the raw DefLike, PointDefLike, EntryLike, EntryPointLike, TagLike, or TagDefLike - or undefined if none found
      */
-    static findExistingData(dataIn: any, ofType?: 'Def' | 'PointDef' | 'Entry' | 'EntryPoint' | 'TagDef' | 'Tag'): any {
+    static findExistingData(dataIn: any, ofType?: 'Def' | 'Entry' | 'Tag'): any {
         const type = ofType === undefined ? Element.getTypeOfElementLike(dataIn) : ofType + 'Like';
         if (type === null) return undefined;
 
@@ -1370,30 +1072,14 @@ export abstract class Element implements ElementLike {
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as DefLike
             })
         }
-        if (type === 'PointDefLike') {
-            pdwRef.dataStores.forEach(store => {
-                let storeResult = maybeGetOnlyResult(store.getPointDefs({ pid: [dataIn._pid], did: [dataIn._did], includeDeleted: 'no' }));
-                if (storeResult === undefined) storeResult = maybeGetOnlyResult(store.getPointDefs({ pointLbl: [dataIn._lbl], did: [dataIn._did], includeDeleted: 'no' }));
-                if (storeResult !== undefined && existing === undefined) existing = storeResult as PointDefLike
-            })
-        }
         if (type === 'EntryLike') {
             pdwRef.dataStores.forEach(store => {
+                //search by _eid
                 let storeResult = maybeGetOnlyResult(store.getEntries({ eid: [dataIn._eid], includeDeleted: 'no' }));
-                if (storeResult !== undefined && existing === undefined) existing = storeResult as EntryLike
-            })
-        }
-        if (type === 'EntryPointLike') {
-            pdwRef.dataStores.forEach(store => {
-                const pidOrLbl = dataIn._pid ?? dataIn._lbl
-                let storeResult = maybeGetOnlyResult(store.getEntryPoints({ pid: [dataIn._pid], eid: [dataIn._eid], includeDeleted: 'no' }));
-                if (storeResult !== undefined && existing === undefined) existing = storeResult as EntryPointLike
-            })
-        }
-        if (type === 'TagDefLike') {
-            pdwRef.dataStores.forEach(store => {
-                let storeResult = maybeGetOnlyResult(store.getTagDefs({ tid: [dataIn._tid], includeDeleted: 'no' }));
-                if (storeResult !== undefined && existing === undefined) existing = storeResult as TagDefLike
+                if (storeResult !== undefined && existing === undefined) existing = storeResult as unknown as EntryLike
+                //search by _uid
+                storeResult = maybeGetOnlyResult(store.getEntries({ uid: [dataIn._uid], includeDeleted: 'no' }));
+                if (storeResult !== undefined && existing === undefined) existing = storeResult as unknown as EntryLike
             })
         }
         if (type === 'TagLike') {
@@ -1401,13 +1087,19 @@ export abstract class Element implements ElementLike {
                 let storeResult
                 if (dataIn._pid === undefined) storeResult = maybeGetOnlyResult(store.getTags({ did: [dataIn._did], tid: [dataIn._tid], includeDeleted: 'no' }));
                 if (dataIn._pid !== undefined) storeResult = maybeGetOnlyResult(store.getTags({ did: [dataIn._did], tid: [dataIn._tid], pid: [dataIn._pid], includeDeleted: 'no' }));
-                if (storeResult !== undefined && existing === undefined) existing = storeResult as TagDefLike
+                if (storeResult !== undefined && existing === undefined) existing = storeResult as TagLike
             })
         }
         return existing;
     }
 
+    /**
+     * what was this specificlly supposed to do? To filter gainst an EpochStr?
+     * @param elementArr 
+     * @returns 
+     */
     public static getMostRecent(elementArr: ElementLike[]): ElementLike | undefined {
+        //#TODO - what was this whole method meant to do?
         if (elementArr.length == 0) {
             console.warn('You tried to get the most recent of a list of zero elements');
             return undefined
@@ -1419,7 +1111,7 @@ export abstract class Element implements ElementLike {
             _updated: '0' // earlier than anything before 12/31/1969, 6:00:00 PM CST
         }
         elementArr.forEach(element => {
-            if (element._updated > mostRecent._updated) mostRecent = element
+            if (element._updated! > mostRecent._updated!) mostRecent = element
         })
         return mostRecent
     }
@@ -1431,137 +1123,130 @@ export class Def extends Element implements DefLike {
     readonly _desc: string;
     readonly _emoji: string;
     readonly _scope: Scope;
-    constructor(newDefData: MinimumDef) {
-        if (newDefData._scope !== undefined && !Def.isValidScope(newDefData._scope)) throw new Error('Invalid scope supplied when creating Def: ' + newDefData._scope);
-        if (newDefData._did !== undefined) {
-            let existing = Element.findExistingData(newDefData);
+    readonly _pts: PointDef[];
+    constructor(defData: DefLike, lookForExisting = true) {
+        if (defData._scope !== undefined && !Def.isValidScope(defData._scope)) throw new Error('Invalid scope supplied when creating Def: ' + defData._scope);
+        if (lookForExisting) {
+            let existing = Element.findExistingData(defData, 'Def');
             if (existing !== undefined) {
-                if (newDefData._created === undefined) newDefData._created = existing._created;
-                if (newDefData._desc === undefined) newDefData._desc = existing._desc;
-                if (newDefData._emoji === undefined) newDefData._emoji = existing._emoji;
-                if (newDefData._did === undefined) newDefData._did = existing._did;
-                if (newDefData._lbl === undefined) newDefData._lbl = existing._lbl;
-                if (newDefData._scope === undefined) newDefData._scope = existing._scope;
+                if (defData._created === undefined) defData._created = existing._created;
+                if (defData._desc === undefined) defData._desc = existing._desc;
+                if (defData._emoji === undefined) defData._emoji = existing._emoji;
+                if (defData._did === undefined) defData._did = existing._did;
+                if (defData._lbl === undefined) defData._lbl = existing._lbl;
+                if (defData._scope === undefined) defData._scope = existing._scope;
             }
         }
-        super(newDefData)
-        this._lbl = newDefData._lbl ?? 'Unlabeled Default Text';
-        this._did = newDefData._did ?? makeSmallID();
-        this._desc = newDefData._desc ?? 'Set a description';
-        this._emoji = newDefData._emoji ?? '🆕';
-        this._scope = newDefData._scope ?? Scope.SECOND;
+        super(defData)
+        this._did = defData._did ?? makeSmallID();
+        this._lbl = defData._lbl ?? 'Unlabeled Definition ' + this._did;
+        this._desc = defData._desc ?? 'Set a description';
+        this._emoji = defData._emoji ?? '🆕';
+        this._scope = defData._scope ?? Scope.SECOND;
+
+        let pointsToSanitize = defData._pts ?? [];
         //spawn new PointDefs for any non-underscore-prefixed keys
-        let pids = Object.keys(newDefData).filter(key => key.substring(0, 1) !== '_');
-        if (pids.length > 0) {
-            let pointDefs: MinimumPointDef[] = pids.map(pid => {
-                newDefData[pid]._pid = pid;
-                newDefData[pid]._did = this._did;
-                newDefData[pid]._def = this
-                return newDefData[pid]
-            });
-            PDW.getInstance().setPointDefs(pointDefs);
-        }
+        let pids = Object.keys(defData).filter(key => key.substring(0, 1) !== '_');
+        pids.forEach(pid => {
+            defData[pid]._pid = pid;
+            pointsToSanitize.push(defData[pid]);
+        })
+
+        this._pts = pointsToSanitize.map(rawPoint => new PointDef(rawPoint, this));
+        
         if (!Def.isDefLike(this)) throw new Error('Def was mal-formed.')
     }
 
-    setPointDefs(pointInfoIn: {
-        _lbl: string,
-        _type: PointType,
-        _emoji?: string,
-        _desc?: Markdown,
-        _rollup?: Rollup
-        _pid?: SmallID
-    }[]): PointDef[] {
-        let pointDefs = pointInfoIn.map(point => {
-            return PDW.getInstance().newPointDef({
-                _lbl: point._lbl,
-                _did: this._did,
-                _type: point._type,
-                _emoji: point._emoji,
-                _desc: point._desc,
-                _rollup: point._rollup,
-                _pid: point._pid
-            })
-        })
-        return pointDefs
+    getPoint(pidOrLbl: string): PointDef {
+        let point = this._pts.find(point => point._pid === pidOrLbl);
+        if (point === undefined) point = this._pts.find(point => point._lbl === pidOrLbl);
+        if (point !== undefined) return point
+        throw new Error('No point found with pid or lbl when getting ' + pidOrLbl + ' for the Def labeled ' + this._lbl)
+    }
+
+    addPoint(pointInfo: PointDefLike): Def{
+        let newPoint = new PointDef(pointInfo, this);
+        this._pts.push(newPoint);
+        return this
     }
 
     /**
-     * Will call the PDW setDefs method and pass
-     * in the `this` as the existing data
-     * @param dataIn a Map of Def attributes
-     */
-    updateTo(dataIn: MinimumDef) {
-        if (Array.isArray(dataIn)) throw new Error("cannot updateTo an array, you probably passed one in on accident")
-        //ensure this isn't overwriting newer data
-        if (dataIn._updated !== undefined && dataIn._updated < this._updated) {
-            console.warn('Called update on Def using data that was older than the def itself');
-            throw new Error('Do you want this to error? Or just return null?')
-        }
-
-        if (dataIn._did !== undefined && dataIn._did !== this._did) {
-            console.warn("You decided you dont wnat to enable chaging of _did");
-            throw new Error('You cannot change _did on an existing def');
-        }
-
-        let newDefData: DefLike = {
-            _did: this._did,
-            _lbl: dataIn._lbl ?? this._lbl,
-            _desc: dataIn._desc ?? this._desc,
-            _emoji: dataIn._emoji ?? this._emoji,
-            _scope: dataIn._scope ?? this._scope,
-            _uid: makeUID(),
-            _deleted: false,
-            _created: dataIn._created ?? this._created,
-            _updated: makeEpochStr(),
-            __isNew: true, //no need to look for existing for this
-        }
-
-        // PDW
-        this._deleted = true;
-        this._updated = makeEpochStr();
-
-        PDW.getInstance().setDefs([
-            this, //writing the deletes to the dbs
-            newDefData
-        ])
-    }
-
-    getPoints(includeDeleted = false): PointDef[] {
-        const pdwRef = PDW.getInstance();
-
-        //if there's only DataStore, bypass the combining stuff to save time
-        if (pdwRef.dataStores.length == 1) {
-            let pds = pdwRef.dataStores[0].getPointDefs({ did: [this._did], includeDeleted: includeDeleted ? 'yes' : 'no' })
-            return pds.map(pointDef => new PointDef(pointDef));
-        }
-
-        throw new Error('Multiple Data Stores are #TODO') //#TODO - for multiple data stores
-    }
-
-    /**
-     * Associates an Existing TagDef with this Def
+     * Associates an Existing Tag with this Def
      * Doesn't work for Enum values, I think.
      * 
-     * @param tidOrLbl Tid or Lbl of EXISTING TagDef
+     * @param tid of EXISTING Tag
      * @returns the new Tag
      */
-    addTag(tidOrLbl: string): Tag {
-        let pdwRef = PDW.getInstance();
-        let tagArr = pdwRef.getTagDefs({ tid: tidOrLbl });
-        if (tagArr.length === 0) tagArr = pdwRef.getTagDefs({ tagLbl: tidOrLbl });
-        if (tagArr.length === 0) throw new Error('No tag def found for ' + tidOrLbl);
-        let tagDef = tagArr[0];
-        return pdwRef.setTags([{
-            _did: this._did,
-            _tid: tagDef._tid
-        }])[0]
+    addTag(tid: string): Tag {
+        throw new Error('fix this')
+        // let pdwRef = PDW.getInstance();
+        // let tagArr = pdwRef.getTags({ tid: tid });
+        // if (tagArr.length === 0) throw new Error('No tag def found for ' + tid);
+        // let tag = tagArr[0];
+        // if (this._tags.some(t => t === tid)) {
+        //     console.warn('Tried adding a tag to a Def that already had that tag');
+        // } else {
+        //     this._tags.push(tag._tid);
+        // }
+        // return tag
     }
 
-    newEntry(entryData: MinimumEntry): Entry {
+    setPointProps(pointIdentifier: string | PointDef, newPropsMap: DefLike | EntryLike | TagLike): Element {
+        let assPoint: undefined | PointDef
+        if(typeof pointIdentifier === undefined) throw new Error("Must send a string or object as a point identifier");
+        if(typeof pointIdentifier === 'string'){
+            assPoint = this.getPoint(pointIdentifier);
+        }else{
+            assPoint = pointIdentifier;
+            if(!PointDef.isPointDefLike(assPoint)) throw new Error("pointIdentifier passed in wasn't PointDefLike")
+        }
+        
+        if(typeof newPropsMap !== 'object') throw new Error('Element.setProps() expects an object with key/value pairs to set')
+        
+        assPoint.setProps(newPropsMap as unknown as PointDefLike);
+        
+        return this
+    }
+
+    /**
+     * Marks the pointDef as _active = false
+     */
+    deactivatePoint(pointIdentifier: string | PointDef, isReactivate = false){
+        let assPoint: undefined | PointDef
+        if(typeof pointIdentifier === undefined) throw new Error("Must send a string or object as a point identifier");
+        if(typeof pointIdentifier === 'string'){
+            assPoint = this.getPoint(pointIdentifier);
+        }else{
+            assPoint = pointIdentifier;
+            if(!PointDef.isPointDefLike(assPoint)) throw new Error("pointIdentifier passed in wasn't PointDefLike")
+        }
+        //@ts-expect-error - setting read-only here on purpose
+        assPoint._active = isReactivate;
+        this._updated = makeEpochStr();
+    }
+
+    /**
+     * Will set _active = true for the identified point
+     * @param pointIdentifier the point to set as active again
+     */
+    reactivatePoint(pointIdentifier: string | PointDef){
+        this.deactivatePoint(pointIdentifier, true)
+    }
+
+    newEntry(entryData: EntryLike): Entry {
         //not tesitng the 'any' right here
         entryData._did = this._did;
         return PDW.getInstance().setEntries([entryData])[0];
+    }
+
+    setEmoji(newEmoji: string): Def{
+        if(!Def.isSingleEmoji(newEmoji)){
+            console.warn('Tried to set an emoji with something that was too long, emoji will not change');
+            return this
+        }
+        //@ts-expect-error - setting read-only
+        this._emoji = newEmoji;
+        return this
     }
 
     /**
@@ -1575,11 +1260,13 @@ export class Def extends Element implements DefLike {
         if (typeof data._lbl !== 'string') return false
         if (typeof data._desc !== 'string') return false
         if (typeof data._emoji !== 'string') return false
+        if (!Def.isSingleEmoji(data._emoji)) return false
         if (data._scope == undefined || !Def.isValidScope(data._scope)) return false
         if (typeof data._uid !== 'string') return false
         if (typeof data._created !== 'string') return false
         if (typeof data._deleted !== 'boolean') return false
         if (typeof data._updated !== 'string') return false
+        if (!Array.isArray(data._pts)) return false
         return true;
     }
 
@@ -1587,99 +1274,236 @@ export class Def extends Element implements DefLike {
         const values = Object.values(Scope);
         return values.includes(typeStr as unknown as Scope)
     }
+
+    private static isSingleEmoji(emojiStr: string): boolean {
+        return [...new Intl.Segmenter().segment(emojiStr)].length == 1;
+    }
 }
 
-export class PointDef extends Element implements PointDefLike {
-    readonly _did: string;
-    readonly _pid: string;
+export class PointDef implements PointDefLike {
     readonly _lbl: string;
     readonly _desc: string;
     readonly _emoji: string;
     readonly _type: PointType;
     readonly _rollup: Rollup;
-    _def?: Def;
-    constructor(newPointDefData: MinimumPointDef) {
-        if (newPointDefData._did !== undefined && newPointDefData._pid !== undefined) {
-            let existing = Element.findExistingData(newPointDefData);
-            if (existing !== undefined) {
-                if (newPointDefData._created === undefined) newPointDefData._created = existing._created;
-                if (newPointDefData._desc === undefined) newPointDefData._desc = existing._desc;
-                if (newPointDefData._emoji === undefined) newPointDefData._emoji = existing._emoji;
-                if (newPointDefData._did === undefined) newPointDefData._did = existing._did;
-                if (newPointDefData._lbl === undefined) newPointDefData._lbl = existing._lbl;
-                if (newPointDefData._type === undefined) newPointDefData._type = existing._type;
-                if (newPointDefData._rollup === undefined) newPointDefData._rollup = existing._rollup;
-            }
-        }
-        super(newPointDefData)
+    readonly _active: boolean;
+    readonly _opts?: Opt[];
+    readonly _pid: string;
+    readonly __def: Def;
+    constructor(newPointDefData: PointDefLike, def: Def) {
+        if (newPointDefData._pid === undefined) throw new Error("No PointDef _pid supplied.");
+
+        // if (newPointDefData.__isNew !== true) {
+        //     let existing = Element.findExistingData(newPointDefData);
+        //     if (existing !== undefined) {
+        //         if (newPointDefData._active === undefined) newPointDefData._active = existing._active;
+        //         if (newPointDefData._desc === undefined) newPointDefData._desc = existing._desc;
+        //         if (newPointDefData._emoji === undefined) newPointDefData._emoji = existing._emoji;
+        //         if (newPointDefData._lbl === undefined) newPointDefData._lbl = existing._lbl;
+        //         if (newPointDefData._type === undefined) newPointDefData._type = existing._type;
+        //         if (newPointDefData._rollup === undefined) newPointDefData._rollup = existing._rollup;
+        //         if (newPointDefData._opts === undefined) newPointDefData._opts = existing._opts;
+        //     }
+        // }
 
         if (newPointDefData._type !== undefined && !PointDef.isValidType(newPointDefData._type)) throw new Error('Cannot parse point type ' + newPointDefData._type);
         if (newPointDefData._rollup !== undefined && !PointDef.isValidRollup(newPointDefData._rollup)) throw new Error('Cannot parse point rollup ' + newPointDefData._rollup);
 
-        this._did = newPointDefData._did;
+        this._pid = newPointDefData._pid
         this._lbl = newPointDefData._lbl ?? 'Label unset';
         this._type = newPointDefData._type ?? PointType.TEXT;
-        this._pid = newPointDefData._pid ?? makeSmallID();
         this._desc = newPointDefData._desc ?? 'Set a description';
         this._emoji = newPointDefData._emoji ?? '🆕';
         this._rollup = newPointDefData._rollup ?? Rollup.COUNT;
-        //ensure there is ANY def with the same DID
-        if (newPointDefData._def === undefined && PDW.getInstance().getDefs({ did: this._did }).length === 0) throw new Error('No associated Def for PointDef')
-        //assigning out o convenience here
-        if (newPointDefData._def) this._def = newPointDefData._def;
+        this._active = newPointDefData._active ?? true;
+        if (this.shouldHaveOptsProp()){
+            if(newPointDefData._opts !== undefined){
+                this._opts = PointDef.validateOptsArray(newPointDefData._opts);
+            }else{
+                this._opts = [];
+            }
+        }
+
+        this.__def = def;
 
         if (!PointDef.isPointDefLike(this)) throw new Error('Mal-formed PointDef')
     }
 
-    getEnumOptions(includeDeleted = false): Tag[] {
-        const pdwRef = PDW.getInstance();
-        if (includeDeleted) return pdwRef.getTags({ pid: this._pid, did: this._did, includeDeleted: 'yes' });
-        return pdwRef.getTags({ pid: this._pid, did: this._did });
+    /**
+     * Updates the properties of a PointDef inside a Def, returns teh DEF itself.
+     * Because Defs **own** PointDefs.
+     * @param newPropsMap map of PointDefLike properties with new values
+     */
+    setProps(newPropsMap: PointDefLike): PointDef {
+        if(typeof newPropsMap !== 'object') throw new Error('Element.setProps() expects an object with key/value pairs to set')
+        
+        let newKeys = Object.keys(newPropsMap);
+
+        newKeys.forEach(key=>{
+            if(key === '_did' || key === '_pid'){
+                console.warn('Tried to update prop ' + key + ', but ID properties cannot be updated. ID will not be updated.')
+                return
+            }
+            if(key === '_emoji'){
+                this.setEmoji(newPropsMap[key]!);
+                return
+            }
+            if(key === '_rollup'){
+                this.setRollup(newPropsMap[key]!);
+                return
+            }
+            if(key === '_type'){
+                this.setType(newPropsMap[key]!);
+                return
+            }
+            if(key === '_opt' || key === '_opts'){
+                console.warn('Cannot set PointDef options via setProps. Must call setOpts on the PointDef')
+                return
+            }
+            //@ts-expect-error
+            this[key] = newPropsMap[key];
+        })
+
+        this.__def._updated = makeEpochStr();
+
+        if(!PointDef.isPointDefLike(this)) throw new Error('Your updates made a PointDef not PointDefLike');
+        if(!Def.isDefLike(this.__def)) throw new Error('Your updates made a Def not DefLike');
+        return this
+    }
+
+    setProp(key: keyof PointDefLike, val: any){
+        this.setProps({[key]: val})
+    }
+
+
+    setRollup(newRollup: Rollup){
+        if(!PointDef.isValidRollup(newRollup)){
+            console.warn('tried to set a rollup to an invalid value. Ignoring that');
+                return
+        }
+        //@ts-expect-error
+        this._rollup = newRollup;
+        this.__def._updated = makeEpochStr();
+        return this
+    }
+
+    setType(newType: PointType){
+        if(!PointDef.isValidType(newType)){
+            console.warn('tried to set a type to an invalid value. Ignoring that');
+                return
+        }
+        //@ts-expect-error
+        this._type = newType;
+        this.__def._updated = makeEpochStr();
+        return this
+    }
+
+    setEmoji(newEmoji: string): PointDef{
+        if(!PointDef.isSingleEmoji(newEmoji)){
+            console.warn('Tried to set an emoji with something that was too long, emoji will not change');
+            return this
+        }
+        //@ts-expect-error - setting read-only
+        this._emoji = newEmoji;
+        this.__def._updated = makeEpochStr();
+        return this
     }
 
     /**
-     * Creates a new TagDef and a Tag assigning it to this point
-     * @param lbl label to use for the TagDef
-     * @param tid optional, tid for Tag and TagDef to share
-     * @returns the Tag (you can use Tag.getDef() to get to the TagDef)
+     * 
+     * @param oid required - oid of option ot change
+     * @param newLbl optional - if supplied option label will be set
+     * @returns 
      */
-    addEnumOption(lbl: string, tid?: string): Tag {
-        if(this._type !== PointType.SELECT && this._type !== PointType.MULTISELECT) throw new Error('Attempted to add an enum option to a point of type: ' + this._type);
-        const pdwRef = PDW.getInstance();
-        const newTid = tid ?? makeSmallID();
-        pdwRef.setTagDefs([{
-            _did: this._did,
-            _lbl: lbl,
-            _pid: this._pid,
-            _tid: newTid,
-        }])
-        return pdwRef.setTags([{
-            _did: this._did,
-            _tid: newTid,
-            _pid: this._pid
-        }])[0]
+    setOpt(oid: string, newLbl: string){
+        let opt = this._opts?.find(o=>o._oid===oid);
+        if(opt === undefined){
+            console.warn('Tried to setOpt with a non-existant oid. If trying to create a new one, use addOpt().');
+            return this
+        }
+        opt._lbl = newLbl;
+        this.__def._updated = makeEpochStr();
+        return this
+    }
+
+
+    
+    /**
+     * Passes along the save to the Def that owns this.
+     */
+    save(){
+        this.__def.save();
+    }
+
+    private static validateOptsArray(optsArr: Opt[]){
+        if(!Array.isArray(optsArr)){
+            optsArr = [optsArr]
+        }
+        optsArr.forEach(opt=>{
+            //not modifiying, just looking for errors
+            if(
+                !opt.hasOwnProperty('_oid') || 
+                !opt.hasOwnProperty('_lbl')
+            ) throw new Error("Option wasn't formatted like an 'opt' due to missing property")
+            if(typeof opt._oid !== 'string') throw new Error("Option ID wasn't a string")
+            if(typeof opt._lbl !== 'string') throw new Error("Option text wasn't a string")
+        })
+        //you *could* create new array of objects explicitly only keeping the 3 desired keys,
+        //but you're not.
+        return optsArr
+    }
+
+    addOpt(lbl: string, oid?: string){
+        if(!this.shouldHaveOptsProp()){
+            console.warn('Cannot add option to PointDef of type ' + this._type);
+            return
+        }
+        if(oid=== undefined) oid = makeSmallID();
+        this._opts?.push({
+            _oid: oid,
+            _lbl: lbl
+        })
+        this.__def._updated = makeEpochStr();
+        return this;
+    }
+
+    removeOpt(oidOrLbl:string): PointDef{
+        let opt = this.getOpt(oidOrLbl);
+        if(opt!==undefined){
+            //@ts-expect-error
+            this._opts = this._opts?.filter(o=>o._oid!==opt?._oid);
+        }
+        this.__def._updated = makeEpochStr();
+        return this
+    }
+
+    getOpt(oidOrLbl:string): Opt | undefined{
+        if(this._opts === undefined) return undefined
+        let opt = this._opts.find(o=>o._oid === oidOrLbl);
+        if(opt !== undefined) return opt;
+        return this._opts.find(o=>o._lbl === oidOrLbl);
+    }
+
+    getOpts(): Opt[]{
+        if(!this.shouldHaveOptsProp()){
+            console.warn('Tried getting Options for a PointDef that should not have any');
+            return [];
+        }
+        return this._opts ?? [];
+    }
+
+
+
+    /**
+     * The Def that contains this PointDef.
+     */
+    getDef(): Def {
+        //#THINK - do you have to worry about this Def every not being the most recent Def?
+        return this.__def;
     };
 
-    editEnumOption(tid: string, newLbl: string): Tag {
-        let pdwRef = PDW.getInstance();
-        const existingArr = pdwRef.getTags({
-            did: this._did,
-            pid: this._pid,
-            tid: tid,
-            includeDeleted: 'no'
-        })
-        if(existingArr.length !== 1) throw new Error('Found no existing Enum with tid = ' + tid);
-        const existing = existingArr[0];
-        existing.markDeleted();
-        return pdwRef.setTags([{
-            _did: this._did,
-            _tid: tid,
-            _created: existing._created,
-            _pid: this._pid,
-        }, 
-        existing //now marked as deleted, but for now that's not writing to the database
-    ])[0]
-
+    shouldHaveOptsProp(): boolean {
+        return this._type === PointType.SELECT || this._type === PointType.MULTISELECT;
     }
 
     /**
@@ -1689,247 +1513,26 @@ export class PointDef extends Element implements PointDefLike {
     * @returns true if data have all required properties of {@link DefLike}
     */
     static isPointDefLike(data: any): boolean {
-        if (typeof data._did !== 'string') return false
-        if (typeof data._pid !== 'string') return false
         if (typeof data._lbl !== 'string') return false
         if (typeof data._desc !== 'string') return false
         if (typeof data._emoji !== 'string') return false
+        if (!PointDef.isSingleEmoji(data._emoji)) return false
+        if (typeof data._active !== 'boolean') return false
         if (data._type == undefined || !PointDef.isValidType(data._type)) return false
         if (data._rollup == undefined || !PointDef.isValidRollup(data._rollup)) return false
-        if (typeof data._uid !== 'string') return false
-        if (typeof data._created !== 'string') return false
-        if (typeof data._deleted !== 'boolean') return false
-        if (typeof data._updated !== 'string') return false
         return true;
     }
 
-    static isValidType(typeStr: string): boolean {
-        //Handy bit of Enum functionality here for ref
-        const values = Object.values(PointType);
-        return values.includes(typeStr as unknown as PointType)
-    }
-
-    static isValidRollup(typeStr: string): boolean {
-        //Handy bit of Enum functionality here for ref
-        const values = Object.values(Rollup);
-        return values.includes(typeStr as unknown as Rollup)
-    }
-}
-
-export class Entry extends Element implements EntryLike {
-    readonly _eid: string;
-    readonly _note: Markdown;
-    readonly _did: string;
-    readonly _period: PeriodStr;
-    readonly _source: string;
-    __def?: Def;
-    constructor(entryData: MinimumEntry) {
-        if (entryData._eid === undefined && entryData._did === undefined)
-            throw new Error('Not enough info to determine Entry type')
-        if (entryData._eid !== undefined) {
-            let existing = Element.findExistingData(entryData);
-            if (existing !== undefined) {
-                if (entryData._created === undefined) entryData._created = existing._created;
-                if (entryData._did === undefined) entryData._did = existing._did;
-                if (entryData._period === undefined) entryData._period = existing._period;
-                if (entryData._note === undefined) entryData._note = existing._note;
-                if (entryData._source === undefined) entryData._source = existing._source;
-            }
-        }
-        super(entryData);
-        if (entryData._def !== undefined) this.__def = entryData._def;
-        if (this.__def === undefined && entryData._did !== undefined) this.__def = maybeGetOnlyResult(PDW.getInstance().getDefs({ did: [entryData._did!], includeDeleted: 'no' })) as Def;
-        // if (entryData._did === undefined) true == true
-        if (this.__def === undefined)
-            throw new Error('No def found for ' + entryData._did);
-        this._did = this.__def._did;
-        if (entryData._period !== undefined) {
-            //force period scope compatibility
-            this._period = new Period(entryData._period, this.__def._scope).toString();
-        } else {
-            this._period = Period.now(this.__def._scope);
-        }
-        this._eid = entryData._eid ?? makeUID();
-        this._note = entryData._note ?? '';
-        this._source = entryData._source ?? '';
-        if (!Entry.isEntryLike(this)) throw new Error('An error occurred in the Entry creation');
-        //spawn new EntryPoints for any non-underscore-prefixed keys
-        let pointKey = Object.keys(entryData).filter(key => key.substring(0, 1) !== '_');
-        if (pointKey.length > 0) {
-            let entryPoints: MinimumEntryPoint[] = pointKey.map(pid => {
-                //needing to find associated PointDef to support using the _lbl as the key
-                let assPointDef
-                //checking first for pointKey is a _pid
-                //making SmallID here to avoid hardcoding the length to "4"
-                if (pid.length === makeSmallID().length) assPointDef = EntryPoint.findExistingData({ _did: this._did, _pid: pid });
-                //checking for if pointKey is a _lbl
-                if (assPointDef === undefined) assPointDef = EntryPoint.findExistingData({ _did: this._did, _lbl: pid, _pid: undefined })
-                if (assPointDef === undefined) {
-                    console.error("Couldn't find associated pointDef for '" + pid + '".', entryData);
-                    throw new Error('Error creating Entry. :-(');
-                }
-                return {
-                    _pid: assPointDef._pid,
-                    _val: entryData[pid],
-                    _eid: this._eid,
-                    _did: this._did,
-                    _pointDef: assPointDef
-                }
-            });
-            PDW.getInstance().setEntryPoints(entryPoints);
-        }
-    }
-
-    getPoints(includeDeleted = false): EntryPoint[] {
-        const pdwRef = PDW.getInstance();
-        return pdwRef.getEntryPoints({ eid: [this._eid], includeDeleted: includeDeleted ? 'yes' : 'no' })
-    }
-
-    getPoint(pidLbl: string, includeDeleted = false): EntryPoint | null {
-        let pds = this.getPoints(includeDeleted);
-        let point = pds.filter(p => p._pid === pidLbl);
-        if (point.length !== 0) return new EntryPoint(point[0])
-        let pointDefs = this.getDef().getPoints();
-        let pointDef = pointDefs.filter(pd => pd._lbl === pidLbl);
-        console.log(pointDef.length + ' for ' + pidLbl);
-        if (pointDef.length !== 1) return null
-        point = pds.filter(p => p._pid === pointDef[0]._pid);
-        if (point.length === 0) {
-            // console.warn('No point found on Entry with label or pid: ' + pidLbl);
-            return null;
-        }
-        return new EntryPoint(point[0]);
-    }
-
-    getDef(): Def {
-        if (this.__def) return this.__def;
-        return PDW.getInstance().getDefs({ did: this._did })[0]
-    }
-
-    getPeriod(): Period {
-        return new Period(this._period);
-    }
-
-    setPeriod(periodStr: PeriodStr): Entry {
-        if (periodStr === this._period) {
-            console.warn('Attempted to set period to what it already is');
-            return this
-        }
-        let deepCopy = JSON.parse(JSON.stringify(this));
-        deepCopy._period = new Period(periodStr, this.getDef()._scope).toString();
-        this.markDeleted();
-        return PDW.getInstance().setEntries([
-            deepCopy,
-            this
-        ])[0]
-    }
-
-    setPoint(pidOrLbl: string, val: any, created?: EpochStr): EntryPoint {
-        const pdwRef = PDW.getInstance()
-        let pointDefArr = pdwRef.getPointDefs({ did: this._did, pid: pidOrLbl });
-        if (pointDefArr.length === 0) pointDefArr = pdwRef.getPointDefs({ did: this._did, pointLbl: pidOrLbl });
-        if (pointDefArr.length === 0) throw new Error("Could'nt find associated pointDef for setPoint data");
-        const pointDef = pointDefArr[0];
-
-        let existing = this.getPoint(pidOrLbl);
-        if (existing) {
-            existing.markDeleted();
-            created = created ?? existing._created;
-            return pdwRef.setEntryPoints([{
-                _created: created,
-                _eid: this._eid,
-                _pid: pointDef._pid,
-                _val: val
-            }])[0]
-        }
-        // const assDef = pdwRef.getPointDefs([])
-        return pdwRef.setEntryPoints([{
-            _did: pointDef._did,
-            _created: created,
-            _eid: this._eid,
-            _pid: pointDef._pid,
-            _val: val
-        }])[0]
-    }
-
-    setNote(noteText: string): Entry {
-        if (noteText === this._note) {
-            console.warn('Attempted to set note text to what it already is');
-            return this
-        }
-        let deepCopy = JSON.parse(JSON.stringify(this));
-        deepCopy._note = noteText;
-        this.markDeleted();
-        return PDW.getInstance().setEntries([
-            deepCopy,
-            this
-        ])[0]
-    }
-
     /**
-    * Predicate to check if an object has all {@link EntryLike} properties
-    * AND they are the right type.
-    * @param data data to check
-    * @returns true if data have all required properties of {@link DefLike}
+    * Attempts to intercept poorly-typed values and convert them if possible.
+    * If conversion isn't possible, returns undefined and logs to console.warn
+    * @param _val value to check
+    * @param _type type to attempt to convert to
+    * @returns correctly-typed _val, or undefined if _val cannot be converted
     */
-    static isEntryLike(data: any): boolean {
-        if (typeof data._did !== 'string') return false
-        if (typeof data._eid !== 'string') return false
-        if (typeof data._note !== 'string') return false
-        if (typeof data._period !== 'string') return false
-        if (typeof data._uid !== 'string') return false
-        if (typeof data._created !== 'string') return false
-        if (typeof data._deleted !== 'boolean') return false
-        if (typeof data._updated !== 'string') return false
-        if (typeof data._source !== 'string') return false
-        return true;
-    }
-}
+    ensureValType(_val: string | number | boolean | object, _type?: PointType) {
+        if (_type === undefined) _type = this._type;
 
-/**
- * Making this a class for symmetry, but not exactly sure if it 
- * really should be one. Can't think of any methods that would 
- * be attached. But I guess it's an easy way to build an EntryLike obj
- */
-export class EntryPoint extends Element implements EntryPointLike {
-    readonly _eid: UID;
-    readonly _pid: SmallID;
-    readonly _val: any;
-    readonly _did: SmallID;
-    _pointDef?: PointDef;
-    constructor(entryPointData: MinimumEntryPoint, associatedPointDef?: PointDef) {
-        if (entryPointData._eid !== undefined) {
-            let existing = Element.findExistingData(entryPointData);
-            if (existing !== undefined) {
-                if (entryPointData._created === undefined) entryPointData._created = existing._created;
-                if (entryPointData._did === undefined) entryPointData._did = existing._did;
-            }
-        }
-        if (entryPointData._pointDef !== undefined) associatedPointDef = entryPointData._pointDef;
-        if (associatedPointDef === undefined) associatedPointDef = PointDef.findExistingData(entryPointData, 'PointDef');
-        if (associatedPointDef === undefined) { // throw new Error('No definition associated with supplied EntryPoint data')
-            PointDef.findExistingData(entryPointData, 'PointDef');
-            throw new Error('No definition associated with supplied EntryPoint data')
-        }
-
-        let correctType: any = EntryPoint.ensureValType(entryPointData._val, associatedPointDef._type);
-        if (correctType === undefined) correctType = entryPointData._val; //for now passing thru bad data
-
-        super(entryPointData);
-        this._eid = entryPointData._eid;
-        this._pid = entryPointData._pid;
-        this._val = correctType;
-        this._did = associatedPointDef._did!; //I *think* this will always be not undefined
-    }
-
-    /**
-     * Attempts to intercept poorly-typed values and convert them if possible.
-     * If conversion isn't possible, returns undefined and logs to console.warn
-     * @param _val value to check
-     * @param _type type to attempt to convert to
-     * @returns correctly-typed _val, or undefined if _val cannot be converted
-     */
-    static ensureValType(_val: string | number | boolean | object, _type: PointType) {
         if (_type === PointType.BOOL) {
             if (typeof _val === 'boolean') return _val;
             if (typeof _val === 'string') return _val.toUpperCase() === 'TRUE';
@@ -1956,8 +1559,8 @@ export class EntryPoint extends Element implements EntryPointLike {
             throw new Error(`Cannot convert this to markdown:` + _val)
         }
         if (_type === PointType.MULTISELECT) {
-            if (Array.isArray(_val)) return _val.join(', ');
-            if (typeof _val === 'string') return _val;
+            if (Array.isArray(_val)) return _val;
+            if (typeof _val === 'string') return [_val];
             throw new Error(`Cannot convert this to multiselect:` + _val)
         }
         if (_type === PointType.NUMBER) {
@@ -1990,7 +1593,6 @@ export class EntryPoint extends Element implements EntryPointLike {
                 return new Temporal.PlainTime(0, 0).add({ seconds: Math.round(86400 * _val) }).toString();
             }
             throw new Error(`Cannot convert this to time:` + _val)
-
         }
         if (_type === PointType.JSON) {
             if (typeof _val === 'string') return _val.trim();
@@ -2000,33 +1602,194 @@ export class EntryPoint extends Element implements EntryPointLike {
         throw new Error("Type not supported: " + _type);
     }
 
-    static isEntryPointLike(data: any): boolean {
+    static isValidType(typeStr: string): boolean {
+        //Handy bit of Enum functionality here for ref
+        const values = Object.values(PointType);
+        return values.includes(typeStr as unknown as PointType)
+    }
+
+    static isValidRollup(typeStr: string): boolean {
+        //Handy bit of Enum functionality here for ref
+        const values = Object.values(Rollup);
+        return values.includes(typeStr as unknown as Rollup)
+    }
+
+    private static isSingleEmoji(emojiStr: string): boolean {
+        return [...new Intl.Segmenter().segment(emojiStr)].length == 1;
+    }
+}
+
+export class Entry extends Element implements EntryLike {
+    readonly _eid: string;
+    readonly _note: Markdown;
+    readonly _did: string;
+    readonly _period: PeriodStr;
+    readonly _source: string;
+    [pid: string]: any;
+    __def?: Def;
+    constructor(entryData: EntryLike, lookForExisting = true, def?: Def) {
+        if (entryData._uid === undefined && entryData._eid === undefined && entryData._did === undefined && def === undefined)
+            throw new Error('Not enough info to determine Entry type')
+        if (lookForExisting) {
+            let existing = Element.findExistingData(entryData, 'Entry');
+            if (existing !== undefined) {
+                if (entryData._created === undefined) entryData._created = existing._created;
+                if (entryData._did === undefined) entryData._did = existing._did;
+                if (entryData._period === undefined) entryData._period = existing._period;
+                if (entryData._note === undefined) entryData._note = existing._note;
+                if (entryData._source === undefined) entryData._source = existing._source;
+            }
+        }
+        super(entryData);
+
+        if (entryData._def !== undefined) this.__def = entryData._def;
+        if (this.__def === undefined && entryData._did !== undefined) this.__def = maybeGetOnlyResult(PDW.getInstance().getDefs({ did: [entryData._did!], includeDeleted: 'no' })) as Def;
+        if (this.__def === undefined) {
+            throw new Error('No def found for ' + entryData._did);
+        }
+        this._did = this.__def._did;
+
+        if (entryData._period !== undefined) {
+            //force period scope compatibility
+            this._period = new Period(entryData._period, this.__def._scope).toString();
+        } else {
+            this._period = Period.now(this.__def._scope);
+        }
+
+        this._eid = entryData._eid ?? makeUID();
+        this._note = entryData._note ?? '';
+        this._source = entryData._source ?? '';
+
+        //spawn new EntryPoints for any non-underscore-prefixed keys
+        let pids = Object.keys(entryData).filter(key => key.substring(0, 1) !== '_');
+        pids.forEach(pid => {
+            const keyval = this.sanitizePointData({[pid]: entryData[pid]});
+            this[keyval.pid] = keyval.val;
+        })
+
+        if (!Entry.isEntryLike(this)) throw new Error('An error occurred in the Entry creation');
+    }
+
+    /**
+     * Looks up the associated PointDef based on the object key.
+     * Checks the value against that PointDef._type. Calls {@link PointDef.ensureValType()}
+     * @param rawPointData key: value pair with key = _pid or _lbl of PointDef
+     * @returns an object with 'key' = _pid for PointDef, and 'val' = value
+     */
+    sanitizePointData(rawPointData: any): {'pid': string, 'lbl': string, 'val': any, 'pointDef': PointDef} {
+        if (typeof rawPointData !== 'object') throw new Error('Saw non-object Entry Point:' + rawPointData);
+        if (Object.keys(rawPointData).length > 1) throw new Error('Expected a single-keyed object. Saw multiple keys');
+        const key = Object.keys(rawPointData)[0];
+
+        const assPointDef = this.__def?.getPoint(key);
+        if(assPointDef===undefined) throw new Error('No PointDef found for ' + key)
+        const validatedValue = assPointDef?.ensureValType(rawPointData[key]);
+
+        return {
+                'pid': assPointDef._pid,
+                'lbl': assPointDef._lbl,
+                'val': validatedValue, 
+                'pointDef': assPointDef
+            }
+    }
+
+    getPoints(): {'pid': string, 'lbl': string, 'val': any, 'pointDef': PointDef}[] {
+        let pids = Object.keys(this).filter(key => key.substring(0, 1) !== '_');
+        let def = this.getDef();
+        return pids.map(pid=> {
+                const assPD = def._pts.find(point=>point._pid === pid);
+                return {
+                    pointDef: assPD!,
+                    pid: pid,
+                    lbl: assPD!._lbl,
+                    val: this[pid]
+                }
+            })
+    }
+
+    getPoint(pidOrLbl: string): {'pid': string, 'lbl': string, 'val': any, 'pointDef': PointDef} | undefined{
+        const allPoints = this.getPoints();
+        let point = allPoints.find(point=>point.pid === pidOrLbl);
+        if(point!== undefined) return point;
+        return allPoints.find(point=>point.lbl === pidOrLbl);
+    }
+
+    setPointVals(pidValArr: {[pid: string]: any}[]): Entry{
+        pidValArr.forEach(keyVal=>{
+            let pointVal = this.sanitizePointData(keyVal);
+            this[pointVal.pid] = pointVal.val;
+        })
+        this._updated = makeEpochStr();
+        return this;
+    }
+
+    setPointVal(pid: string, val: any): Entry{
+        this._updated = makeEpochStr();
+        return this.setPointVals([{[pid]:val}]);
+    }
+
+    getDef(): Def {
+        if (this.__def) return this.__def;
+        return PDW.getInstance().getDefs({ did: this._did })[0]
+    }
+
+    getPeriod(): Period {
+        return new Period(this._period);
+    }
+
+    setPeriod(periodStr: PeriodStr): Entry {
+        if (periodStr === this._period) {
+            console.warn('Attempted to set period to what it already is');
+            return this
+        }
+        
+        //@ts-expect-error - setting readonly
+        this._period = new Period(periodStr, this.getDef()._scope).toString();
+
+        this._updated = makeEpochStr();
+        return this;
+    }
+
+    /**
+    * Predicate to check if an object has all {@link EntryLike} properties
+    * AND they are the right type.
+    * @param data data to check
+    * @returns true if data have all required properties of {@link DefLike}
+    */
+    static isEntryLike(data: any): boolean {
+        if (typeof data._did !== 'string') return false
+        if (typeof data._eid !== 'string') return false
+        if (typeof data._note !== 'string') return false
+        if (typeof data._period !== 'string') return false
         if (typeof data._uid !== 'string') return false
         if (typeof data._created !== 'string') return false
-        if (typeof data._updated !== 'string') return false
         if (typeof data._deleted !== 'boolean') return false
-        if (typeof data._did !== 'string') return false
-        if (typeof data._pid !== 'string') return false
-        if (typeof data._eid !== 'string') return false
-        if (data._val === undefined) return false
+        if (typeof data._updated !== 'string') return false
+        if (typeof data._source !== 'string') return false
         return true;
     }
 }
 
-export class TagDef extends Element implements TagDefLike {
+export class Tag extends Element implements TagLike {
     readonly _tid: string;
     readonly _lbl: string;
-    constructor(tagDefData: MinimumTagDef) {
-        if (tagDefData._tid !== undefined) {
-            let existing = Element.findExistingData(tagDefData);
+    readonly _dids: SmallID[]
+    __defs: Def[];
+    constructor(tagDefData: TagLike, lookForExisting = true) {
+        if (lookForExisting) {
+            let existing = Element.findExistingData(tagDefData, 'Tag');
             if (existing !== undefined) {
                 if (tagDefData._created === undefined) tagDefData._created = existing._created;
             }
         }
         super(tagDefData);
         this._tid = tagDefData._tid ?? makeSmallID();
-        this._lbl = tagDefData._lbl;
-        if (!TagDef.isTagDefLike(this)) {
+        this._lbl = tagDefData._lbl ?? 'Unlabeled Tag with _tid = ' + this._tid;
+        this._dids = tagDefData._dids ?? [];
+        //#TODO - figure out how to handle situaitons where _dids and __defs are supplied but dont' agree
+        this.__defs = tagDefData.__defs ?? [];
+        
+        if (!Tag.isTagDefLike(this)) {
             throw new Error('TagDef created is not TagDefLike');
         }
     }
@@ -2038,100 +1801,29 @@ export class TagDef extends Element implements TagDefLike {
         if (typeof data._deleted !== 'boolean') return false
         if (typeof data._tid !== 'string') return false
         if (typeof data._lbl !== 'string') return false
+        if (!Array.isArray(data.__defs)) return false
         return true;
     }
 
-    getTagsAndDefs(includeDeleted = false): { tags: Tag[], defs: Def[] } {
-        const pdwRef = PDW.getInstance();
-        let tags = pdwRef.getTags({ tid: this._tid });
-        let tagsAndDefs: any = { tags: [], defs: [] };
-        tags.forEach(tag => {
-            let result = pdwRef.getDefs({ did: tag._did });
-            result.forEach(inner => {
-                if (!tagsAndDefs.defs.some((d: any) => d._uid === inner._uid)) {
-                    tagsAndDefs.defs.push(inner);
-                    tagsAndDefs.tags.push(tag);
-                }
-            })
-        })
-        return tagsAndDefs
-    }
+    // getDefs(includeDeleted = false): { tags: Tag[], defs: Def[] } {
+    //     const pdwRef = PDW.getInstance();
+    //     let tags = pdwRef.getTags({ tid: this._tid });
+    //     let tagsAndDefs: any = { tags: [], defs: [] };
+    //     tags.forEach(tag => {
+    //         let result = pdwRef.getDefs({ did: tag._did });
+    //         result.forEach(inner => {
+    //             if (!tagsAndDefs.defs.some((d: any) => d._uid === inner._uid)) {
+    //                 tagsAndDefs.defs.push(inner);
+    //                 tagsAndDefs.tags.push(tag);
+    //             }
+    //         })
+    //     })
+    //     return tagsAndDefs
+    // }
 
-    addTag(didOrLbl: string): Tag {
-        let pdwRef = PDW.getInstance();
-        let defArr = pdwRef.getDefs({ did: didOrLbl });
-        if (defArr.length === 0) defArr = pdwRef.getDefs({ defLbl: didOrLbl });
-        if (defArr.length === 0) throw new Error('Found no Def with _lbl or _did ' + didOrLbl);
-        let def = defArr[0];
-        return pdwRef.newTag({
-            _did: def._did,
-            _tid: this._tid,
-        })
-    }
-}
-
-export class Tag extends Element implements TagLike {
-    readonly _tid: string;
-    readonly _did: string;
-    readonly _pid?: string | undefined;
-    __tagDef?: TagDef
-    constructor(tagData: MinimumTag) {
-        if (tagData._tid !== undefined) {
-            let existing = Element.findExistingData(tagData);
-            if (existing !== undefined) {
-                if (tagData._created === undefined) tagData._created = existing._created;
-            }
-        }
-        super(tagData);
-        this.__tagDef = Element.findExistingData({_tid: tagData._tid, _deleted: false}, 'TagDef');
-        if(this.__tagDef === undefined) throw new Error('Couldnt find a TagDef for supplied Tag info')
-        this._tid = tagData._tid;
-        this._did = tagData._did;
-        this._pid = tagData._pid;
-        if (!Tag.isTagLike(this)) throw new Error('Tag created is not TagLike');
-    }
-
-    getDef(): TagDef{
-        if(this.__tagDef !== undefined) return this.__tagDef;
-        return Element.findExistingData({_tid: this._tid, _deleted: false}, 'TagDef');
-    }
-
-    /**
-     * To get the _lbl of the TagDef for this tag
-     * @returns the _lbl of the current TagDef for this Tag
-     */
-    getLbl(): string{
-        return this.getDef()._lbl;
-    }
-
-    /**
-     * Updates the `_lbl` property of the current TagDef for this tag
-     * @param newLbl the new _lbl for the TagDef
-     * @returns the newly created {@link TagDef}
-     */
-    setLbl(newLbl: string): TagDef{
-        let existing = this.getDef();
-        existing.markDeleted();
-        this.__tagDef = PDW.getInstance().setTagDefs([
-            existing,
-            {
-                _lbl: newLbl,
-                _tid: existing._tid,
-                _created: existing._created,
-            }
-        ])[1];
-        return this.__tagDef
-    }
-
-    static isTagLike(data: any): boolean {
-        if (typeof data._uid !== 'string') return false
-        if (typeof data._created !== 'string') return false
-        if (typeof data._updated !== 'string') return false
-        if (typeof data._deleted !== 'boolean') return false
-        if (typeof data._did !== 'string') return false
-        if (typeof data._tid !== 'string') return false
-        return true;
-    }
+    //getOpts(){
+    // 
+    // }
 }
 
 /**
@@ -2509,7 +2201,7 @@ export function getElementType(element: ElementLike): 'DefLike' | 'PointDefLike'
     return "DefLike"
 }
 
-function maybeGetOnlyResult(arrayOfOneElement: any[]): undefined | Def | Entry | PointDef | EntryPoint | Tag | TagDef {
+function maybeGetOnlyResult(arrayOfOneElement: any[]): any {
     if (arrayOfOneElement.length === 0) return undefined
     if (arrayOfOneElement.length > 1) {
         console.error('Found too many errors:', arrayOfOneElement)
