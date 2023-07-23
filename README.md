@@ -32,18 +32,37 @@ This is already out-of-date, but I want something like this to show up so hey.
 
 ## Elements
 
-### Def
+_uid
+_created
+_updated
+_deleted
 
+### Def
+_did
+_lbl
+_desc
+_emoji
+_scope
+_points
+    _pid
+    _lbl
+    _desc
+    _emoji
+    _type
+    _rollup     
 
 ### Entry
-
+_eid
+_did
+_period
+_note
+_source
+_points
+    (key:value) key by 
 
 ### Tag
+_tid
+_defs: [array of _dids]
+_points: [array of _did._pids]
 
-
-## PointElements
-
-### PointDef
-
-### EntryPoint
-
+and I guess that's it?
