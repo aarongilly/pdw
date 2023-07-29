@@ -1088,7 +1088,40 @@ test('Query Basics', () => {
     result = q.run();
     expect(result.count).toBe(2); //now returning both versions
     expect(result.entries.map(e=>e['bbb2'])).toEqual(['Michael Jordan', 'Michael SCOTT'])
+
     
+    /**
+     * Created & Updated, Before & After
+    */
+    q = new pdw.Query();
+    q.includeDeleted().allOnPurpose();
+    expect(q.run().entries.length).toBe(10)
+    q = new pdw.Query().includeDeleted();
+    expect(q.createdBefore('2023-07-23').run().entries.length).toBe(4);
+    q = new pdw.Query().includeDeleted();
+    expect(q.createdAfter('2023-07-23').run().entries.length).toBe(6);
+    q = new pdw.Query().includeDeleted();
+    expect(q.updatedBefore('2023-07-23').run().entries.length).toBe(2);    
+    q = new pdw.Query().includeDeleted();
+    expect(q.updatedAfter('2023-07-23').run().entries.length).toBe(8);
+    //all of which also works with epochStr, Dates, Temporal.ZonedDateTimes and full ISO strings;
+    q = new pdw.Query().includeDeleted();
+    let fullISO = '2023-07-23T03:04:50-05:00';
+    let epochStr = pdw.makeEpochStrFrom('2023-07-23T03:04:50-05:00')!;
+    let temp = pdw.parseTemporalFromEpochStr(epochStr);
+    let date = new Date('2023-07-23T03:04:50-05:00');
+    result = q.updatedAfter(fullISO).run();
+    expect(q.updatedAfter(epochStr).run().entries).toEqual(result.entries);
+    expect(q.updatedAfter(temp).run().entries).toEqual(result.entries);
+    expect(q.updatedAfter(date).run().entries).toEqual(result.entries);
+
+    //#TODO - tags & tids
+    //#TODO - from & to
+    
+    
+    
+
+
     function createTestDataSet(){
         const nightly = pdwRef.newDef({
             _did: 'aaaa',

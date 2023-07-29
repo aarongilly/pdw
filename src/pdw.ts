@@ -203,12 +203,12 @@ export interface StandardParams {
     pointLbl?: string[] | string,//#TODO
     tagLbl?: string[] | string,
     limit?: number,//#TODO
-    allOnPurpose?: boolean//#TODO
+    allOnPurpose?: boolean
 }
 
 /**
  * A more tightly-controlled version of the {@link StandardParams}, meant to make
- * development of any new {@link DataStore} easier to implement. SanitizedParams are
+ * development of any new {@link DataStore} **EASIER** to implement. SanitizedParams are
  * what DataStore versions of the main setter/getter functions respond to.  
  */
 export interface SanitizedParams {
@@ -220,14 +220,19 @@ export interface SanitizedParams {
     includeDeleted: 'yes' | 'no' | 'only',
     from?: Period, //#TODO
     to?: Period, //#TODO
+
+    //these 4 pairs come in pairs from the sanitizeParams() func, DataStore could use either
     createdAfter?: Temporal.ZonedDateTime,
-    createdBefore?: Temporal.ZonedDateTime,
-    updatedAfter?: Temporal.ZonedDateTime,
-    updatedBefore?: Temporal.ZonedDateTime
     createdAfterEpochStr?: EpochStr,
+    
+    createdBefore?: Temporal.ZonedDateTime,
     createdBeforeEpochStr?: EpochStr,
-    updatedAfterEpochStr?: EpochStr,
+    
+    updatedBefore?: Temporal.ZonedDateTime
     updatedBeforeEpochStr?: EpochStr,
+    
+    updatedAfter?: Temporal.ZonedDateTime,
+    updatedAfterEpochStr?: EpochStr,
     uid?: UID[],
     did?: SmallID[],
     pid?: SmallID[], //#TODO
@@ -673,36 +678,36 @@ export class PDW {
         if (params.createdAfter !== undefined) {
             if (typeof params.createdAfter === 'string') {
                 params.createdAfter = parseTemporalFromEpochStr(params.createdAfter);
-                (<SanitizedParams>params).createdAfterEpochStr = makeEpochStrFromTemporal(params.createdAfter);
+                (<SanitizedParams>params).createdAfterEpochStr = makeEpochStrFrom(params.createdAfter);
             } else {
-                (<SanitizedParams>params).createdAfterEpochStr = makeEpochStrFromTemporal(params.createdAfter);
+                (<SanitizedParams>params).createdAfterEpochStr = makeEpochStrFrom(params.createdAfter);
                 params.createdAfter = parseTemporalFromEpochStr((<SanitizedParams>params).createdAfterEpochStr!);
             }
         }
         if (params.createdBefore !== undefined) {
             if (typeof params.createdBefore === 'string') {
                 params.createdBefore = parseTemporalFromEpochStr(params.createdBefore);
-                (<SanitizedParams>params).createdBeforeEpochStr = makeEpochStrFromTemporal(params.createdBefore);
+                (<SanitizedParams>params).createdBeforeEpochStr = makeEpochStrFrom(params.createdBefore);
             } else {
-                (<SanitizedParams>params).createdBeforeEpochStr = makeEpochStrFromTemporal(params.createdBefore);
+                (<SanitizedParams>params).createdBeforeEpochStr = makeEpochStrFrom(params.createdBefore);
                 params.createdBefore = parseTemporalFromEpochStr((<SanitizedParams>params).createdBeforeEpochStr!);
             }
         }
         if (params.updatedAfter !== undefined) {
             if (typeof params.updatedAfter === 'string') {
                 params.updatedAfter = parseTemporalFromEpochStr(params.updatedAfter);
-                (<SanitizedParams>params).updatedAfterEpochStr = makeEpochStrFromTemporal(params.updatedAfter);
+                (<SanitizedParams>params).updatedAfterEpochStr = makeEpochStrFrom(params.updatedAfter);
             } else {
-                (<SanitizedParams>params).updatedAfterEpochStr = makeEpochStrFromTemporal(params.updatedAfter);
+                (<SanitizedParams>params).updatedAfterEpochStr = makeEpochStrFrom(params.updatedAfter);
                 params.updatedAfter = parseTemporalFromEpochStr((<SanitizedParams>params).updatedAfterEpochStr!);
             }
         }
         if (params.updatedBefore !== undefined) {
             if (typeof params.updatedBefore === 'string') {
                 params.updatedBefore = parseTemporalFromEpochStr(params.updatedBefore);
-                (<SanitizedParams>params).updatedBeforeEpochStr = makeEpochStrFromTemporal(params.updatedBefore);
+                (<SanitizedParams>params).updatedBeforeEpochStr = makeEpochStrFrom(params.updatedBefore);
             } else {
-                (<SanitizedParams>params).updatedBeforeEpochStr = makeEpochStrFromTemporal(params.updatedBefore);
+                (<SanitizedParams>params).updatedBeforeEpochStr = makeEpochStrFrom(params.updatedBefore);
                 params.updatedBefore = parseTemporalFromEpochStr((<SanitizedParams>params).updatedBeforeEpochStr!);
             }
         }
@@ -825,10 +830,10 @@ export abstract class Element implements ElementLike {
         if (typeof inputSeen === 'string') {
             if (isValidEpochStr(inputSeen)) return inputSeen;
             //try passing through new Date()'s wide-open interpretations
-            return makeEpochStrFromTemporal(Temporal.Instant.fromEpochMilliseconds(new Date(inputSeen).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()));
+            return makeEpochStrFrom(Temporal.Instant.fromEpochMilliseconds(new Date(inputSeen).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()))!;
         }
         if (typeof inputSeen === 'number') {
-            makeEpochStrFromTemporal(Temporal.Instant.fromEpochMilliseconds(inputSeen).toZonedDateTimeISO(Temporal.Now.timeZone()));
+            makeEpochStrFrom(Temporal.Instant.fromEpochMilliseconds(inputSeen).toZonedDateTimeISO(Temporal.Now.timeZone()));
         }
         console.warn('Did not know how to handle parsing this date input, defaulting to now:', inputSeen);
         return makeEpochStr();
@@ -2220,6 +2225,31 @@ export class Query {
         return this
     }
 
+    createdAfter(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime){
+        const epoch = makeEpochStrFrom(epochDateOrTemporal);
+        this.params.createdAfter = epoch;
+        return this;
+    }
+
+    createdBefore(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime){
+        const epoch = makeEpochStrFrom(epochDateOrTemporal);
+        this.params.createdBefore = epoch;
+        return this;
+    }
+
+    updatedAfter(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime){
+        const epoch = makeEpochStrFrom(epochDateOrTemporal);
+        this.params.updatedAfter = epoch;
+        return this;
+    }
+
+    updatedBefore(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime){
+        const epoch = makeEpochStrFrom(epochDateOrTemporal);
+        this.params.updatedBefore = epoch;
+        return this;
+    }
+
+
     forDefs(defList: Def[] | Def) {
         if (!Array.isArray(defList)) defList = [defList];
         return this.forDids(defList.map(def => def._did));
@@ -2299,10 +2329,6 @@ export function parseTemporalFromUid(uid: UID): Temporal.ZonedDateTime {
     return parseTemporalFromEpochStr(uid.split("-")[0]);
 }
 
-export function makeEpochStrFromTemporal(temp: Temporal.ZonedDateTime): EpochStr {
-    return temp.epochMilliseconds.toString(36);
-}
-
 export function isValidEpochStr(epochStr: string): boolean {
     if (typeof epochStr !== 'string') return false;
     if (epochStr.length !== 8) return false; //not supporting way in the past or future
@@ -2311,6 +2337,21 @@ export function isValidEpochStr(epochStr: string): boolean {
     //console.log(parseTemporalFromEpochStr('100000000').toLocaleString()) //is "5/25/2059, 12:38:27 PM CDT"
     //for now this is good enough. I could parse a temporal out then check if it succeed & is in a resonable year, but meh
     return true
+}
+
+export function makeEpochStrFrom(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime): EpochStr | undefined{
+    if(typeof epochDateOrTemporal === 'string'){
+        if(isValidEpochStr(epochDateOrTemporal)) return epochDateOrTemporal;
+        //This WILL cause errors given bad strings, but I want to support lazy strings like "2023-07-28"
+        return Temporal.Instant.fromEpochMilliseconds(new Date(epochDateOrTemporal).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()).epochMilliseconds.toString(36);
+    }
+    if(Object.prototype.toString.call(epochDateOrTemporal) === "[object Date]"){
+        return (<Date> epochDateOrTemporal).getTime().toString(36);
+    }
+    if(Object.prototype.toString.call(epochDateOrTemporal) === "[object Temporal.ZonedDateTime]"){
+        return (<Temporal.ZonedDateTime> epochDateOrTemporal).epochMilliseconds.toString(36);
+    }
+    return undefined;
 }
 
 export function parseTemporalFromEpochStr(epochStr: EpochStr): Temporal.ZonedDateTime {

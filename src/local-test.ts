@@ -11,13 +11,16 @@ const pdwRef = pdw.PDW.getInstance();
 
 createTestDataSet();
 
+let entries = pdwRef.getEntries({includeDeleted: 'yes'});
+console.log(entries.map(d=>d.__tempUpdated.toLocaleString()));
+
 let q = new Query();
 
-q.includeDeleted(false);
-// q.forDids(['bbbb', 'aaaa']);
-q = new pdw.Query();
-let def = pdwRef.getDefs({did: 'aaaa'})[0];
-q.forDefs([def]).run();
+q.updatedAfter('2023-07-23');
+let result = q.includeDeleted().run();
+
+console.log(result.entries.map(e=>e.__tempUpdated.toLocaleString()));
+
 
 // console.log(results.count);
 
@@ -44,6 +47,7 @@ console.log(defs);
 
 function createTestDataSet(){
     const nightly = pdwRef.newDef({
+        _created: '2023-07-10T20:02:30-05:00',
         _did: 'aaaa',
         _lbl: 'Nightly Review',
         _scope: pdw.Scope.DAY,
