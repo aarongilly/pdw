@@ -7,6 +7,8 @@ import { importFromFile } from '../src/dataStores/fileAsyncDataStores';
 const pdwRef = pdw.PDW.getInstance();
 
 function resetTestDataset() {
+    //@ts-expect-error - this exists
+    pdwRef.manifest = [];
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 }
 
@@ -523,18 +525,18 @@ test.skip('Entry Creation and Getting', () => {
     expect(testEntry._period).toBe('2023-06-03T00:00:00');
 
     /**
-     * OPTS
+     * Opts
      */
     let defWithOpts = pdwRef.newDef({
-        _did: 'bbbb',
+        _did: 'cccc',
         _pts: [
             {
-                _pid: 'b111',
+                _pid: 'c111',
                 _lbl: 'Select Point',
                 _type: pdw.PointType.SELECT,
                 _opts: { 
-                    'bbb1': 'Opt 1',
-                    'bbb2': 'Opt 2' 
+                    'ccc1': 'Opt 1',
+                    'ccc2': 'Opt 2' 
                 }
             }
         ]
@@ -544,10 +546,10 @@ test.skip('Entry Creation and Getting', () => {
      */
     let entryWithOpts = defWithOpts.newEntry({
         _note: 'Setting Opt 1',
-        'b111': 'bbb1' //weird, but how it has to work
+        'c111': 'ccc1' //weird, but how it has to work
     })
-    expect(entryWithOpts.getPoint('Select Point')?.val).toBe('bbb1');
-    expect(entryWithOpts.getPoint('b111')?.pointDef.getOptLbl('bbb1')).toBe('Opt 1');
+    expect(entryWithOpts.getPoint('Select Point')?.val).toBe('ccc1');
+    expect(entryWithOpts.getPoint('c111')?.pointDef.getOptLbl('ccc1')).toBe('Opt 1');
 
     /**
      * Select Opts are not validated! It's not worth doing.
@@ -555,37 +557,37 @@ test.skip('Entry Creation and Getting', () => {
      */
     entryWithOpts = defWithOpts.newEntry({
         _note: 'Setting Non-existant opt',
-        'b111': 'fake oid'
+        'c111': 'fake oid'
     })
-    let point = entryWithOpts.getPoint('b111')!;
+    let point = entryWithOpts.getPoint('c111')!;
     expect(point.val).toBe('fake oid'); //no errors thrown
     expect(point.pointDef.getOptLbl('fake oid')).toBeUndefined(); //is undefined
 
     let defWithMultiselect = pdwRef.newDef({
-        _did: 'cccc',
+        _did: 'dddd',
         _pts: [
             {
-                _pid: 'c111',
+                _pid: 'd111',
                 _type: pdw.PointType.MULTISELECT,
                 _opts: { 
-                    'ccc1': 'One',
-                    'ccc2': 'Two' 
+                    'ddd1': 'One',
+                    'ddd2': 'Two' 
                 }
             }
         ]
     })
     let none = defWithMultiselect.newEntry({
-        'c111': []
+        'd111': []
     });
     let one = defWithMultiselect.newEntry({
-        'c111': ['ccc1']
+        'd111': ['ddd1']
     });
     let both = defWithMultiselect.newEntry({
-        'c111': ['ccc1', 'ccc2']
+        'd111': ['ddd1', 'ddd2']
     });
-    expect(none.getPoint('c111')?.val).toEqual([]);
-    expect(one.getPoint('c111')?.val).toEqual(['ccc1']);
-    expect(both.getPoint('c111')?.val).toEqual(['ccc1', 'ccc2']);
+    expect(none.getPoint('d111')?.val).toEqual([]);
+    expect(one.getPoint('d111')?.val).toEqual(['ddd1']);
+    expect(both.getPoint('d111')?.val).toEqual(['ddd1', 'ddd2']);
 })
 
 test.skip('Tag Basics', () => {
@@ -986,7 +988,7 @@ test.skip('Update Logic', () => {
 
 })
 
-test('Get All',()=>{
+test.skip('Get All',()=>{
     resetTestDataset();
     let def = pdwRef.newDef({
         _did: 'yoyo',
@@ -1009,14 +1011,420 @@ test('Get All',()=>{
     expect(all.defs![0]);
 })
 
-test.skip('Query Basics', () => {
-    (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
+test('Query Basics', () => {
+    resetTestDataset() 
 
+    createTestDataSet();
+
+    /**
+     * Empty queries are rejected
+     */
     let q = new pdw.Query();
-    loadFullTestDatasetFromFile();
-    //#TODO - build a better test file, then build Query out
+    let result = q.run();
+    expect(result.success).toBe(false);
+    expect(result.messages).toBe('Empty queries not allowed. If seeking all, include {allOnPurpose: true}')
+    q.allOnPurpose(); //set 'all' explicitly.
+    result = q.run()
+    expect(result.success).toBe(true);
+    expect(result.messages).toBeUndefined();
+    expect(result.count).toBe(9);
 
-    // q.run();
+    /**
+     * Query.includeDeleted 
+     * and 
+     * Query.onlyIncludeDeleted
+     */
+    q = new pdw.Query();
+    q.allOnPurpose(); //"include deleted" isn't narrow enough to bypass the need for expliciy 'all'
+    q.includeDeleted();
+    result = q.run();
+    expect(result.count).toBe(10);
+    //q = new pdw.Query(); //good practice, probably, but not needed here
+    q.includeDeleted(false);
+    result = q.run();
+    expect(result.count).toBe(9);
+    q.onlyIncludeDeleted();
+    result = q.run();
+    expect(result.count).toBe(1);
+
+    /**
+     * Query.forDids
+     * and
+     * Query.forDefs
+     */
+    //these all internally set the StandardParam "_did", so you don't need to make new Query instances
+    q = new pdw.Query();
+    q.forDids(['aaaa']); //no need for "all()"
+    expect(q.run().count).toBe(3);
+    q.forDids('aaaa'); //converted to array internally
+    expect(q.run().count).toBe(3);
+    let def = pdwRef.getDefs({did: 'aaaa'})[0];
+    q.forDefs([def]);
+    expect(q.run().count).toBe(3);
+    q.forDefs(def); //converted to array internally
+    expect(q.run().count).toBe(3);
+
+    /**
+     * Query.forDefsWithLbls
+     */
+    result = q.run(); //from previous test for _did = 'aaaa'
+    q.forDefsWithLbls('Nightly Review'); //label for that def
+    expect(q.run()).toEqual(result); //pulls the same data
+
+    /**
+     * Query.uids()
+     */
+    q = new pdw.Query();
+    q.uids(['lkfkuxob-0av3', 'lkfkuxo8-9ysw']);
+    expect(q.run().count).toBe(2);
+
+    /**
+     * Query.eids()
+     */
+    q = new pdw.Query();
+    q.eids(['lkfkuxon-f9ys']); // the entry that was updated
+    expect(q.run().count).toBe(1);
+    q.includeDeleted();
+    result = q.run();
+    expect(result.count).toBe(2); //now returning both versions
+    expect(result.entries.map(e=>e['bbb2'])).toEqual(['Michael Jordan', 'Michael SCOTT'])
+    
+    function createTestDataSet(){
+        const nightly = pdwRef.newDef({
+            _did: 'aaaa',
+            _lbl: 'Nightly Review',
+            _scope: pdw.Scope.DAY,
+            _emoji: '👀',
+            _pts: [
+                {
+                    _emoji: '👀',
+                    _lbl: 'Review',
+                    _desc: 'Your nightly review',
+                    _pid: 'aaa1',
+                    _type: pdw.PointType.MARKDOWN
+                },
+                {
+                    _emoji: '👔',
+                    _lbl: 'Work Status',
+                    _desc: 'Did you go in, if so where?',
+                    _pid: 'aaa2',
+                    _type: pdw.PointType.SELECT,
+                    _opts: {
+                            'opt1': 'Weekend/Holiday',
+                            'opt2': 'North',
+                            'opt3': 'WFH',
+                            'opt4': 'Vacation',
+                            'opt5': 'sickday',
+                        }
+                },
+                {
+                    _emoji: '1️⃣',
+                    _desc: '10 perfect 1 horrid',
+                    _lbl: 'Satisfaction',
+                    _pid: 'aaa3',
+                    _type: pdw.PointType.NUMBER
+                },
+                {
+                    _emoji: '😥',
+                    _desc: '10 perfect 1 horrid',
+                    _lbl: 'Physical Health',
+                    _pid: 'aaa4',
+                    _type: pdw.PointType.NUMBER
+                }
+            ]
+        });
+        const quotes = pdwRef.newDef({
+            _did: 'bbbb',
+            _lbl: 'Quotes',
+            _desc: 'Funny or good sayings',
+            _scope: pdw.Scope.SECOND,
+            _emoji: "💬",
+            'bbb1': {
+                _emoji: "💬",
+                _lbl: "Quote",
+                _desc: 'what was said',
+                _type: pdw.PointType.TEXT
+            },
+            'bbb2': {
+                _emoji: "🙊",
+                _lbl: "Quoter",
+                _desc: 'who said it',
+                _type: pdw.PointType.TEXT
+            },
+        })
+        const movies = pdwRef.newDef({
+            _did: 'cccc',
+            _lbl: 'Movie',
+            _emoji: "🎬",
+            _scope: pdw.Scope.SECOND,
+            'ccc1': {
+                _lbl: 'Name',
+                _emoji: "🎬",
+            },
+            'ccc2': {
+                _lbl: 'First Watch?',
+                _emoji: '🆕',
+                _type: pdw.PointType.BOOL
+            }
+        })
+        const book = pdwRef.newDef({
+            _did: 'dddd',
+            _lbl: 'Book',
+            _emoji: "📖",
+            _scope: pdw.Scope.SECOND,
+            'ddd1': {
+                _lbl: 'Name',
+                _emoji: "📖",
+            },
+        })
+        /**
+         * A tag
+         */
+        const mediaTag = pdwRef.newTag({
+            _lbl: 'media',
+            _dids: ['dddd','cccc'],
+            _tid: 'tag1'
+        });
+        /**
+         * Several entries
+         */
+        let quote = quotes.newEntry({
+            _eid: 'lkfkuxon-f9ys',
+            _period: '2023-07-21T14:02:13',
+            _created: '2023-07-22T20:02:13Z',
+            _updated: '2023-07-22T20:02:13Z',
+            _note: 'Testing updates',
+            'bbb1': 'You miss 100% of the shots you do not take',
+            'bbb2': 'Michael Jordan' //updated later
+        });
+    
+        nightly.newEntry({
+            _uid: 'lkfkuxo8-9ysw',
+            _eid: 'lkfkuxol-mnhe',
+            _period: '2023-07-22',
+            _created: '2023-07-22T01:02:03Z',
+            _updated: '2023-07-22T01:02:03Z',
+            _deleted: false,
+            _source: 'Test data',
+            _note: 'Original entry',
+            'aaa1': "Today I didn't do **anything**.",
+            'aaa2': 'opt1',
+            'aaa3': 9,
+            'aaa4': 10
+        });
+        nightly.newEntry({
+            _uid: 'lkfkuxob-0av3',
+            _period: '2023-07-23',
+            _source: 'Test data',
+            'aaa1': "Today I wrote this line of code!",
+            'aaa2': 'opt3',
+            'aaa3': 5,
+            'aaa4': 9
+        });
+        nightly.newEntry({
+            _period: '2023-07-21',
+            _created: '2023-07-20T22:02:03Z',
+            _updated: '2023-07-20T22:02:03Z',
+            _note: 'pretending I felt bad',
+            _source: 'Test data',
+            'aaa1': "This was a Friday. I did some stuff.",
+            'aaa2': 'opt2',
+            'aaa3': 6,
+            'aaa4': 5
+        });
+        book.newEntry({
+            'ddd1': "Oh the places you'll go!"
+        })
+        book.newEntry({
+            _period: '2025-01-02T15:21:49',
+            'ddd1': "The Time Traveller"
+        })
+        book.newEntry({
+            _period: '2022-10-04T18:43:22',
+            'ddd1': "The Time Traveller 2"
+        });
+        movies.newEntry({
+            _period: '2023-07-24T13:15:00',
+            'Name': 'Barbie',
+            'First Watch?': true
+        });
+        movies.newEntry({
+            _period: '2023-07-24T18:45:00',
+            'ccc1': 'Oppenheimer',
+            'ccc2': true
+        });
+    
+        quote.setPointVal('bbb2', 'Michael SCOTT').save();
+    }
+
+    // function createTestDataSet(){
+    //     const nightly = pdwRef.newDef({
+    //         _did: 'aaaa',
+    //         _lbl: 'Nightly Review',
+    //         _scope: pdw.Scope.DAY,
+    //         _emoji: '👀',
+    //         _pts: [
+    //             {
+    //                 _emoji: '👀',
+    //                 _lbl: 'Review',
+    //                 _desc: 'Your nightly review',
+    //                 _pid: 'aaa1',
+    //                 _type: pdw.PointType.MARKDOWN
+    //             },
+    //             {
+    //                 _emoji: '👔',
+    //                 _lbl: 'Work Status',
+    //                 _desc: 'Did you go in, if so where?',
+    //                 _pid: 'aaa2',
+    //                 _type: pdw.PointType.SELECT,
+    //                 _opts: {
+    //                         'opt1': 'Weekend/Holiday',
+    //                         'opt2': 'North',
+    //                         'opt3': 'WFH',
+    //                         'opt4': 'Vacation',
+    //                         'opt5': 'sickday',
+    //                     }
+    //             },
+    //             {
+    //                 _emoji: '1️⃣',
+    //                 _desc: '10 perfect 1 horrid',
+    //                 _lbl: 'Satisfaction',
+    //                 _pid: 'aaa3',
+    //                 _type: pdw.PointType.NUMBER
+    //             },
+    //             {
+    //                 _emoji: '😥',
+    //                 _desc: '10 perfect 1 horrid',
+    //                 _lbl: 'Physical Health',
+    //                 _pid: 'aaa4',
+    //                 _type: pdw.PointType.NUMBER
+    //             }
+    //         ]
+    //     });
+    //     const quotes = pdwRef.newDef({
+    //         _did: 'bbbb',
+    //         _lbl: 'Quotes',
+    //         _desc: 'Funny or good sayings',
+    //         _scope: pdw.Scope.SECOND,
+    //         _emoji: "💬",
+    //         'bbb1': {
+    //             _emoji: "💬",
+    //             _lbl: "Quote",
+    //             _desc: 'what was said',
+    //             _type: pdw.PointType.TEXT
+    //         },
+    //         'bbb2': {
+    //             _emoji: "🙊",
+    //             _lbl: "Quoter",
+    //             _desc: 'who said it',
+    //             _type: pdw.PointType.TEXT
+    //         },
+    //     })
+    //     const movies = pdwRef.newDef({
+    //         _did: 'cccc',
+    //         _lbl: 'Movie',
+    //         _emoji: "🎬",
+    //         _scope: pdw.Scope.SECOND,
+    //         'ccc1': {
+    //             _lbl: 'Name',
+    //             _emoji: "🎬",
+    //         },
+    //         'ccc2': {
+    //             _lbl: 'First Watch?',
+    //             _emoji: '🆕',
+    //             _type: pdw.PointType.BOOL
+    //         }
+    //     })
+    //     const book = pdwRef.newDef({
+    //         _did: 'dddd',
+    //         _lbl: 'Book',
+    //         _emoji: "📖",
+    //         _scope: pdw.Scope.SECOND,
+    //         'ddd1': {
+    //             _lbl: 'Name',
+    //             _emoji: "📖",
+    //         },
+    //     })
+    //     /**
+    //      * A tag
+    //      */
+    //     const mediaTag = pdwRef.newTag({
+    //         _lbl: 'media',
+    //         _dids: ['dddd','cccc'],
+    //         _tid: 'tag1'
+    //     });
+    //     /**
+    //      * Several entries
+    //      */
+    //     let quote = quotes.newEntry({
+    //         _eid: 'lkfkuxon-f9ys',
+    //         _period: '2023-07-21T14:02:13',
+    //         _created: '2023-07-22T20:02:13Z',
+    //         _updated: '2023-07-22T20:02:13Z',
+    //         _note: 'Testing updates',
+    //         'bbb1': 'You miss 100% of the shots you do not take',
+    //         'bbb2': 'Michael Jordan' //updated later
+    //     });
+    
+    //     nightly.newEntry({
+    //         _uid: 'lkfkuxo8-9ysw',
+    //         _eid: 'lkfkuxol-mnhe',
+    //         _period: '2023-07-22',
+    //         _created: '2023-07-22T01:02:03Z',
+    //         _updated: '2023-07-22T01:02:03Z',
+    //         _deleted: false,
+    //         _source: 'Test data',
+    //         _note: 'Original entry',
+    //         'aaa1': "Today I didn't do **anything**.",
+    //         'aaa2': 'opt1',
+    //         'aaa3': 9,
+    //         'aaa4': 10
+    //     });
+    //     nightly.newEntry({
+    //         _uid: 'lkfkuxob-0av3',
+    //         _period: '2023-07-23',
+    //         _source: 'Test data',
+    //         'aaa1': "Today I wrote this line of code!",
+    //         'aaa2': 'opt3',
+    //         'aaa3': 5,
+    //         'aaa4': 9
+    //     });
+    //     nightly.newEntry({
+    //         _period: '2023-07-21',
+    //         _created: '2023-07-20T22:02:03Z',
+    //         _updated: '2023-07-20T22:02:03Z',
+    //         _note: 'pretending I felt bad',
+    //         _source: 'Test data',
+    //         'aaa1': "This was a Friday. I did some stuff.",
+    //         'aaa2': 'opt2',
+    //         'aaa3': 6,
+    //         'aaa4': 5
+    //     });
+    //     book.newEntry({
+    //         'ddd1': "Oh the places you'll go!"
+    //     })
+    //     book.newEntry({
+    //         _period: '2025-01-02T15:21:49',
+    //         'ddd1': "The Time Traveller"
+    //     })
+    //     book.newEntry({
+    //         _period: '2022-10-04T18:43:22',
+    //         'ddd1': "The Time Traveller 2"
+    //     });
+    //     movies.newEntry({
+    //         _period: '2023-07-24T13:15:00',
+    //         'Name': 'Barbie',
+    //         'First Watch?': true
+    //     });
+    //     movies.newEntry({
+    //         _period: '2023-07-24T18:45:00',
+    //         'ccc1': 'Oppenheimer',
+    //         'ccc2': true
+    //     });
+    
+    //     quote.setPointVal('bbb2', 'Michael SCOTT').save();
+    // }
+    
 })
 
 test.skip('Data Merge', () => {

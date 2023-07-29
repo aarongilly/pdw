@@ -683,28 +683,31 @@ export class AsyncYaml implements pdw.AsyncDataStore {
         if (element.per !== undefined) returnObj._period = element.per
         if (element.nte !== undefined) returnObj._note = element.nte
         if (element.dids !== undefined) returnObj._dids = element.dids
-        if (element.pts !== undefined) returnObj._pts = element.pts.map((pt: any) => translatePointDefFromYaml(pt))
+        if (element.pts !== undefined) returnObj._pts = readPointDefMap(element.pts)//.map((pt: any) => translatePointDefFromYaml(pt))
         if (element.ep !== undefined) {        
             Object.keys(element.ep).forEach(key => {
                 returnObj[key] = element.ep[key];
             })
         }
 
-
-        function translatePointDefFromYaml(pd: any): any {
-            let returnObj: any = {};
-            if (pd.dsc !== undefined) returnObj._desc = pd.dsc
-            if (pd.pid !== undefined) returnObj._pid = pd.pid
-            if (pd.lbl !== undefined) returnObj._lbl = pd.lbl
-            if (pd.emo !== undefined) returnObj._emoji = pd.emo
-            if (pd.typ !== undefined) returnObj._type = pd.typ;
-            if (pd.rlp !== undefined) returnObj._rollup = pd.rlp
-            if (pd.act !== undefined) returnObj._active = pd.act
-            if (pd.opts !== undefined) returnObj._opts = pd.opts
-            return returnObj;
-        }
-
         return returnObj
+
+        function readPointDefMap(pdMap: any): any {
+            const keys = Object.keys(pdMap);
+            return keys.map(key=>{
+                let pd = pdMap[key];
+                let returnObj: any = {};
+                if (pd.dsc !== undefined) returnObj._desc = pd.dsc
+                if (pd.pid !== undefined) returnObj._pid = pd.pid
+                if (pd.lbl !== undefined) returnObj._lbl = pd.lbl
+                if (pd.emo !== undefined) returnObj._emoji = pd.emo
+                if (pd.typ !== undefined) returnObj._type = pd.typ;
+                if (pd.rlp !== undefined) returnObj._rollup = pd.rlp
+                if (pd.act !== undefined) returnObj._active = pd.act
+                if (pd.opts !== undefined) returnObj._opts = pd.opts
+                return returnObj;
+            })
+        }
     }
 
     makeEpochStrFromISO(ISOString: string): pdw.EpochStr {
@@ -749,7 +752,7 @@ export class AsyncYaml implements pdw.AsyncDataStore {
         if (element._lbl !== undefined) returnObj.lbl = element._lbl
         if (element._emoji !== undefined) returnObj.emo = element._emoji
         if (element._scope !== undefined) returnObj.scp = element._scope
-        if (element._pts !== undefined) returnObj.pts = element._pts.map((pt: any) => translatePointDefToYaml(pt));
+        if (element._pts !== undefined) returnObj.pts = makeYamlPointDefMap(element._pts)//.map((pt: any) => translatePointDefToYaml(pt));
         if (element._eid !== undefined) returnObj.eid = element._eid
         if (element._period !== undefined) returnObj.per = element._period
         if (element._source !== undefined) returnObj.src = element._source
@@ -767,17 +770,20 @@ export class AsyncYaml implements pdw.AsyncDataStore {
 
         return returnObj
 
-        function translatePointDefToYaml(pd: pdw.PointDefLike): any {
-            if (pd.__def !== undefined) delete pd.__def
+        function makeYamlPointDefMap(pdArr: pdw.PointDefLike[]): any {
             let returnObj: any = {};
-            if (pd._desc !== undefined) returnObj.dsc = pd._desc
-            if (pd._pid !== undefined) returnObj.pid = pd._pid
-            if (pd._lbl !== undefined) returnObj.lbl = pd._lbl
-            if (pd._emoji !== undefined) returnObj.emo = pd._emoji
-            if (pd._type !== undefined) returnObj.typ = pd._type;
-            if (pd._rollup !== undefined) returnObj.rlp = pd._rollup
-            if (pd._active !== undefined) returnObj.act = pd._active
-            if (pd._opts !== undefined) returnObj.opts = pd._opts
+            pdArr.forEach(pd=> {
+                if (pd.__def !== undefined) delete pd.__def;
+                returnObj[pd._pid!] = {} as any;
+                if (pd._desc !== undefined) returnObj[pd._pid!].dsc = pd._desc
+                if (pd._pid !== undefined) returnObj[pd._pid!].pid = pd._pid
+                if (pd._lbl !== undefined) returnObj[pd._pid!].lbl = pd._lbl
+                if (pd._emoji !== undefined) returnObj[pd._pid!].emo = pd._emoji
+                if (pd._type !== undefined) returnObj[pd._pid!].typ = pd._type;
+                if (pd._rollup !== undefined) returnObj[pd._pid!].rlp = pd._rollup
+                if (pd._active !== undefined) returnObj[pd._pid!].act = pd._active
+                if (pd._opts !== undefined) returnObj[pd._pid!].opts = pd._opts
+            })
             return returnObj;
         }
     }

@@ -53,7 +53,7 @@ export class DefaultDataStore implements pdw.DataStore {
     getEntries(params: pdw.SanitizedParams): pdw.EntryLike[] {
         const allMatches = this.entries.filter(entry => entry.passesFilters(params));
         let noDupes = new Set(allMatches);
-        return Array.from(noDupes).map(entry => new pdw.Entry(entry, false));
+        return Array.from(noDupes).map(entry => new pdw.Entry(entry, false, entry.__def));
     }
 
     getTags(params: pdw.SanitizedParams): pdw.TagLike[] {
