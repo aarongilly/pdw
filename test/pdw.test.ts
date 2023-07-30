@@ -1115,9 +1115,25 @@ test('Query Basics', () => {
     expect(q.updatedAfter(temp).run().entries).toEqual(result.entries);
     expect(q.updatedAfter(date).run().entries).toEqual(result.entries);
 
+    q = new pdw.Query();
+    q.from('2023-07-22');
+    expect(q.run().entries.length).toBe(6);
+    q = new pdw.Query();
+    q.to('2023-07-22');
+    expect(q.run().entries.length).toBe(4);
+    q = new pdw.Query();
+    q.from('2023-07-20').to('2023-07-25'); //specify both ends explicitly
+    expect(q.run().entries.length).toBe(6)
+    q = new pdw.Query();
+    q.from('2023-07-22').to('2023-07-22'); //from = from START, end = from END, so this gets all day
+    let fromTo = q.run().entries;
+    expect(fromTo.length).toBe(1)
+    q = new pdw.Query();
+    q.inPeriod('2023-07-22'); //same as specifying from().to() for same period
+    expect(q.run().entries).toEqual(fromTo);
+
     //#TODO - tags & tids
-    //#TODO - from & to
-    
+    //#TODO - scope restriction
     
     
 

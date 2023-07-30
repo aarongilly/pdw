@@ -30,7 +30,7 @@ import { Temporal } from 'temporal-polyfill';
 //     expect(parsedDate).toBeTypeOf('object');
 // })
 
-test.skip('Period Contains', ()=>{
+test('Period Contains', ()=>{
     expect(new Period('2020').contains(new Period('2020'))).toBe(true)
     expect(new Period('2020').contains(new Period('2020-12-31T23:59:59'))).toBe(true)
     expect(new Period('2020').contains(new Period('2020-01-01T00:00:00'))).toBe(true)
@@ -47,14 +47,24 @@ test.skip('Period Contains', ()=>{
     expect(new Period('2020').contains(new Period('2021'))).toBe(false)
     expect(new Period('2020').contains(new Period('2021-Q4'))).toBe(false)
     expect(new Period('2021-01').contains(new Period('2021'))).toBe(false)
+
+    /**
+     * WEEKS are weird.
+     */
+    let wkTen = new Period('2023-W10'); //2023-02-27 to 2023-03-05, Thur is 2023-03-02
+    let feb = new Period('2023-02');
+    let mar = new Period('2023-03');
+    expect(feb.contains(wkTen)).toBe(false);
+    expect(mar.contains(wkTen)).toBe(true);
 })
 
-test.skip('Sliding periods', ()=>{
+test('Sliding periods', ()=>{
     expect(new Period('2020').getNext().periodStr).toBe('2021')
     expect(new Period('2020-Q1').getNext().periodStr).toBe('2020-Q2')
     expect(new Period('2020-Q4').getNext().periodStr).toBe('2021-Q1')
     expect(new Period('2020-06').getNext().periodStr).toBe('2020-07')
-    expect(new Period('2020-W52').getNext().periodStr).toBe('2020-W53')
+    expect(new Period('2020-W52').getNext().periodStr).toBe('2020-W53') //year with 53 weeks ✅
+    expect(new Period('2024-W52').getNext().periodStr).toBe('2025-W01') //year with 52 weeks ✅
     expect(new Period('2020-08-08').getNext().periodStr).toBe('2020-08-09')
     expect(new Period('2020-03-03T02').getNext().periodStr).toBe('2020-03-03T03')
     expect(new Period('2020-03-03T02:18').getNext().periodStr).toBe('2020-03-03T02:19')
@@ -62,14 +72,16 @@ test.skip('Sliding periods', ()=>{
     expect(new Period('2021-12-31T23:59:59').getNext().periodStr).toBe('2022-01-01T00:00:00') //EDGE COVERED
 })
 
-test.skip('All periods between',()=>{
-    expect(Period.allPeriodsBetween(new Period('2020'),new Period('2020'),Scope.YEAR,true).join(', ')).toBe('2020')
-    expect(Period.allPeriodsBetween(new Period('2020-W01'),new Period('2020-W02'),Scope.DAY,true).length).toBe(14)
-    expect(Period.allPeriodsBetween(new Period('2020'),new Period('2020'),Scope.DAY,true).length).toBe(366)
-    expect(Period.allPeriodsBetween(new Period('2021'),new Period('2021'),Scope.DAY,true).length).toBe(365)
+test('All periods in',()=>{
+    expect(Period.allPeriodsIn(new Period('2020'),new Period('2020'),Scope.YEAR,true).join(', ')).toBe('2020')
+    expect(Period.allPeriodsIn(new Period('2020-W01'),new Period('2020-W02'),Scope.DAY,true).length).toBe(14)
+    expect(Period.allPeriodsIn(new Period('2020'),new Period('2020'),Scope.DAY,true).length).toBe(366)
+    expect(Period.allPeriodsIn(new Period('2021'),new Period('2021'),Scope.DAY,true).length).toBe(365)
+    expect(Period.allPeriodsIn(new Period('2021-01-01'),new Period('2021-01-01'),Scope.HOUR,true).length).toBe(24)
+    expect(Period.allPeriodsIn(new Period('2021-01-01T01'),new Period('2021-01-01T01'),Scope.MINUTE,true).length).toBe(60)
 })
 
-test.skip('Period Type Parsing', ()=>{
+test('Period Type Parsing', ()=>{
 // test.skip('Period Type Parsing', ()=>{
     expect(Period.inferScope(Period.now(Scope.SECOND))).toBe(Scope.SECOND);
     expect(Period.inferScope(Period.now(Scope.MINUTE))).toBe(Scope.MINUTE);
@@ -81,7 +93,7 @@ test.skip('Period Type Parsing', ()=>{
     expect(Period.inferScope(Period.now(Scope.YEAR))).toBe(Scope.YEAR);
 })
 
-test.skip('Period End & Begin', ()=>{
+test('Period End & Begin', ()=>{
 // test.skip('Period End & Begin', ()=>{
     expect(new Period('2020').getStart().periodStr).toBe('2020-01-01T00:00:00')
     expect(new Period('2020-Q1').getStart().periodStr).toBe('2020-01-01T00:00:00')
@@ -106,7 +118,7 @@ test.skip('Period End & Begin', ()=>{
     // expect(per.getPeriodEnd()).toBe('2023-04-27T23:59:59');
 })
 
-test.skip('Period Hierarchy', ()=>{
+test('Period Hierarchy', ()=>{
 // test.skip('Period Hierarchy', ()=>{
     let per = new Period('2023-04-27T08:06:47');
     expect(per.scope).toBe(Scope.SECOND);
@@ -135,10 +147,11 @@ test.skip('Period Hierarchy', ()=>{
     per = new Period(per.zoomOut());
     expect(per.periodStr).toBe('2023-04')
     expect(per.scope).toBe(Scope.MONTH)
-    //edge case
-    const endOfJan = new Period('2023-01-30')
+    //edge case -- zooming out twice goes from jan to feb due to week's weirdness
+    const endOfJan = new Period('2023-01-31');
     const januaryDateButFirstWeekOfFeb = new Period(endOfJan.zoomOut());
-    // expect(januaryDateButFirstWeekOfFeb.zoomOut().periodStr).toBe('2023-02') ////#BUG
+    // expect(januaryDateButFirstWeekOfFeb.periodStr).toBe('2023-W06'); //#BUG blocked by polyfill missing weekOfYear method
+    // expect(januaryDateButFirstWeekOfFeb.zoomOut().periodStr).toBe('2023-02')
 
     per = new Period(per.zoomOut());
     expect(per.periodStr).toBe('2023-Q2')
@@ -175,4 +188,88 @@ test.skip('Period Hierarchy', ()=>{
     expect(per.periodStr).toBe('2022-12-26T00:00:00');
     per = new Period(per.zoomIn());
     expect(per.periodStr).toBe('2022-12-26T00:00:00'); //zooming in returns second again
+})
+
+test('Before and After', ()=>{
+    /**
+     * Before, at all scopes
+     */
+    let one = new Period('2021-01-01T01:01:01');
+    let two = new Period('2021-01-01T01:01:02');
+    expect(one.isBefore(two)).toBe(true);
+    expect(two.isBefore(one)).toBe(false);
+
+    one = new Period('2021-01-01T01:01');
+    two = new Period('2021-01-01T01:02');
+    expect(one.isBefore(two)).toBe(true);
+    expect(two.isBefore(one)).toBe(false);
+    
+    one = new Period('2021-01-01T01');
+    two = new Period('2021-01-01T02');
+    expect(one.isBefore(two)).toBe(true);
+    expect(two.isBefore(one)).toBe(false);
+
+    one = new Period('2021-01-01');
+    two = new Period('2021-01-02');
+    expect(one.isBefore(two)).toBe(true);
+    expect(two.isBefore(one)).toBe(false);
+
+    one = new Period('2021-W01');
+    two = new Period('2021-W02');
+    expect(one.isBefore(two)).toBe(true);
+    expect(two.isBefore(one)).toBe(false);
+    
+    one = new Period('2021-01');
+    two = new Period('2021-02');
+    expect(one.isBefore(two)).toBe(true);
+    expect(two.isBefore(one)).toBe(false);
+
+    one = new Period('2021-Q1');
+    two = new Period('2021-Q2');
+    expect(one.isBefore(two)).toBe(true);
+    expect(two.isBefore(one)).toBe(false);
+    
+    one = new Period('2020');
+    two = new Period('2021');
+    expect(one.isBefore(two)).toBe(true);
+    expect(two.isBefore(one)).toBe(false);
+
+    /**
+     * Before, between scopes
+     */
+    one = new Period('2021-01');
+    two = new Period('2021-02-01');
+    expect(one.isBefore(two)).toBe(true);
+    expect(two.isBefore(one)).toBe(false);
+
+    one = new Period('2021-03-05T08:54:28');
+    two = new Period('2022');
+    expect(one.isBefore(two)).toBe(true);
+    expect(two.isBefore(one)).toBe(false);
+
+    /**
+     * Same is not before
+    */
+   one = new Period('2021-03-05T08:54:28');
+   two = new Period('2021-03-05T08:54:28');
+   expect(two.isBefore(one)).toBe(false);
+   one = new Period('2021-01');
+   two = new Period('2021-01');    
+   expect(two.isBefore(one)).toBe(false);
+   
+   /**
+    * Contains is not before
+    */
+   one = new Period('2021-01');
+   two = new Period('2021-01-20');
+   expect(one.isBefore(two)).toBe(false);
+   expect(two.isBefore(one)).toBe(false);
+
+    /**
+     * The logic is completely mirrored for 'isAfter'.
+     * All the same stuff should apply.
+     */
+    one = new Period('2023');
+    two = new Period('2022-Q4');
+    expect(one.isAfter(two)).toBe(true);
 })

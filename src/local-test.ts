@@ -12,22 +12,23 @@ const pdwRef = pdw.PDW.getInstance();
 createTestDataSet();
 
 let entries = pdwRef.getEntries({includeDeleted: 'yes'});
-console.log(entries.map(d=>d.__tempUpdated.toLocaleString()));
+console.log(entries.map(d=>d.getPeriod().toString()));
 
 let q = new Query();
 
-q.updatedAfter('2023-07-23');
+q.from('2023-07-22');
+
+// q.from('2023-W30').to('2023-W30');
+// q.inPeriod('2023-W30')
 let result = q.includeDeleted().run();
 
-console.log(result.entries.map(e=>e.__tempUpdated.toLocaleString()));
+console.log(result.entries.map(e=>e.getPeriod().toString()));
 
-
-// console.log(results.count);
-
+console.log('yo.');
 
 // importFromFile('data-files/test.yaml');
-let all = pdwRef.getAll({includeDeleted:'yes'});
-console.log(all);
+// let all = pdwRef.getAll({includeDeleted:'yes'});
+// console.log(all);
 // exportToFile('data-files/test.yaml', all);
 
 
