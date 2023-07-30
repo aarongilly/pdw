@@ -2300,6 +2300,23 @@ export class Query {
         return this
     }
 
+    /**
+     * Cannot be used in conjuction with dids. This sets `params.did` internally.
+     * @param tid tag ID of tags to be used
+     * @returns 
+     */
+    tids(tid: string[] | string){
+        if (!Array.isArray(tid)) tid = [tid];
+        //convert tid into dids
+        const tags = PDW.getInstance().getTags({tid: tid});
+        const dids: string[] = [];
+        tags.forEach(tag=>tag._dids.forEach(did=>{
+            if(!dids.some(d=>d===did)) dids.push(did);
+        }))
+        this.params.did = dids;
+        return this
+    }
+
     allOnPurpose(allIn = true): Query {
         this.params.allOnPurpose = allIn;
         return this
