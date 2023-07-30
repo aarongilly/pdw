@@ -1133,6 +1133,11 @@ test('Query Basics', () => {
     expect(q.run().entries).toEqual(fromTo);
 
     //#TODO - tags & tids
+    q = new pdw.Query();
+    q.tids('tag1')
+    expect(q.run().entries.length).toBe(5);
+    
+
     //#TODO - scope restriction
     
     
