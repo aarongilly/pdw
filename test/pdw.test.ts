@@ -1049,28 +1049,24 @@ test('Query Basics', () => {
 
     /**
      * Query.forDids
-     * and
      * Query.forDefs
+     * Querty.forDefsLbld
      */
     //these all internally set the StandardParam "_did", so you don't need to make new Query instances
     q = new pdw.Query();
     q.forDids(['aaaa']); //no need for "all()"
-    expect(q.run().count).toBe(3);
+    let origResult = q.run();
+    expect(origResult.count).toBe(3);
     q.forDids('aaaa'); //converted to array internally
-    expect(q.run().count).toBe(3);
+    expect(q.run()).toEqual(origResult);
     let def = pdwRef.getDefs({did: 'aaaa'})[0];
     q.forDefs([def]);
-    expect(q.run().count).toBe(3);
+    expect(q.run()).toEqual(origResult);
     q.forDefs(def); //converted to array internally
-    expect(q.run().count).toBe(3);
-
-    /**
-     * Query.forDefsWithLbls
-     */
-    result = q.run(); //from previous test for _did = 'aaaa'
-    q.forDefsWithLbls('Nightly Review'); //label for that def
-    expect(q.run()).toEqual(result); //pulls the same data
-
+    expect(q.run()).toEqual(origResult);    
+    q.forDefsLbld('Nightly Review'); //label for that def
+    expect(q.run()).toEqual(origResult);
+    
     /**
      * Query.uids()
      */
@@ -1091,7 +1087,7 @@ test('Query Basics', () => {
 
     
     /**
-     * Created & Updated, Before & After
+     * Created & Updated, both Before & After
     */
     q = new pdw.Query();
     q.includeDeleted().allOnPurpose();
@@ -1115,6 +1111,9 @@ test('Query Basics', () => {
     expect(q.updatedAfter(temp).run().entries).toEqual(result.entries);
     expect(q.updatedAfter(date).run().entries).toEqual(result.entries);
 
+    /**
+     * Entry Period: From, To, and inPeriod
+     */
     q = new pdw.Query();
     q.from('2023-07-22');
     expect(q.run().entries.length).toBe(6);
@@ -1131,15 +1130,48 @@ test('Query Basics', () => {
     q = new pdw.Query();
     q.inPeriod('2023-07-22'); //same as specifying from().to() for same period
     expect(q.run().entries).toEqual(fromTo);
-
-    //#TODO - tags & tids
     q = new pdw.Query();
-    q.tids('tag1')
-    expect(q.run().entries.length).toBe(5);
-    
+    q.inPeriod('2022'); //same as specifying from().to() for same period
+    expect(q.run().entries.map(e=>e.getPoint('ddd1')!.val)).toEqual(['The Time Traveller 2']);
 
-    //#TODO - scope restriction
+    /**
+     * Tags
+     */
+    q = new pdw.Query();
+    q.tids('tag1');
+    origResult = q.run();
+    expect(origResult.entries.length).toBe(5);
+    q.tagsLbld('media');
+    expect(q.run()).toEqual(origResult);
+    let tag = pdwRef.getTags({tagLbl: 'media'})[0];
+    q.tags(tag);
+    expect(q.run()).toEqual(origResult);
     
+    /**
+     * Scopes
+     */
+    q = new pdw.Query();
+    q.scopes(pdw.Scope.DAY);
+    expect(q.run().count).toBe(3);
+    q.scopes([pdw.Scope.DAY, pdw.Scope.SECOND]);
+    expect(q.run().count).toBe(9);
+    
+    q.scopeMax(pdw.Scope.YEAR); //statement doesn't filter anything, but won't break anything
+    expect(q.run().count).toBe(9);
+    q.scopeMax(pdw.Scope.SECOND);
+    expect(q.run().count).toBe(6);
+
+    q.scopeMin(pdw.Scope.SECOND); //statement doesn't filter anything, but won't break anything
+    expect(q.run().count).toBe(9);
+    q.scopeMin(pdw.Scope.DAY);
+    expect(q.run().count).toBe(3);
+
+    /**
+     * Sort
+     */
+    q = new pdw.Query();
+    q.forDefsLbld('Nightly Review');
+    q.sort('_updated','asc');
     
 
 

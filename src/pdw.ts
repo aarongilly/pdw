@@ -568,7 +568,7 @@ export class PDW {
 
     getEntries(rawParams?: StandardParams): Entry[] {
         if (rawParams === undefined) rawParams = {};
-        const params = PDW.sanitizeParams(rawParams)
+        const params = PDW.sanitizeParams(rawParams);
 
         if (this.dataStores.length == 1) {
             let entries = this.dataStores[0].getEntries(params);
@@ -1038,7 +1038,6 @@ export abstract class Element implements ElementLike {
 
         const type = this.getType()!;
 
-
         //@ts-expect-error
         if (params.defLbl !== undefined && type === 'DefLike' && !params.defLbl.some(lbl => lbl === this._lbl)) return false;
         //@ts-expect-error
@@ -1151,13 +1150,23 @@ export abstract class Element implements ElementLike {
         return existing;
     }
 
+    public static mergeArraysWithoutDuplication(arr1: Element[], arr2: Element[]): Element[]{
+        //array.reduce in practice! Whaaaaaaat? I never do that.
+        return [...arr1, ...arr2].reduce((acc: Element[], obj: Element) => {
+            const existingObj = acc.find(item => item._uid === obj._uid);
+            if (!existingObj) {
+              acc.push(obj);
+            }
+            return acc;
+          }, []);
+    }
+
     /**
      * what was this specificlly supposed to do? To filter gainst an EpochStr?
      * @param elementArr 
      * @returns 
      */
     public static getMostRecent(elementArr: ElementLike[]): ElementLike | undefined {
-        //#TODO - what was this whole method meant to do?
         if (elementArr.length == 0) {
             console.warn('You tried to get the most recent of a list of zero elements');
             return undefined
@@ -2215,11 +2224,14 @@ export class Period {
     }
 }
 
+//#TODO - clean up some query methods, maybe combine things like "dids" "defs" "defsLbld"
 export class Query {
     private verbosity: 'terse' | 'normal' | 'verbose'
     // private rollup: boolean
     private scope: Scope | undefined
     private params: StandardParams
+    private sortOrder: undefined | 'asc' | 'dsc'
+    private sortBy: undefined | string
     constructor() {
         this.verbosity = 'normal';
         // this.rollup = false;
@@ -2252,7 +2264,7 @@ export class Query {
         return this
     }
 
-    forDefsWithLbls(defLbls: string[] | string) {
+    forDefsLbld(defLbls: string[] | string) {
         if (!Array.isArray(defLbls)) defLbls = [defLbls];
         this.params.defLbl = defLbls;
         return this
@@ -2288,6 +2300,17 @@ export class Query {
         return this.forDids(defList.map(def => def._did));
     }
 
+    /*
+    forDefs(defList: Def | Def[] | string[] | string) {
+        //@ts-expect-error
+        if (!Array.isArray(defList)) defList = [defList];
+        if(typeof defList !== 'string') defList = (<Def[]>defList).map(d=>d._did);
+
+        this.params.did = defList;
+        return this
+    }
+    */
+
     uids(uid: string[] | string) {
         if (!Array.isArray(uid)) uid = [uid];
         this.params.uid = uid;
@@ -2317,6 +2340,59 @@ export class Query {
         return this
     }
 
+    /**
+     * Cannot be used in conjuction with dids. This sets `params.did` internally.
+     * @param tid tag ID of tags to be used
+     * @returns 
+     */
+    tags(tags: Tag[] | Tag){
+        if (!Array.isArray(tags)) tags = [tags];
+        //convert tid into dids
+        const dids: string[] = [];
+        tags.forEach(tag=>tag._dids.forEach(did=>{
+            if(!dids.some(d=>d===did)) dids.push(did);
+        }))
+        this.params.did = dids;
+        return this
+    }
+
+    /**
+     * Cannot be used in conjuction with dids. This sets `params.did` internally.
+     * @param tid tag ID of tags to be used
+     * @returns 
+     */
+    tagsLbld(tid: string[] | string){
+        if (!Array.isArray(tid)) tid = [tid];
+        //convert tid into dids
+        const tags = PDW.getInstance().getTags({tagLbl: tid});
+        const dids: string[] = [];
+        tags.forEach(tag=>tag._dids.forEach(did=>{
+            if(!dids.some(d=>d===did)) dids.push(did);
+        }))
+        this.params.did = dids;
+        return this
+    }
+
+    scopes(scopes: Scope[] | Scope): Query{
+        if (!Array.isArray(scopes)) scopes = [scopes];
+        let defs = PDW.getInstance().getDefs({});
+        defs = defs.filter(def=> (<Scope[]>scopes).some(scope=>scope===def._scope));
+        this.params.did = defs.map(def=>def._did);
+        return this
+    }
+
+    scopeMin(scope: Scope): Query{
+        let scopes = Object.values(Scope);
+        let index = scopes.indexOf(scope);
+        return this.scopes(scopes.slice(index));
+    }
+
+    scopeMax(scope: Scope): Query{
+        let scopes = Object.values(Scope);
+        let index = scopes.indexOf(scope);
+        return this.scopes(scopes.slice(0, index + 1));
+    }
+
     allOnPurpose(allIn = true): Query {
         this.params.allOnPurpose = allIn;
         return this
@@ -2338,6 +2414,12 @@ export class Query {
         return this
     }
 
+    sort(propName: string, type: undefined | 'asc' | 'dsc'){
+        if(type === undefined) type = 'asc';
+        this.sortOrder = type;
+        this.sortBy = propName;
+    }
+
     run(): QueryResponse {
         //empty queries are not allowed
         if (this.params === undefined ||
@@ -2354,8 +2436,8 @@ export class Query {
                 entries: []
             }
         }
-        let entries = PDW.getInstance().getEntries(this.params)
-
+        let entries = PDW.getInstance().getEntries(this.params);
+        if(this.sortBy !== undefined) entries = this.applySort(entries);
         let resp: QueryResponse = {
             success: true,
             count: entries.length,
@@ -2367,6 +2449,17 @@ export class Query {
         }
 
         return resp
+    }
+
+    private applySort(entries: Entry[]): Entry[]{
+        return entries.sort((a,b)=>{
+            if(this.sortOrder === 'asc'){
+                //@ts-expect-error
+                return a[this.sortBy] > b[this.sortBy] ? 1 : -1
+            }
+            //@ts-expect-error
+            return a[this.sortBy] > b[this.sortBy] ? -1 : 1
+        })
     }
 }
 

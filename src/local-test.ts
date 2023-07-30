@@ -11,16 +11,14 @@ const pdwRef = pdw.PDW.getInstance();
 
 createTestDataSet();
 
-let entries = pdwRef.getEntries({includeDeleted: 'yes'});
-console.log(entries.map(d=>d.getPeriod().toString()));
-
 let q = new Query();
 
-q.from('2023-07-22');
+q.forDids('aaaa');
+q.sort('_updated','asc');
 
 // q.from('2023-W30').to('2023-W30');
 // q.inPeriod('2023-W30')
-let result = q.includeDeleted().run();
+let result = q.run();
 
 console.log(result.entries.map(e=>e.getPeriod().toString()));
 
