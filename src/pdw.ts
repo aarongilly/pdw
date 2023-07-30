@@ -203,12 +203,12 @@ export interface StandardParams {
     pointLbl?: string[] | string,//#TODO
     tagLbl?: string[] | string,
     limit?: number,//#TODO
-    allOnPurpose?: boolean//#TODO
+    allOnPurpose?: boolean
 }
 
 /**
  * A more tightly-controlled version of the {@link StandardParams}, meant to make
- * development of any new {@link DataStore} easier to implement. SanitizedParams are
+ * development of any new {@link DataStore} **EASIER** to implement. SanitizedParams are
  * what DataStore versions of the main setter/getter functions respond to.  
  */
 export interface SanitizedParams {
@@ -218,16 +218,21 @@ export interface SanitizedParams {
      * only - returns **only** deleted stuff
      */
     includeDeleted: 'yes' | 'no' | 'only',
-    from?: Period, //#TODO
-    to?: Period, //#TODO
+    from?: Period,
+    to?: Period,
+
+    //these 4 pairs come in pairs from the sanitizeParams() func, DataStore could use either
     createdAfter?: Temporal.ZonedDateTime,
-    createdBefore?: Temporal.ZonedDateTime,
-    updatedAfter?: Temporal.ZonedDateTime,
-    updatedBefore?: Temporal.ZonedDateTime
     createdAfterEpochStr?: EpochStr,
+
+    createdBefore?: Temporal.ZonedDateTime,
     createdBeforeEpochStr?: EpochStr,
-    updatedAfterEpochStr?: EpochStr,
+
+    updatedBefore?: Temporal.ZonedDateTime
     updatedBeforeEpochStr?: EpochStr,
+
+    updatedAfter?: Temporal.ZonedDateTime,
+    updatedAfterEpochStr?: EpochStr,
     uid?: UID[],
     did?: SmallID[],
     pid?: SmallID[], //#TODO
@@ -661,11 +666,19 @@ export class PDW {
 
         //make periods from period srings
         if (params.from !== undefined) {
-            if (typeof params.from === 'string') params.from = new Period(params.from);
+            if (typeof params.from === 'string') {
+                params.from = new Period(params.from);
+            } else {
+                console.warn('From and To should be PeriodStr type.')
+            }
             //otherwise I guess I'll assume it's okay
         }
         if (params.to !== undefined) {
-            if (typeof params.to === 'string') params.to = new Period(params.to);
+            if (typeof params.to === 'string') {
+                params.to = new Period(params.to);
+            } else {
+                console.warn('From and To should be PeriodStr type.')
+            }
             //otherwise I guess I'll assume it's okay
         }
 
@@ -673,36 +686,36 @@ export class PDW {
         if (params.createdAfter !== undefined) {
             if (typeof params.createdAfter === 'string') {
                 params.createdAfter = parseTemporalFromEpochStr(params.createdAfter);
-                (<SanitizedParams>params).createdAfterEpochStr = makeEpochStrFromTemporal(params.createdAfter);
+                (<SanitizedParams>params).createdAfterEpochStr = makeEpochStrFrom(params.createdAfter);
             } else {
-                (<SanitizedParams>params).createdAfterEpochStr = makeEpochStrFromTemporal(params.createdAfter);
+                (<SanitizedParams>params).createdAfterEpochStr = makeEpochStrFrom(params.createdAfter);
                 params.createdAfter = parseTemporalFromEpochStr((<SanitizedParams>params).createdAfterEpochStr!);
             }
         }
         if (params.createdBefore !== undefined) {
             if (typeof params.createdBefore === 'string') {
                 params.createdBefore = parseTemporalFromEpochStr(params.createdBefore);
-                (<SanitizedParams>params).createdBeforeEpochStr = makeEpochStrFromTemporal(params.createdBefore);
+                (<SanitizedParams>params).createdBeforeEpochStr = makeEpochStrFrom(params.createdBefore);
             } else {
-                (<SanitizedParams>params).createdBeforeEpochStr = makeEpochStrFromTemporal(params.createdBefore);
+                (<SanitizedParams>params).createdBeforeEpochStr = makeEpochStrFrom(params.createdBefore);
                 params.createdBefore = parseTemporalFromEpochStr((<SanitizedParams>params).createdBeforeEpochStr!);
             }
         }
         if (params.updatedAfter !== undefined) {
             if (typeof params.updatedAfter === 'string') {
                 params.updatedAfter = parseTemporalFromEpochStr(params.updatedAfter);
-                (<SanitizedParams>params).updatedAfterEpochStr = makeEpochStrFromTemporal(params.updatedAfter);
+                (<SanitizedParams>params).updatedAfterEpochStr = makeEpochStrFrom(params.updatedAfter);
             } else {
-                (<SanitizedParams>params).updatedAfterEpochStr = makeEpochStrFromTemporal(params.updatedAfter);
+                (<SanitizedParams>params).updatedAfterEpochStr = makeEpochStrFrom(params.updatedAfter);
                 params.updatedAfter = parseTemporalFromEpochStr((<SanitizedParams>params).updatedAfterEpochStr!);
             }
         }
         if (params.updatedBefore !== undefined) {
             if (typeof params.updatedBefore === 'string') {
                 params.updatedBefore = parseTemporalFromEpochStr(params.updatedBefore);
-                (<SanitizedParams>params).updatedBeforeEpochStr = makeEpochStrFromTemporal(params.updatedBefore);
+                (<SanitizedParams>params).updatedBeforeEpochStr = makeEpochStrFrom(params.updatedBefore);
             } else {
-                (<SanitizedParams>params).updatedBeforeEpochStr = makeEpochStrFromTemporal(params.updatedBefore);
+                (<SanitizedParams>params).updatedBeforeEpochStr = makeEpochStrFrom(params.updatedBefore);
                 params.updatedBefore = parseTemporalFromEpochStr((<SanitizedParams>params).updatedBeforeEpochStr!);
             }
         }
@@ -825,10 +838,10 @@ export abstract class Element implements ElementLike {
         if (typeof inputSeen === 'string') {
             if (isValidEpochStr(inputSeen)) return inputSeen;
             //try passing through new Date()'s wide-open interpretations
-            return makeEpochStrFromTemporal(Temporal.Instant.fromEpochMilliseconds(new Date(inputSeen).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()));
+            return makeEpochStrFrom(Temporal.Instant.fromEpochMilliseconds(new Date(inputSeen).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()))!;
         }
         if (typeof inputSeen === 'number') {
-            makeEpochStrFromTemporal(Temporal.Instant.fromEpochMilliseconds(inputSeen).toZonedDateTimeISO(Temporal.Now.timeZone()));
+            makeEpochStrFrom(Temporal.Instant.fromEpochMilliseconds(inputSeen).toZonedDateTimeISO(Temporal.Now.timeZone()));
         }
         console.warn('Did not know how to handle parsing this date input, defaulting to now:', inputSeen);
         return makeEpochStr();
@@ -1025,6 +1038,7 @@ export abstract class Element implements ElementLike {
 
         const type = this.getType()!;
 
+
         //@ts-expect-error
         if (params.defLbl !== undefined && type === 'DefLike' && !params.defLbl.some(lbl => lbl === this._lbl)) return false;
         //@ts-expect-error
@@ -1039,7 +1053,10 @@ export abstract class Element implements ElementLike {
         if (params.includeDeleted === 'no' && this._deleted === true) return false;
         if (params.includeDeleted === 'only' && this._deleted === false) return false;
 
-        //#TODO - from & to?
+        if (type === 'EntryLike') {
+            if (params.from !== undefined && (<Entry> <unknown>this).getPeriod().getStart().isBefore(params.from)) return false
+            if (params.to !== undefined && (<Entry> <unknown> this).getPeriod().getEnd().isAfter(params.to)) return false
+        }
 
         return true;
     }
@@ -2045,6 +2062,7 @@ export class Period {
         if (this.scope === Scope.MINUTE) return new Period(this.periodStr.slice(0, -3));
         if (this.scope === Scope.HOUR) return new Period(this.periodStr.slice(0, -3));
         if (this.scope === Scope.DAY) {
+            //this SHOULD be usign Temporal.PlaidDateTime.weekOfYear(), but that's not implemented on this polyfill
             const temp = Temporal.PlainDateTime.from(this.periodStr);
             //catching edge cases like 2019-12-31 => 2020-W01 & 2023-01-01 => 2022-W52
             let year = temp.year;
@@ -2053,13 +2071,14 @@ export class Period {
             return new Period(year + "-W" + temp.weekOfYear.toString().padStart(2, '0'));
         }
         if (this.scope === Scope.WEEK) {
-            //weeks zooming out resolve to whichever month contains the THURSDAY of the week
-            let numWks = Number.parseInt(this.periodStr.split('W')[1]) - 1;
-            //if the previous year had 53 weeks, this is necessary
-            if (Period.prevYearHas53Weeks(this.periodStr.substring(0, 4))) numWks = numWks + 1
-            let init = Temporal.PlainDate.from(this.periodStr.split('-')[0] + '01-01')
-            let thur = init.add({ days: 4 - init.dayOfWeek }).add({ days: numWks * 7 })
-            return new Period(thur.toPlainYearMonth().toString());
+            return new Period(Period.getMidWeek(this).toString().substring(0, 7))
+            // //weeks zooming out resolve to whichever month contains the THURSDAY of the week
+            // let numWks = Number.parseInt(this.periodStr.split('W')[1]) - 1;
+            // //if the previous year had 53 weeks, this is necessary
+            // if (Period.prevYearHas53Weeks(this.periodStr.substring(0, 4))) numWks = numWks + 1
+            // let init = Temporal.PlainDate.from(this.periodStr.split('-')[0] + '01-01')
+            // let thur = init.add({ days: 4 - init.dayOfWeek }).add({ days: numWks * 7 })
+            // return new Period(thur.toPlainYearMonth().toString());
         }
         if (this.scope === Scope.MONTH) {
             let yearStr = this.periodStr.split('-')[0];
@@ -2078,6 +2097,8 @@ export class Period {
     }
 
     contains(period: Period): boolean {
+        //converting week scopes to THURSDAY of that week
+        if(period.scope === Scope.WEEK) period = Period.getMidWeek(period)
         const inBegin = Temporal.PlainDateTime.from(period.getStart().periodStr)
         const inEnd = Temporal.PlainDateTime.from(period.getEnd().periodStr)
         const thisBegin = Temporal.PlainDateTime.from(this.getStart().periodStr);
@@ -2085,6 +2106,18 @@ export class Period {
         const start = Temporal.PlainDateTime.compare(inBegin, thisBegin);
         const end = Temporal.PlainDateTime.compare(thisEnd, inEnd);
         return start !== -1 && end !== -1
+    }
+
+    isBefore(period: Period): boolean{
+        const start = Temporal.PlainDateTime.from(this.getEnd().periodStr);
+        const end = Temporal.PlainDateTime.from(period.getStart().periodStr);
+        return Temporal.PlainDateTime.compare(start, end) === -1
+    }
+
+    isAfter(period: Period): boolean{
+        const start = Temporal.PlainDateTime.from(this.getStart().periodStr);
+        const end = Temporal.PlainDateTime.from(period.getEnd().periodStr);
+        return Temporal.PlainDateTime.compare(start, end) === 1
     }
 
     // I can't believe I was able to reduce these to a 1 liner
@@ -2106,7 +2139,12 @@ export class Period {
 
     }
 
-    static allPeriodsBetween(start: Period, end: Period, scope: Scope, asStrings = false): Period[] | string[] {
+    private static getMidWeek(period: Period){
+        if(period.scope !== Scope.WEEK) return period;
+        return period.getStart().zoomTo(Scope.DAY).addDuration('P3D');
+    }
+
+    static allPeriodsIn(start: Period, end: Period, scope: Scope, asStrings = false): Period[] | string[] {
         if (Temporal.PlainDateTime.compare(Temporal.PlainDateTime.from(start.getStart().periodStr), Temporal.PlainDateTime.from(end.getStart().periodStr)) === 1) {
             console.warn('You may have flipped your start and end dates accidentally... or something')
             const temp = start;
@@ -2185,7 +2223,7 @@ export class Query {
     constructor() {
         this.verbosity = 'normal';
         // this.rollup = false;
-        this.params = {includeDeleted: 'no'}; //default
+        this.params = { includeDeleted: 'no' }; //default
     }
 
     parseQueryString(queryString: string, isUrlFormatted = false) {
@@ -2220,6 +2258,31 @@ export class Query {
         return this
     }
 
+    createdAfter(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime) {
+        const epoch = makeEpochStrFrom(epochDateOrTemporal);
+        this.params.createdAfter = epoch;
+        return this;
+    }
+
+    createdBefore(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime) {
+        const epoch = makeEpochStrFrom(epochDateOrTemporal);
+        this.params.createdBefore = epoch;
+        return this;
+    }
+
+    updatedAfter(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime) {
+        const epoch = makeEpochStrFrom(epochDateOrTemporal);
+        this.params.updatedAfter = epoch;
+        return this;
+    }
+
+    updatedBefore(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime) {
+        const epoch = makeEpochStrFrom(epochDateOrTemporal);
+        this.params.updatedBefore = epoch;
+        return this;
+    }
+
+
     forDefs(defList: Def[] | Def) {
         if (!Array.isArray(defList)) defList = [defList];
         return this.forDids(defList.map(def => def._did));
@@ -2237,26 +2300,59 @@ export class Query {
         return this
     }
 
-    allOnPurpose(allIn = true): Query{
+    /**
+     * Cannot be used in conjuction with dids. This sets `params.did` internally.
+     * @param tid tag ID of tags to be used
+     * @returns 
+     */
+    tids(tid: string[] | string){
+        if (!Array.isArray(tid)) tid = [tid];
+        //convert tid into dids
+        const tags = PDW.getInstance().getTags({tid: tid});
+        const dids: string[] = [];
+        tags.forEach(tag=>tag._dids.forEach(did=>{
+            if(!dids.some(d=>d===did)) dids.push(did);
+        }))
+        this.params.did = dids;
+        return this
+    }
+
+    allOnPurpose(allIn = true): Query {
         this.params.allOnPurpose = allIn;
+        return this
+    }
+
+    from(period: Period | PeriodStr){
+        this.params.from = period;
+        return this
+    }
+
+    to(period: Period | PeriodStr){
+        this.params.to = period;
+        return this
+    }
+
+    inPeriod(period: Period | PeriodStr){
+        this.params.from = period;
+        this.params.to = period;
         return this
     }
 
     run(): QueryResponse {
         //empty queries are not allowed
-        if(this.params === undefined || 
+        if (this.params === undefined ||
             (!this.params.allOnPurpose && Object.keys(this.params).length <= 1)
-            ){
-                return {
-                    success: false,
-                    count: 0,
-                    params: {
-                        paramsIn: this.params,
-                        asParsed: {todo: '#TODO'}
-                    },
-                    messages: 'Empty queries not allowed. If seeking all, include {allOnPurpose: true}',
-                    entries: []
-                }
+        ) {
+            return {
+                success: false,
+                count: 0,
+                params: {
+                    paramsIn: this.params,
+                    asParsed: { todo: '#TODO' }
+                },
+                messages: 'Empty queries not allowed. If seeking all, include {allOnPurpose: true}',
+                entries: []
+            }
         }
         let entries = PDW.getInstance().getEntries(this.params)
 
@@ -2299,10 +2395,6 @@ export function parseTemporalFromUid(uid: UID): Temporal.ZonedDateTime {
     return parseTemporalFromEpochStr(uid.split("-")[0]);
 }
 
-export function makeEpochStrFromTemporal(temp: Temporal.ZonedDateTime): EpochStr {
-    return temp.epochMilliseconds.toString(36);
-}
-
 export function isValidEpochStr(epochStr: string): boolean {
     if (typeof epochStr !== 'string') return false;
     if (epochStr.length !== 8) return false; //not supporting way in the past or future
@@ -2311,6 +2403,21 @@ export function isValidEpochStr(epochStr: string): boolean {
     //console.log(parseTemporalFromEpochStr('100000000').toLocaleString()) //is "5/25/2059, 12:38:27 PM CDT"
     //for now this is good enough. I could parse a temporal out then check if it succeed & is in a resonable year, but meh
     return true
+}
+
+export function makeEpochStrFrom(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime): EpochStr | undefined {
+    if (typeof epochDateOrTemporal === 'string') {
+        if (isValidEpochStr(epochDateOrTemporal)) return epochDateOrTemporal;
+        //This WILL cause errors given bad strings, but I want to support lazy strings like "2023-07-28"
+        return Temporal.Instant.fromEpochMilliseconds(new Date(epochDateOrTemporal).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()).epochMilliseconds.toString(36);
+    }
+    if (Object.prototype.toString.call(epochDateOrTemporal) === "[object Date]") {
+        return (<Date>epochDateOrTemporal).getTime().toString(36);
+    }
+    if (Object.prototype.toString.call(epochDateOrTemporal) === "[object Temporal.ZonedDateTime]") {
+        return (<Temporal.ZonedDateTime>epochDateOrTemporal).epochMilliseconds.toString(36);
+    }
+    return undefined;
 }
 
 export function parseTemporalFromEpochStr(epochStr: EpochStr): Temporal.ZonedDateTime {

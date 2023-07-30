@@ -11,20 +11,24 @@ const pdwRef = pdw.PDW.getInstance();
 
 createTestDataSet();
 
+let entries = pdwRef.getEntries({includeDeleted: 'yes'});
+console.log(entries.map(d=>d.getPeriod().toString()));
+
 let q = new Query();
 
-q.includeDeleted(false);
-// q.forDids(['bbbb', 'aaaa']);
-q = new pdw.Query();
-let def = pdwRef.getDefs({did: 'aaaa'})[0];
-q.forDefs([def]).run();
+q.from('2023-07-22');
 
-// console.log(results.count);
+// q.from('2023-W30').to('2023-W30');
+// q.inPeriod('2023-W30')
+let result = q.includeDeleted().run();
 
+console.log(result.entries.map(e=>e.getPeriod().toString()));
+
+console.log('yo.');
 
 // importFromFile('data-files/test.yaml');
-let all = pdwRef.getAll({includeDeleted:'yes'});
-console.log(all);
+// let all = pdwRef.getAll({includeDeleted:'yes'});
+// console.log(all);
 // exportToFile('data-files/test.yaml', all);
 
 
@@ -44,6 +48,7 @@ console.log(defs);
 
 function createTestDataSet(){
     const nightly = pdwRef.newDef({
+        _created: '2023-07-10T20:02:30-05:00',
         _did: 'aaaa',
         _lbl: 'Nightly Review',
         _scope: pdw.Scope.DAY,
