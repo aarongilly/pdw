@@ -188,19 +188,19 @@ export interface StandardParams {
      * only - only include deleted things
      */
     includeDeleted?: 'yes' | 'no' | 'only',
-    from?: Period | PeriodStr,//#TODO
-    to?: Period | PeriodStr,//#TODO
+    from?: Period | PeriodStr,
+    to?: Period | PeriodStr,
     createdAfter?: Temporal.ZonedDateTime | EpochStr,
     createdBefore?: Temporal.ZonedDateTime | EpochStr,
     updatedAfter?: Temporal.ZonedDateTime | EpochStr,
     updatedBefore?: Temporal.ZonedDateTime | EpochStr,
     uid?: UID[] | UID,
     did?: SmallID[] | SmallID,
-    pid?: SmallID[] | SmallID,//#TODO
+    pid?: SmallID[] | SmallID,
     eid?: UID[] | UID,
     tid?: SmallID[] | SmallID,
     defLbl?: string[] | string,
-    pointLbl?: string[] | string,//#TODO
+    pointLbl?: string[] | string,
     tagLbl?: string[] | string,
     limit?: number,//#TODO
     allOnPurpose?: boolean
@@ -235,14 +235,14 @@ export interface SanitizedParams {
     updatedAfterEpochStr?: EpochStr,
     uid?: UID[],
     did?: SmallID[],
-    pid?: SmallID[], //#TODO
+    pid?: SmallID[],
     eid?: UID[],
     tid?: SmallID[],
     defLbl?: string[],
-    pointLbl?: string[], //#TODO
+    pointLbl?: string[], 
     tagLbl?: string[],
     limit?: number, //#TODO
-    allOnPurpose?: boolean //#TODO
+    allOnPurpose?: boolean
 }
 
 /**
@@ -652,7 +652,14 @@ export class PDW {
         return newTag;
     }
 
+    static merge(a: Element[], b: Element[]): Element[]{
+        let result: Element[] = [];
 
+        
+
+
+        return result;
+    }
 
     /**
      * Enforces defaults. Sanity check some types.
@@ -1060,8 +1067,6 @@ export abstract class Element implements ElementLike {
         return true;
     }
 
-    //#TODO - fallsInPeriod(period: Period): boolean
-
     /**
      * Create an object that is a non-referenced copy of the Element.
      * Also strips out meta-properties (those starting with double underscores).
@@ -1150,16 +1155,16 @@ export abstract class Element implements ElementLike {
         return existing;
     }
 
-    public static mergeArraysWithoutDuplication(arr1: Element[], arr2: Element[]): Element[]{
-        //array.reduce in practice! Whaaaaaaat? I never do that.
-        return [...arr1, ...arr2].reduce((acc: Element[], obj: Element) => {
-            const existingObj = acc.find(item => item._uid === obj._uid);
-            if (!existingObj) {
-              acc.push(obj);
-            }
-            return acc;
-          }, []);
-    }
+    // public static mergeArraysWithoutDuplication(arr1: Element[], arr2: Element[]): Element[]{
+    //     //array.reduce in practice! Whaaaaaaat? I never do that.
+    //     return [...arr1, ...arr2].reduce((acc: Element[], obj: Element) => {
+    //         const existingObj = acc.find(item => item._uid === obj._uid);
+    //         if (!existingObj) {
+    //           acc.push(obj);
+    //         }
+    //         return acc;
+    //       }, []);
+    // }
 
     /**
      * what was this specificlly supposed to do? To filter gainst an EpochStr?
@@ -1562,7 +1567,6 @@ export class PointDef implements PointDefLike {
      * The Def that contains this PointDef.
      */
     getDef(): Def {
-        //#THINK - do you have to worry about this Def every not being the most recent Def?
         return this.__def;
     };
 
@@ -2185,7 +2189,6 @@ export class Period {
         }
     }
 
-    //#TODO - enable Periods to query for Entries
     //getEntriesInPeriodMatchingFilter(params: StandardFilters): Element[]
 
     static now(scope: Scope): PeriodStr {
@@ -2414,6 +2417,11 @@ export class Query {
         return this
     }
 
+    /**
+     * How to sort the entries in the result.
+     * @param propName underscore-prefixed known prop, or the pid of the Point to sort by
+     * @param type defaults to 'asc'
+     */
     sort(propName: string, type: undefined | 'asc' | 'dsc'){
         if(type === undefined) type = 'asc';
         this.sortOrder = type;
@@ -2447,7 +2455,6 @@ export class Query {
             },
             entries: entries
         }
-
         return resp
     }
 

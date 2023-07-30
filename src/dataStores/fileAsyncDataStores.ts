@@ -69,7 +69,6 @@ export class AsyncCSV implements pdw.AsyncDataStore {
         return {
             defs: defs,
             entries: entries,
-            tagDefs: tagDefs,
             tags: tags
         }
 
@@ -712,7 +711,7 @@ export class AsyncYaml implements pdw.AsyncDataStore {
 
     makeEpochStrFromISO(ISOString: string): pdw.EpochStr {
         let temp = Temporal.Instant.fromEpochMilliseconds(new Date(ISOString).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone());
-        return pdw.makeEpochStrFromTemporal(temp);
+        return pdw.makeEpochStrFrom(temp)!;
     }
 
     translateToYamlFormat(data: pdw.CompleteDataset) {

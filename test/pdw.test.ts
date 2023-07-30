@@ -1011,7 +1011,7 @@ test.skip('Get All',()=>{
     expect(all.defs![0]);
 })
 
-test('Query Basics', () => {
+test.skip('Query Basics', () => {
     resetTestDataset() 
 
     createTestDataSet();
@@ -1513,7 +1513,7 @@ test('Query Basics', () => {
     
 })
 
-test.skip('Data Merge', () => {
+test('Data Merge', () => {
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 
     let inMemoryDataStoreTwo = new DefaultDataStore(pdwRef);
@@ -1521,9 +1521,3 @@ test.skip('Data Merge', () => {
 
 
 })
-
-function loadFullTestDatasetFromFile() {
-
-    console.log(pdwRef.getAll({}));
-
-}

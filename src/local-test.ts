@@ -4,34 +4,24 @@ import { Query, Scope } from './pdw.js'
 import { AsyncExcelNatural, altTempExport, exportToFile } from './dataStores/fileAsyncDataStores.js';
 import { importFromFile, altTempImport } from './dataStores/fileAsyncDataStores.js';
 import { Temporal, toTemporalInstant } from 'temporal-polyfill';
-import { importFirestore, importMongo, importOldV9, importOldest } from './onetimeImports.js'
+import { importFirestore, importMongo, importOldV9, importOldest, importPreviousCSV } from './onetimeImports.js'
 import { DefaultDataStore } from './DefaultDataStore.js';
 
 const pdwRef = pdw.PDW.getInstance();
 
-createTestDataSet();
+// createTestDataSet();
 
-let q = new Query();
-
-q.forDids('aaaa');
-q.sort('_updated','asc');
-
-// q.from('2023-W30').to('2023-W30');
-// q.inPeriod('2023-W30')
-let result = q.run();
-
-console.log(result.entries.map(e=>e.getPeriod().toString()));
-
-console.log('yo.');
 
 // importFromFile('data-files/test.yaml');
 // let all = pdwRef.getAll({includeDeleted:'yes'});
 // console.log(all);
-// exportToFile('data-files/test.yaml', all);
+// exportToFile('data-files/test.csv', all);
 
 
+// importPreviousCSV('real-data/pre-de-flattening/consolidated.csv');
 
-/** -- Multi DataStore experimentation
+
+/** -- Multi DataStore experimentation */
 pdwRef.newDef({_lbl: 'Pre joining'})
 let inMemoryDataStoreTwo = new DefaultDataStore(pdwRef);
 pdwRef.dataStores.push(inMemoryDataStoreTwo);
@@ -42,7 +32,7 @@ let def = pdwRef.getDefs({defLbl: 'Pre joining'})[0];
 def.setProp('_lbl', 'Updated!').save();
 defs = pdwRef.getDefs();
 console.log(defs);
-*/
+
 
 function createTestDataSet(){
     const nightly = pdwRef.newDef({

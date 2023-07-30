@@ -3,7 +3,114 @@ import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as pdw from './pdw.js';
 import { Temporal } from 'temporal-polyfill';
+import * as YAML from 'yaml';
 
+export function importPreviousCSV(filepath: string): pdw.CompleteDataset{
+    console.log('loading...');
+        let returnData: pdw.CompleteDataset = {}
+        XLSX.set_fs(fs);
+        let loadedWb = XLSX.readFile(filepath);
+        const shts = loadedWb.SheetNames;
+        const pdwRef = pdw.PDW.getInstance();
+        const sht = loadedWb.Sheets[shts[0]];
+        let elements = XLSX.utils.sheet_to_json(sht) as pdw.DefLike[];
+
+        let defs: any = [];
+        let pointDefs: any = [];
+        let entries: any = [];
+        let entryPoints: any = [];
+        let tagDefs: any = [];
+        let tags: any = [];
+
+        elements.forEach((element: any) => {
+            if (element['Row Type'] === 'Def') defs.push(buildElement(element));
+            if (element['Row Type'] === 'PointDef') pointDefs.push(buildElement(element));
+            if (element['Row Type'] === 'Entry') entries.push(buildElement(element));
+            if (element['Row Type'] === 'EntryPoint') entryPoints.push(buildElement(element));
+            if (element['Row Type'] === 'TagDef') tagDefs.push(buildElement(element));
+            if (element['Row Type'] === 'Tag') tags.push(buildElement(element));
+        })
+
+        // defs.forEach(def=>{
+        //     def._pts = pointDefs.filter(pd=>pd._did === def._did).map(p=>{
+        //         return {
+        //             _pid: p._pid,
+        //             _lbl: p._lbl,
+        //             _desc: p._desc,
+        //             _emoji: "🙋‍♂️",
+        //             _type: p._type,
+        //             _rollup: p._rollup,
+        //             _active: true,
+        //             _opts: []
+        //         }
+        //     });
+        //     def._emoji = "🙋‍♂️";
+        // })
+
+        let ewo = 0
+
+        entries.forEach(entry=>{
+            let points = entryPoints.filter(ep=> ep._eid === entry._eid)
+            if(points.length == 0){
+                ewo = ewo + 1;
+                //shoot.
+                // console.log(points);
+            }
+            
+        })
+
+        pdwRef.setDefs((<pdw.DefLike[]>defs))
+        pdwRef.setEntries((<pdw.EntryLike[]>entries))
+
+        return {
+            defs: defs,
+            entries: entries,
+            tags: []
+        }
+
+        function buildElement(elementData: any) {
+            let returnObj: any = {
+                _uid: elementData._uid,
+                _created: elementData._created,
+                _updated: elementData._updated,
+            };
+            if (typeof elementData._deleted === 'boolean') {
+                returnObj._deleted = elementData._deleted
+            } else {
+                returnObj._deleted = elementData._deleted === 'TRUE' ? true : false
+            }
+            if (elementData._did !== undefined) returnObj._did = elementData._did;
+            if (elementData._pid !== undefined) returnObj._pid = elementData._pid;
+            if (elementData._eid !== undefined) returnObj._eid = elementData._eid;
+            if (elementData._tid !== undefined) returnObj._tid = elementData._tid;
+            if (elementData._lbl !== undefined) returnObj._lbl = elementData._lbl;
+            if (elementData._emoji !== undefined) returnObj._emoji = elementData._emoji;
+            if (elementData._desc !== undefined) returnObj._desc = elementData._desc;
+            if (elementData._scope !== undefined) returnObj._scope = elementData._scope;
+            if (elementData._type !== undefined) returnObj._type = elementData._type;
+            if (elementData._rollup !== undefined) returnObj._rollup = elementData._rollup;
+            if (elementData._period !== undefined) returnObj._period = parsePeriod(elementData._period);
+            if (elementData._note !== undefined) returnObj._note = elementData._note;
+            if (elementData._source !== undefined) returnObj._source = elementData._source;
+            if (elementData._val !== undefined) returnObj._val = elementData._val;
+
+            return returnObj;
+        }
+
+        function parsePeriod(period: any): string {
+            if (typeof period === 'string') return period
+            if (typeof period === 'number') {
+                period = Math.round(period * 10000) / 10000
+                try {
+                    return Temporal.Instant.fromEpochMilliseconds((period - (25567 + 1)) * 86400 * 1000).toZonedDateTimeISO(Temporal.Now.timeZone()).toPlainDate().toString();
+                } catch (e) {
+                    console.log('shit');
+
+                }
+            }
+            throw new Error('Unhandled period val...')
+        }
+}
 
 export function importFirestore(filepath: string): pdw.CompleteDataset {
     function xlateDate(oldDate: string): pdw.EpochStr {
