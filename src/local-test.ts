@@ -1,8 +1,7 @@
 //// @ts-nocheck
 import * as pdw from './pdw.js'
 import { Query, Scope } from './pdw.js'
-import { AsyncExcelNatural, altTempExport, exportToFile } from './dataStores/fileAsyncDataStores.js';
-import { importFromFile, altTempImport } from './dataStores/fileAsyncDataStores.js';
+import { exportToFile, importFromFile } from './dataStores/fileAsyncDataStores.js';
 import { Temporal, toTemporalInstant } from 'temporal-polyfill';
 import { importFirestore, importMongo, importOldV9, importOldest, importPreviousCSV } from './onetimeImports.js'
 import { DefaultDataStore } from './DefaultDataStore.js';
@@ -11,30 +10,145 @@ const pdwRef = pdw.PDW.getInstance();
 
 // createTestDataSet();
 
+let a = tinyDataA().tags!;
+let b = tinyDataB().tags!;
+let merge = pdw.PDW.merge(a, b);
 
-// importFromFile('data-files/test.yaml');
-// let all = pdwRef.getAll({includeDeleted:'yes'});
+console.log(merge);
+
+function tinyDataA(): pdw.CompleteDataset {
+    return {
+        defs: [
+            {
+                "_uid": "lkljr435-phsn",
+                "_deleted": false,
+                "_updated": "lkljr435",
+                "_created": "lkljr435",
+                "_did": "cccc",
+                "_lbl": "Movie",
+                "_desc": "Set a description",
+                "_emoji": "🎬",
+                "_scope": pdw.Scope.SECOND,
+                "_pts": [
+                    {
+                        "_lbl": "Name",
+                        "_desc": "Set a description",
+                        "_emoji": "🎬",
+                        "_type": pdw.PointType.TEXT,
+                        "_rollup": pdw.Rollup.COUNT,
+                        "_active": true,
+                        "_pid": "ccc1"
+                    }
+                ]
+            },
+        ],
+        entries: [
+            {
+                "_uid": "lkljr4sj-grd4",
+                "_deleted": false,
+                "_updated": "lkljr4sk",
+                "_created": "lkljr4sk",
+                "_eid": "lkljr4sk-526e",
+                "_note": "",
+                "_did": "cccc",
+                "_period": "2023-07-24T18:45:00",
+                "_source": "",
+                "ccc1": "Oppenheimer"
+            },
+        ],
+        tags: [
+            {
+                "_uid": "lkljr437-8ff7",
+                "_deleted": false,
+                "_updated": "lkljr437",
+                "_created": "lkljr437",
+                "_tid": "tag1",
+                "_lbl": "media",
+                "_dids": [
+                    "cccc"
+                ]
+            }
+        ]
+    }
+}
+
+function tinyDataB(): pdw.CompleteDataset {
+    return {
+        defs: [
+            {
+                "_uid": "lkljr999-zzzz",
+                "_deleted": false,
+                "_updated": "lkljr999",
+                "_created": "lkljr435",
+                "_did": "cccc",
+                "_lbl": "Movie",
+                "_desc": "Now has a description!",
+                "_emoji": "🎬",
+                "_scope": pdw.Scope.SECOND,
+                "_pts": [
+                    {
+                        "_lbl": "Name",
+                        "_desc": "This is now also described.",
+                        "_emoji": "🎬",
+                        "_type": pdw.PointType.TEXT,
+                        "_rollup": pdw.Rollup.COUNT,
+                        "_active": true,
+                        "_pid": "ccc1"
+                    }
+                ]
+            },
+        ],
+        entries: [
+            {
+                "_uid": "lkljr4sg-aayg",
+                "_deleted": false,
+                "_updated": "lkljr4si",
+                "_created": "lkljr4sh",
+                "_eid": "lkljr4sj-bulk",
+                "_note": "",
+                "_did": "cccc",
+                "_period": "2023-07-24T13:15:00",
+                "_source": "",
+                "ccc1": "Barbie"
+            },
+        ],
+        tags: [
+            {
+                "_uid": "lkljr437-8ff7",
+                "_deleted": false,
+                "_updated": "lkljr437",
+                "_created": "lkljr437",
+                "_tid": "tag1",
+                "_lbl": "media",
+                "_dids": [
+                    "cccc"
+                ]
+            }
+        ]
+    }
+}
+
+// importFromFile('data-files/test.json');
+// let all = pdw.PDW.flattenCompleteDataset(pdwRef.getAll({includeDeleted:'yes'}));
 // console.log(all);
-// exportToFile('data-files/test.csv', all);
+// exportToFile('data-files/test.json', all);
 
 
-// importPreviousCSV('real-data/pre-de-flattening/consolidated.csv');
-
+// importPreviousCSV('real-data/pre-de-flattening/consolidated.csv')
 
 /** -- Multi DataStore experimentation */
-pdwRef.newDef({_lbl: 'Pre joining'})
-let inMemoryDataStoreTwo = new DefaultDataStore(pdwRef);
-pdwRef.dataStores.push(inMemoryDataStoreTwo);
-pdwRef.newDef({_lbl: 'post join'});
-let defs = pdwRef.getDefs();
-console.log(defs);
-let def = pdwRef.getDefs({defLbl: 'Pre joining'})[0];
-def.setProp('_lbl', 'Updated!').save();
-defs = pdwRef.getDefs();
-console.log(defs);
+// pdwRef.newDef({_lbl: 'Pre joining'})
+// let inMemoryDataStoreTwo = new DefaultDataStore(pdwRef);
+// pdwRef.dataStores.push(inMemoryDataStoreTwo);
+// pdwRef.newDef({_lbl: 'post join'});
+// let defs = pdwRef.getDefs();
+// console.log(defs);
+// let def = pdwRef.getDefs({defLbl: 'Pre joining'})[0];
+// def.setProp('_lbl', 'Updated!').save();
+// defs = pdwRef.getDefs();
+// console.log(defs);
 
-
-function createTestDataSet(){
+function createTestDataSet() {
     const nightly = pdwRef.newDef({
         _created: '2023-07-10T20:02:30-05:00',
         _did: 'aaaa',
@@ -56,12 +170,12 @@ function createTestDataSet(){
                 _pid: 'aaa2',
                 _type: pdw.PointType.SELECT,
                 _opts: {
-                        'opt1': 'Weekend/Holiday',
-                        'opt2': 'North',
-                        'opt3': 'WFH',
-                        'opt4': 'Vacation',
-                        'opt5': 'sickday',
-                    }
+                    'opt1': 'Weekend/Holiday',
+                    'opt2': 'North',
+                    'opt3': 'WFH',
+                    'opt4': 'Vacation',
+                    'opt5': 'sickday',
+                }
             },
             {
                 _emoji: '1️⃣',
@@ -128,7 +242,7 @@ function createTestDataSet(){
      */
     const mediaTag = pdwRef.newTag({
         _lbl: 'media',
-        _dids: ['dddd','cccc'],
+        _dids: ['dddd', 'cccc'],
         _tid: 'tag1'
     });
     /**

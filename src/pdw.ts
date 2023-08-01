@@ -652,13 +652,83 @@ export class PDW {
         return newTag;
     }
 
-    static merge(a: Element[], b: Element[]): Element[]{
-        let result: Element[] = [];
+    /**
+     * Converts class instances into standard objects.
+     * @param elements Def[], Entry[], or Tag[]
+     * @returns DefLike[], EntryLike[], or TagLike[]
+     */
+    static flatten(elements: Element[]): ElementLike[]{
+        return elements.map(e=>Element.toData(e));
+    }
 
+    static mergeComplete(a: CompleteDataset, b: CompleteDataset): CompleteDataset{
+        let returnObj: CompleteDataset = {};
+        // //@ts-expect-error
+        // if(data.defs!==undefined) returnObj.defs = PDW.merge(data.defs);
+        // //@ts-expect-error
+        // if(data.entries!==undefined) returnObj.entries = PDW.merge(data.entries);
+        // //@ts-expect-error
+        // if(a.tags!==undefined) returnObj.tags = PDW.merge(a.tags);
+        return returnObj;
+    }
+
+    static merge(a: ElementLike[], b: ElementLike[]): ElementLike[]{
+        let result: ElementLike[] = [];
         
+        //this logic is probably slow, but easy to write
+        let onlyA = a.filter(eA=>!b.some(eB=>eB._uid === eA._uid));
+        let onlyB = b.filter(eB=>!a.some(eA=>eA._uid === eB._uid));
 
+        let both: ElementLike[] = [];
 
-        return result;
+        //same UID
+        a.forEach(eA => {
+            //if element A is already deleted, then it cannot replace anything in B,
+            //nor can it be updated by anything in B
+            if(eA._deleted) return;
+            let match = b.find(eB=>eB._uid! === eA._uid!);
+            if(match !== undefined){
+                //exact match
+                if(eA._updated! === match._updated!) return both.push(eA);
+                //eA is *newer* than eB
+                if(eA._updated! > match._updated!){
+                    match._updated = eA._updated;
+                    match._deleted = true;
+
+                }else{
+                    //eB is *newer* than eA
+                    eA._updated = match._updated;
+                    eA._deleted = true;    
+                }
+                both.push(match, eA);
+            }
+        })
+
+        //#TODO - this logic is not finished and definitely wrong
+        //different UID, same Element ID
+        a.forEach(eA => {
+            //if element A is already deleted, then it cannot replace anything in B,
+            //nor can it be updated by anything in B
+            if(eA._deleted) return;
+            let match = b.find(eB=>eB._uid! !== eA._uid! && Element.hasSameId(eA, eB));
+            if(match !== undefined){
+                //exact match
+                if(eA._updated! === match._updated!) return both.push(eA);
+                //eA is *newer* than eB
+                if(eA._updated! > match._updated!){
+                    match._updated = eA._updated;
+                    match._deleted = true;
+
+                }else{
+                    //eB is *newer* than eA
+                    eA._updated = match._updated;
+                    eA._deleted = true;    
+                }
+                both.push(match, eA);
+            }
+        })
+
+        return [...onlyA, ...onlyB, ...both];
     }
 
     /**
@@ -752,6 +822,17 @@ export class PDW {
         if (dataset.entries !== undefined && dataset.entries.length > 0) recents.push(Element.getMostRecent(dataset.entries)!)
         if (dataset.tags !== undefined && dataset.tags.length > 0) recents.push(Element.getMostRecent(dataset.tags)!)
         return Element.getMostRecent(recents)!._updated!
+    }
+
+    static flattenCompleteDataset(data: CompleteDataset): CompleteDataset{
+        let returnObj: CompleteDataset = {};
+        //@ts-expect-error
+        if(data.defs!==undefined) returnObj.defs = PDW.flatten(data.defs);
+        //@ts-expect-error
+        if(data.entries!==undefined) returnObj.entries = PDW.flatten(data.entries);
+        //@ts-expect-error
+        if(data.tags!==undefined) returnObj.tags = PDW.flatten(data.tags);
+        return returnObj;
     }
 
     static addOverviewToCompleteDataset(data: CompleteDataset, storeName?: string): CompleteDataset {
@@ -992,9 +1073,7 @@ export abstract class Element implements ElementLike {
      * @returns true if the argument is a newer version of the same Element
      */
     shouldBeReplacedWith(comparison: ElementLike): boolean {
-        if (!this.sameIdAs(comparison)) return false;
-        if (this.isOlderThan(comparison)) return true;
-        return false;
+        return Element.shouldReplace(comparison, this)
     }
 
     /**
@@ -1011,21 +1090,25 @@ export abstract class Element implements ElementLike {
      * @param comparison Element to compare against
      */
     sameIdAs(comparison: ElementLike) {
-        if (!this.sameTypeAs(comparison)) return false;
-        const type = this.getType();
-        //@ts-expect-error
-        if (type === 'DefLike') return this._did === comparison._did;
-        //@ts-expect-error
-        if (type === 'EntryLike') return this._eid === comparison._eid;
-        if (type === 'TagLike') {
-            //@ts-expect-error
-            if (this._pid === undefined) return this._tid === comparison._tid && this._did === comparison._did;
-            //@ts-expect-error
-            return this._tid === comparison._tid && this._did === comparison._did && this._pid === comparison._pid;
+        return Element.hasSameId(this, comparison);
+    }
 
-        }
-        //@ts-expect-error
-        return this._pid === comparison._pid && this._did === comparison._did;
+    static shouldReplace(thing: ElementLike, thingItMayReplace: ElementLike): boolean{
+        if (!Element.hasSameId(thing, thingItMayReplace)) return false;
+        if (thing._updated! > thingItMayReplace._updated!) return true;
+        return false;
+    }
+
+    static hasSameId(a: ElementLike, b: ElementLike): boolean{
+        if(a._uid===b._uid) return true;
+        const type = Element.getTypeOfElementLike(a);
+        const typeB = Element.getTypeOfElementLike(b);
+        if(type !== typeB) return false;
+
+        if (type === 'DefLike') return a._did === b._did;        
+        if (type === 'EntryLike') return a._eid === b._eid;
+        if (type === 'TagLike') return a._tid === b._tid;
+        throw new Error('type not matched!')
     }
 
     sameTypeAs(comparison: ElementLike) {

@@ -23,17 +23,232 @@ export function importFromFile(filepath: string) {
     throw new Error('Unimplemented import type: ' + fileType)
 }
 
-export function altTempImport(filepath: string) {
-    const fileType = inferFileType(filepath);
-    if (fileType !== 'yaml') throw new Error('only YAML is supported right now');
-    return new AsyncNestedYaml().importFrom(filepath);
+//#endregion
+
+//#region #### DONE ####
+
+export class AsyncJson implements pdw.AsyncDataStore {
+
+    exportTo(data: pdw.CompleteDataset, filepath: string) {
+        let json = JSON.stringify(data);
+        fs.writeFile(filepath, json, 'utf8', () => { });
+    }
+
+    importFrom(filepath: string): pdw.CompleteDataset {
+        const file = JSON.parse(fs.readFileSync(filepath).toString());
+        const returnData: pdw.CompleteDataset = {
+            defs: file.defs,
+            entries: file.entries,
+            tags: file.tags
+        }
+        const pdwRef = pdw.PDW.getInstance();
+        if (returnData.defs !== undefined) pdwRef.setDefs(returnData.defs);
+        if (returnData.entries !== undefined) pdwRef.setEntries(returnData.entries);
+        if (returnData.tags !== undefined) pdwRef.setTags(returnData.tags);
+
+        returnData.overview = {
+            storeName: filepath,
+            defs: {
+                current: returnData.defs?.filter(element => element._deleted === false).length,
+                deleted: returnData.defs?.filter(element => element._deleted).length
+            },
+            entries: {
+                current: returnData.entries?.filter(element => element._deleted === false).length,
+                deleted: returnData.entries?.filter(element => element._deleted).length
+            },
+            tags: {
+                current: returnData.tags?.filter(element => element._deleted === false).length,
+                deleted: returnData.tags?.filter(element => element._deleted).length
+            },
+            lastUpdated: pdw.PDW.getDatasetLastUpdate(returnData)
+        }
+
+        return returnData;
+    }
 }
 
-export function altTempExport(data: pdw.CompleteDataset, filepath: string) {
-    return new AsyncNestedYaml().exportTo(data, filepath);
+/**
+ * This was crazy easy.
+ * I made it harder just to prove that I could simultaneusly read
+ * & write from different datafiles with different source formats.
+ * json -> dates stored as EpochStr
+ * yaml -> dates stored as ISO Strings (native YAML dates)
+ * excel -> dates stored as Local Strings AND native Excel dates! 
+ */
+export class AsyncYaml implements pdw.AsyncDataStore {
+
+    exportTo(data: pdw.CompleteDataset, filepath: string) {
+        //crazy simple implementation
+        data = this.translateToYamlFormat(data);
+        const yaml = YAML.stringify(data);
+        fs.writeFile(filepath, yaml, 'utf8', () => { });
+    }
+
+    importFrom(filepath: string): pdw.CompleteDataset {
+        const file = YAML.parse(fs.readFileSync(filepath).toString());
+        let returnData: pdw.CompleteDataset = {
+            defs: file.defs,
+            entries: file.entries,
+            tags: file.tags
+        }
+        this.translateFromYamlFormat(returnData);
+        const pdwRef = pdw.PDW.getInstance();
+        if (returnData.defs !== undefined) pdwRef.setDefs(returnData.defs);
+        if (returnData.entries !== undefined) pdwRef.setEntries(returnData.entries);
+        if (returnData.tags !== undefined) pdwRef.setTags(returnData.tags);
+
+        returnData = pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
+
+        return returnData;
+    }
+
+    translateFromYamlFormat(data: pdw.CompleteDataset) {
+        if (data.overview !== undefined) {
+            let temporal = this.makeEpochStrFromISO(data.overview.lastUpdated);
+            data.overview.lastUpdated = temporal.toString().split('[')[0]
+        }
+        if (data.defs !== undefined) {
+            data.defs = data.defs.map(def => this.translateElementFromYaml(def)) as unknown as pdw.DefLike[];
+        }
+        if (data.entries !== undefined) {
+            data.entries = data.entries.map(element => this.translateElementFromYaml(element)) as unknown as pdw.EntryLike[];
+        }
+        if (data.tags !== undefined) {
+            data.tags = data.tags.map(element => this.translateElementFromYaml(element)) as unknown as pdw.TagLike[];
+        }
+        return data;
+    }
+
+    translateElementFromYaml(element: pdw.ElementLike): pdw.ElementLike {
+        let returnObj: pdw.ElementLike = {
+            _uid: element.uid,
+            _created: this.makeEpochStrFromISO(element.cre),
+            _updated: this.makeEpochStrFromISO(element.upd),
+            _deleted: element.del,
+        }
+        if (element.dsc !== undefined) returnObj._desc = element.dsc
+        if (element.did !== undefined) returnObj._did = element.did
+        if (element.eid !== undefined) returnObj._eid = element.eid
+        if (element.pid !== undefined) returnObj._pid = element.pid
+        if (element.lbl !== undefined) returnObj._lbl = element.lbl
+        if (element.tid !== undefined) returnObj._tid = element.tid
+        if (element.emo !== undefined) returnObj._emoji = element.emo
+        if (element.scp !== undefined) returnObj._scope = element.scp
+        if (element.typ !== undefined) returnObj._type = element.typ
+        if (element.rlp !== undefined) returnObj._rollup = element.rlp
+        if (element.per !== undefined) returnObj._period = element.per
+        if (element.nte !== undefined) returnObj._note = element.nte
+        if (element.dids !== undefined) returnObj._dids = element.dids
+        if (element.pts !== undefined) returnObj._pts = readPointDefMap(element.pts)//.map((pt: any) => translatePointDefFromYaml(pt))
+        if (element.ep !== undefined) {        
+            Object.keys(element.ep).forEach(key => {
+                returnObj[key] = element.ep[key];
+            })
+        }
+
+        return returnObj
+
+        function readPointDefMap(pdMap: any): any {
+            const keys = Object.keys(pdMap);
+            return keys.map(key=>{
+                let pd = pdMap[key];
+                let returnObj: any = {};
+                if (pd.dsc !== undefined) returnObj._desc = pd.dsc
+                if (pd.pid !== undefined) returnObj._pid = pd.pid
+                if (pd.lbl !== undefined) returnObj._lbl = pd.lbl
+                if (pd.emo !== undefined) returnObj._emoji = pd.emo
+                if (pd.typ !== undefined) returnObj._type = pd.typ;
+                if (pd.rlp !== undefined) returnObj._rollup = pd.rlp
+                if (pd.act !== undefined) returnObj._active = pd.act
+                if (pd.opts !== undefined) returnObj._opts = pd.opts
+                return returnObj;
+            })
+        }
+    }
+
+    makeEpochStrFromISO(ISOString: string): pdw.EpochStr {
+        let temp = Temporal.Instant.fromEpochMilliseconds(new Date(ISOString).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone());
+        return pdw.makeEpochStrFrom(temp)!;
+    }
+
+    translateToYamlFormat(data: pdw.CompleteDataset) {
+        if (data.overview !== undefined) {
+            let temporal = pdw.parseTemporalFromEpochStr(data.overview.lastUpdated);
+            data.overview.lastUpdated = temporal.toString().split('[')[0]
+        }
+        if (data.defs !== undefined) {
+            data.defs = data.defs.map(def => this.translateElementToYaml(def)) as unknown as pdw.DefLike[];
+        }
+        if (data.entries !== undefined) {
+            data.entries = data.entries.map(entry => this.translateElementToYaml(entry)) as unknown as pdw.EntryLike[];
+        }
+        if (data.tags !== undefined) {
+            data.tags = data.tags.map(tag => this.translateElementToYaml(tag)) as unknown as pdw.TagLike[];
+        }
+        return data;
+    }
+
+    /**
+     * Translates any kind of Element into a Yaml-approved format.
+     * @param element tag, def, or entry
+     * @returns an object with Yaml-expeted formatting
+     */
+    translateElementToYaml(element: any): any {
+        if (element._tempCreated !== undefined) delete element._tempCreated
+        if (element._tempUpdated !== undefined) delete element._tempUpdated
+        let returnObj: any = {
+            uid: element._uid,
+            cre: pdw.parseTemporalFromEpochStr(element._created).toString().split('[')[0],
+            upd: pdw.parseTemporalFromEpochStr(element._updated).toString().split('[')[0],
+            del: element._deleted,
+        }
+        if (element._desc !== undefined) returnObj.dsc = element._desc
+        if (element._did !== undefined) returnObj.did = element._did
+        if (element._pid !== undefined) returnObj.pid = element._pid
+        if (element._lbl !== undefined) returnObj.lbl = element._lbl
+        if (element._emoji !== undefined) returnObj.emo = element._emoji
+        if (element._scope !== undefined) returnObj.scp = element._scope
+        if (element._pts !== undefined) returnObj.pts = makeYamlPointDefMap(element._pts)//.map((pt: any) => translatePointDefToYaml(pt));
+        if (element._eid !== undefined) returnObj.eid = element._eid
+        if (element._period !== undefined) returnObj.per = element._period
+        if (element._source !== undefined) returnObj.src = element._source
+        if (element._note !== undefined) returnObj.nte = element._note
+        if (element._tid !== undefined) returnObj.tid = element._tid;
+        if (element._dids !== undefined) returnObj.dids = element._dids;
+
+        let entryPoints: any = Object.keys(element).filter(key => key.substring(0, 1) !== '_')
+        if (entryPoints.length > 0) {
+            returnObj.ep = {};
+            entryPoints.forEach((key: any) => {
+                returnObj.ep[key] = element[key];
+            })
+        }
+
+        return returnObj
+
+        function makeYamlPointDefMap(pdArr: pdw.PointDefLike[]): any {
+            let returnObj: any = {};
+            pdArr.forEach(pd=> {
+                if (pd.__def !== undefined) delete pd.__def;
+                returnObj[pd._pid!] = {} as any;
+                if (pd._desc !== undefined) returnObj[pd._pid!].dsc = pd._desc
+                if (pd._pid !== undefined) returnObj[pd._pid!].pid = pd._pid
+                if (pd._lbl !== undefined) returnObj[pd._pid!].lbl = pd._lbl
+                if (pd._emoji !== undefined) returnObj[pd._pid!].emo = pd._emoji
+                if (pd._type !== undefined) returnObj[pd._pid!].typ = pd._type;
+                if (pd._rollup !== undefined) returnObj[pd._pid!].rlp = pd._rollup
+                if (pd._active !== undefined) returnObj[pd._pid!].act = pd._active
+                if (pd._opts !== undefined) returnObj[pd._pid!].opts = pd._opts
+            })
+            return returnObj;
+        }
+    }
 }
 
 //#endregion
+
+//#region #### #TODO ####
+//in order of priority, probably. 
 
 export class AsyncCSV implements pdw.AsyncDataStore {
     importFrom(filepath: string): pdw.CompleteDataset {
@@ -552,634 +767,153 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
 
 }
 
-export class AsyncJson implements pdw.AsyncDataStore {
-
-    exportTo(data: pdw.CompleteDataset, filepath: string) {
-        let json = JSON.stringify(data);
-        fs.writeFile(filepath, json, 'utf8', () => { });
-    }
-
-    importFrom(filepath: string): pdw.CompleteDataset {
-        const file = JSON.parse(fs.readFileSync(filepath).toString());
-        const returnData: pdw.CompleteDataset = {
-            defs: file.defs,
-            pointDefs: file.pointDefs,
-            entries: file.entries,
-            entryPoints: file.entryPoints,
-            tagDefs: file.tagDefs,
-            tags: file.tags
-        }
-        const pdwRef = pdw.PDW.getInstance();
-        if (returnData.defs !== undefined) pdwRef.setDefs(returnData.defs);
-        if (returnData.pointDefs !== undefined) pdwRef.setPointDefs(returnData.pointDefs);
-        if (returnData.entries !== undefined) pdwRef.setEntries(returnData.entries);
-        if (returnData.entryPoints !== undefined) pdwRef.setEntryPoints(returnData.entryPoints);
-        if (returnData.tagDefs !== undefined) pdwRef.setTagDefs(returnData.tagDefs);
-        if (returnData.tags !== undefined) pdwRef.setTags(returnData.tags);
-
-        returnData.overview = {
-            storeName: filepath,
-            defs: {
-                current: returnData.defs?.filter(element => element._deleted === false).length,
-                deleted: returnData.defs?.filter(element => element._deleted).length
-            },
-            pointDefs: {
-                current: returnData.pointDefs?.filter(element => element._deleted === false).length,
-                deleted: returnData.pointDefs?.filter(element => element._deleted).length
-            },
-            entries: {
-                current: returnData.entries?.filter(element => element._deleted === false).length,
-                deleted: returnData.entries?.filter(element => element._deleted).length
-            },
-            entryPoints: {
-                current: returnData.entryPoints?.filter(element => element._deleted === false).length,
-                deleted: returnData.entryPoints?.filter(element => element._deleted).length
-            },
-            tagDefs: {
-                current: returnData.tagDefs?.filter(element => element._deleted === false).length,
-                deleted: returnData.tagDefs?.filter(element => element._deleted).length
-            },
-            tags: {
-                current: returnData.tags?.filter(element => element._deleted === false).length,
-                deleted: returnData.tags?.filter(element => element._deleted).length
-            },
-            lastUpdated: pdw.PDW.getDatasetLastUpdate(returnData)
-        }
-
-        return returnData;
-    }
-}
-
-/**
- * This was crazy easy.
- * I made it harder just to prove that I could simultaneusly read
- * & write from different datafiles with different source formats.
- * json -> dates stored as EpochStr
- * yaml -> dates stored as ISO Strings (native YAML dates)
- * excel -> dates stored as Local Strings AND native Excel dates! 
- */
-export class AsyncYaml implements pdw.AsyncDataStore {
-
-    exportTo(data: pdw.CompleteDataset, filepath: string) {
-        //crazy simple implementation
-        data = this.translateToYamlFormat(data);
-        const yaml = YAML.stringify(data);
-        fs.writeFile(filepath, yaml, 'utf8', () => { });
-    }
-
-    importFrom(filepath: string): pdw.CompleteDataset {
-        const file = YAML.parse(fs.readFileSync(filepath).toString());
-        let returnData: pdw.CompleteDataset = {
-            defs: file.defs,
-            entries: file.entries,
-            tags: file.tags
-        }
-        this.translateFromYamlFormat(returnData);
-        const pdwRef = pdw.PDW.getInstance();
-        if (returnData.defs !== undefined) pdwRef.setDefs(returnData.defs);
-        if (returnData.entries !== undefined) pdwRef.setEntries(returnData.entries);
-        if (returnData.tags !== undefined) pdwRef.setTags(returnData.tags);
-
-        returnData = pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
-
-        return returnData;
-    }
-
-    translateFromYamlFormat(data: pdw.CompleteDataset) {
-        if (data.overview !== undefined) {
-            let temporal = this.makeEpochStrFromISO(data.overview.lastUpdated);
-            data.overview.lastUpdated = temporal.toString().split('[')[0]
-        }
-        if (data.defs !== undefined) {
-            data.defs = data.defs.map(def => this.translateElementFromYaml(def)) as unknown as pdw.DefLike[];
-        }
-        if (data.entries !== undefined) {
-            data.entries = data.entries.map(element => this.translateElementFromYaml(element)) as unknown as pdw.EntryLike[];
-        }
-        if (data.tags !== undefined) {
-            data.tags = data.tags.map(element => this.translateElementFromYaml(element)) as unknown as pdw.TagLike[];
-        }
-        return data;
-    }
-
-    translateElementFromYaml(element: pdw.ElementLike): pdw.ElementLike {
-        let returnObj: pdw.ElementLike = {
-            _uid: element.uid,
-            _created: this.makeEpochStrFromISO(element.cre),
-            _updated: this.makeEpochStrFromISO(element.upd),
-            _deleted: element.del,
-        }
-        if (element.dsc !== undefined) returnObj._desc = element.dsc
-        if (element.did !== undefined) returnObj._did = element.did
-        if (element.eid !== undefined) returnObj._eid = element.eid
-        if (element.pid !== undefined) returnObj._pid = element.pid
-        if (element.lbl !== undefined) returnObj._lbl = element.lbl
-        if (element.tid !== undefined) returnObj._tid = element.tid
-        if (element.emo !== undefined) returnObj._emoji = element.emo
-        if (element.scp !== undefined) returnObj._scope = element.scp
-        if (element.typ !== undefined) returnObj._type = element.typ
-        if (element.rlp !== undefined) returnObj._rollup = element.rlp
-        if (element.per !== undefined) returnObj._period = element.per
-        if (element.nte !== undefined) returnObj._note = element.nte
-        if (element.dids !== undefined) returnObj._dids = element.dids
-        if (element.pts !== undefined) returnObj._pts = readPointDefMap(element.pts)//.map((pt: any) => translatePointDefFromYaml(pt))
-        if (element.ep !== undefined) {        
-            Object.keys(element.ep).forEach(key => {
-                returnObj[key] = element.ep[key];
-            })
-        }
-
-        return returnObj
-
-        function readPointDefMap(pdMap: any): any {
-            const keys = Object.keys(pdMap);
-            return keys.map(key=>{
-                let pd = pdMap[key];
-                let returnObj: any = {};
-                if (pd.dsc !== undefined) returnObj._desc = pd.dsc
-                if (pd.pid !== undefined) returnObj._pid = pd.pid
-                if (pd.lbl !== undefined) returnObj._lbl = pd.lbl
-                if (pd.emo !== undefined) returnObj._emoji = pd.emo
-                if (pd.typ !== undefined) returnObj._type = pd.typ;
-                if (pd.rlp !== undefined) returnObj._rollup = pd.rlp
-                if (pd.act !== undefined) returnObj._active = pd.act
-                if (pd.opts !== undefined) returnObj._opts = pd.opts
-                return returnObj;
-            })
-        }
-    }
-
-    makeEpochStrFromISO(ISOString: string): pdw.EpochStr {
-        let temp = Temporal.Instant.fromEpochMilliseconds(new Date(ISOString).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone());
-        return pdw.makeEpochStrFrom(temp)!;
-    }
-
-    translateToYamlFormat(data: pdw.CompleteDataset) {
-        if (data.overview !== undefined) {
-            let temporal = pdw.parseTemporalFromEpochStr(data.overview.lastUpdated);
-            data.overview.lastUpdated = temporal.toString().split('[')[0]
-        }
-        if (data.defs !== undefined) {
-            data.defs = data.defs.map(def => this.translateElementToYaml(def)) as unknown as pdw.DefLike[];
-        }
-        if (data.entries !== undefined) {
-            data.entries = data.entries.map(entry => this.translateElementToYaml(entry)) as unknown as pdw.EntryLike[];
-        }
-        if (data.tags !== undefined) {
-            data.tags = data.tags.map(tag => this.translateElementToYaml(tag)) as unknown as pdw.TagLike[];
-        }
-        return data;
-    }
-
-    /**
-     * Translates any kind of Element into a Yaml-approved format.
-     * @param element tag, def, or entry
-     * @returns an object with Yaml-expeted formatting
-     */
-    translateElementToYaml(element: any): any {
-        if (element._tempCreated !== undefined) delete element._tempCreated
-        if (element._tempUpdated !== undefined) delete element._tempUpdated
-        let returnObj: any = {
-            uid: element._uid,
-            cre: pdw.parseTemporalFromEpochStr(element._created).toString().split('[')[0],
-            upd: pdw.parseTemporalFromEpochStr(element._updated).toString().split('[')[0],
-            del: element._deleted,
-        }
-        if (element._desc !== undefined) returnObj.dsc = element._desc
-        if (element._did !== undefined) returnObj.did = element._did
-        if (element._pid !== undefined) returnObj.pid = element._pid
-        if (element._lbl !== undefined) returnObj.lbl = element._lbl
-        if (element._emoji !== undefined) returnObj.emo = element._emoji
-        if (element._scope !== undefined) returnObj.scp = element._scope
-        if (element._pts !== undefined) returnObj.pts = makeYamlPointDefMap(element._pts)//.map((pt: any) => translatePointDefToYaml(pt));
-        if (element._eid !== undefined) returnObj.eid = element._eid
-        if (element._period !== undefined) returnObj.per = element._period
-        if (element._source !== undefined) returnObj.src = element._source
-        if (element._note !== undefined) returnObj.nte = element._note
-        if (element._tid !== undefined) returnObj.tid = element._tid;
-        if (element._dids !== undefined) returnObj.dids = element._dids;
-
-        let entryPoints: any = Object.keys(element).filter(key => key.substring(0, 1) !== '_')
-        if (entryPoints.length > 0) {
-            returnObj.ep = {};
-            entryPoints.forEach((key: any) => {
-                returnObj.ep[key] = element[key];
-            })
-        }
-
-        return returnObj
-
-        function makeYamlPointDefMap(pdArr: pdw.PointDefLike[]): any {
-            let returnObj: any = {};
-            pdArr.forEach(pd=> {
-                if (pd.__def !== undefined) delete pd.__def;
-                returnObj[pd._pid!] = {} as any;
-                if (pd._desc !== undefined) returnObj[pd._pid!].dsc = pd._desc
-                if (pd._pid !== undefined) returnObj[pd._pid!].pid = pd._pid
-                if (pd._lbl !== undefined) returnObj[pd._pid!].lbl = pd._lbl
-                if (pd._emoji !== undefined) returnObj[pd._pid!].emo = pd._emoji
-                if (pd._type !== undefined) returnObj[pd._pid!].typ = pd._type;
-                if (pd._rollup !== undefined) returnObj[pd._pid!].rlp = pd._rollup
-                if (pd._active !== undefined) returnObj[pd._pid!].act = pd._active
-                if (pd._opts !== undefined) returnObj[pd._pid!].opts = pd._opts
-            })
-            return returnObj;
-        }
-    }
-}
-
-/**
- * Trying a compactified version
- */
-export class AsyncNestedYaml implements pdw.AsyncDataStore {
-    exportTo(data: pdw.CompleteDataset, filepath: string) {
-        if (data.defs === undefined ||
-            data.entries === undefined ||
-            data.entryPoints === undefined ||
-            data.pointDefs === undefined ||
-            data.tagDefs === undefined ||
-            data.tags === undefined) {
-            throw new Error("Data supplied must have an arrays for defs, pointDefs, tags, tagDefs, entries, and entryPoints'");
-        }
-
-        let activeByDef: any = {};
-        let deleted: pdw.ElementLike[] = [];
-
-        data.defs.forEach((def: any) => {
-            if (def._deleted) {
-                deleted.push(def);
-                return;
-            }
-            let defMember: any = {};
-            if (def._did === undefined) throw new Error("Def data didn't have a _did");
-            //deleted ... assume nothing is deleted?
-            if (def._created !== undefined) defMember.cre = pdw.parseTemporalFromEpochStr(def._created).toString().split('[')[0];
-            if (def._updated !== undefined) defMember.upd = pdw.parseTemporalFromEpochStr(def._updated).toString().split('[')[0];
-            if (def._uid !== undefined) defMember.uid = def._uid;
-            if (def._desc !== undefined) defMember.dsc = def._desc;
-            if (def._lbl !== undefined) defMember.lbl = def._lbl;
-            if (def._scope !== undefined) defMember.scp = def._scope;
-            if (def._emoji !== undefined) defMember.emo = def._emoji;
-            //make room for PointDefs
-            defMember.points = {};
-            //make room for Entries
-            defMember.entries = [];
-            //make room for Tags & TagDefs
-            defMember.tags = {};
-            //add to outer object;
-            activeByDef[def._did] = defMember;
-        })
-
-        data.pointDefs.forEach(pd => {
-            if (pd._deleted) {
-                deleted.push(pd);
-                return;
-            }
-            if (pd._did === undefined) throw new Error("pointDef has no _did, yo");
-            let assDef = activeByDef[pd._did];
-            if (assDef === undefined) throw new Error('Could not find Def associated with PointDef with _did = ' + pd._did);
-
-            let pdMember: any = {};
-
-            // if (pd._created !== undefined) pdMember.cre = pd._created; //not in nested form
-            // if (pd._updated !== undefined) pdMember.upd = pd._updated;
-            if (pd._uid !== undefined) pdMember.uid = pd._uid;
-            if (pd._desc !== undefined) pdMember.dsc = pd._desc;
-            if (pd._lbl !== undefined) pdMember.lbl = pd._lbl;
-            if (pd._type !== undefined) pdMember.typ = pd._type;
-            if (pd._rollup !== undefined) pdMember.rlp = pd._rollup;
-            if (pd._emoji !== undefined) pdMember.emo = pd._emoji;
-            //for selects and multiselects, make enumeration "opts" key
-            if (pd._type === pdw.PointType.SELECT || pd._type === pdw.PointType.MULTISELECT) pdMember.opts = {};
-
-            assDef.points[pd._pid] = pdMember;
-        })
-
-        data.entries.forEach(entry => {
-            if (entry._deleted) {
-                deleted.push(entry);
-                return;
-            }
-            if (entry._did === undefined) throw new Error("entry has no _did, yo");
-            let assDef = activeByDef[entry._did];
-            if (assDef === undefined) throw new Error('Could not find Def associated with Entry with _did = ' + entry._did);
-
-            let entMember: any = {};
-
-            if (entry._created !== undefined) entMember.cre = pdw.parseTemporalFromEpochStr(entry._created).toString().split('[')[0];
-            if (entry._updated !== undefined) entMember.upd = pdw.parseTemporalFromEpochStr(entry._updated).toString().split('[')[0];
-            if (entry._uid !== undefined) entMember.uid = entry._uid;
-            if (entry._eid !== undefined) entMember.eid = entry._eid;
-            if (entry._period !== undefined) entMember.per = entry._period;
-            if (entry._note !== undefined) entMember.nte = entry._note;
-            //make room for PointDefs
-            entMember.points = {};
-            assDef.entries.push(entMember);
-        })
-
-        data.entryPoints.forEach(ep => {
-            if (ep._deleted) {
-                deleted.push(ep);
-                return;
-            }
-            if (ep._did === undefined) throw new Error("entryPoint has no _did, yo");
-            if (ep._eid === undefined) throw new Error("entryPoint has no _eid, yo");
-            let assDef = activeByDef[ep._did];
-            if (assDef === undefined) throw new Error('Could not find Def associated with EntryPoint with _did = ' + ep._did);
-            let assEntry = assDef.entries.find((ent: any) => ent.eid == ep._eid)
-            if (assEntry === undefined) throw new Error("Couldn't find an Entry for the EntryPoint with _eid = " + ep._eid);
-
-            assEntry[ep._pid] = ep._val;
-        })
-
-        data.tags.forEach(tag => {
-            if (tag._deleted) {
-                deleted.push(tag);
-                return;
-            }
-            if (tag._did === undefined) throw new Error("tag has no _did, yo");
-            let assDef = activeByDef[tag._did];
-            if (assDef === undefined) throw new Error('Could not find Def associated with Tag with _did = ' + tag._did);
-            let assPointDef = data.tagDefs?.find(tagDef => tagDef._tid === tag._tid && tagDef._deleted === false);
-            if (assPointDef === undefined) throw new Error("Couldn't find associated TagDef for tag with _tid " + tag._tid);
-
-            let tagMember: any = {};
-            if (tag._created !== undefined) tagMember.cre = pdw.parseTemporalFromEpochStr(tag._created).toString().split('[')[0];
-            if (tag._updated !== undefined) tagMember.upd = pdw.parseTemporalFromEpochStr(tag._updated).toString().split('[')[0];
-            if (tag._uid !== undefined) tagMember.uid = tag._uid;
-            if (tag._lbl !== undefined) tagMember.lbl = tag._lbl;
-
-            assDef.tags[tag._tid] = tagMember;
-        })
-
-        let yamlObj: any = { active: activeByDef, deleted: deleted }
-        const yaml = YAML.stringify(yamlObj);
-        fs.writeFile(filepath, yaml, 'utf8', () => { });
-
-    }
-
-    importFrom(filepath: string): pdw.CompleteDataset {
-        const file = YAML.parse(fs.readFileSync(filepath).toString());
-        let returnData: pdw.CompleteDataset = {
-            defs: [],
-            pointDefs: [],
-            entries: [],
-            entryPoints: [],
-            tagDefs: [],
-            tags: []
-        }
-        this.translateFromNestedYamlFormat(file);
-        const pdwRef = pdw.PDW.getInstance();
-        if (returnData.defs !== undefined) pdwRef.setDefs(returnData.defs);
-        if (returnData.pointDefs !== undefined) pdwRef.setPointDefs(returnData.pointDefs);
-        if (returnData.entries !== undefined) pdwRef.setEntries(returnData.entries);
-        if (returnData.entryPoints !== undefined) pdwRef.setEntryPoints(returnData.entryPoints);
-        if (returnData.tagDefs !== undefined) pdwRef.setTagDefs(returnData.tagDefs);
-        if (returnData.tags !== undefined) pdwRef.setTags(returnData.tags);
-
-        returnData = pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
-
-        return returnData;
-    }
-
-    translateFromNestedYamlFormat(data: any) {
-        if (data.defs === undefined) throw new Error('Expect to have a top-level "defs" key');
-        data.defs.forEach((def: any) => {
-            console.log(def);
-            const defData: pdw.MinimumDef = {}
-            if (def.did === undefined) throw new Error('no did found');
-            defData._did = def.did;
-
-        })
-        return data;
-    }
-
-    translateElementFromYaml(element: pdw.ElementLike): pdw.ElementLike {
-        let returnObj: pdw.ElementLike = {
-            _uid: element.uid,
-            _created: this.makeEpochStrFromISO(element.cre),
-            _updated: this.makeEpochStrFromISO(element.upd),
-            _deleted: element.del,
-        }
-        if (element.dsc !== undefined) returnObj._desc = element.dsc
-        if (element.did !== undefined) returnObj._did = element.did
-        if (element.eid !== undefined) returnObj._eid = element.eid
-        if (element.pid !== undefined) returnObj._pid = element.pid
-        if (element.lbl !== undefined) returnObj._lbl = element.lbl
-        if (element.tid !== undefined) returnObj._tid = element.tid
-        if (element.emo !== undefined) returnObj._emoji = element.emo
-        if (element.scp !== undefined) returnObj._scope = element.scp
-        if (element.typ !== undefined) returnObj._type = element.typ
-        if (element.rlp !== undefined) returnObj._rollup = element.rlp
-        if (element.per !== undefined) returnObj._period = element.per
-        if (element.nte !== undefined) returnObj._note = element.nte
-        if (element.val !== undefined) returnObj._val = element.val
-        return returnObj
-    }
-
-    makeEpochStrFromISO(ISOString: string): pdw.EpochStr {
-        let temp = Temporal.Instant.fromEpochMilliseconds(new Date(ISOString).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone());
-        return pdw.makeEpochStrFromTemporal(temp);
-    }
-
-    translateToYamlFormat(data: pdw.CompleteDataset) {
-        if (data.overview !== undefined) {
-            let temporal = pdw.parseTemporalFromEpochStr(data.overview.lastUpdated);
-            data.overview.lastUpdated = temporal.toString().split('[')[0]
-        }
-        if (data.defs !== undefined) {
-            data.defs = data.defs.map(def => this.translateElementToYaml(def)) as unknown as pdw.DefLike[];
-        }
-        if (data.pointDefs !== undefined) {
-            data.pointDefs = data.pointDefs.map(element => this.translateElementToYaml(element)) as unknown as pdw.PointDefLike[];
-        }
-        if (data.entries !== undefined) {
-            data.entries = data.entries.map(element => this.translateElementToYaml(element)) as unknown as pdw.EntryLike[];
-        }
-        if (data.entryPoints !== undefined) {
-            data.entryPoints = data.entryPoints.map(element => this.translateElementToYaml(element)) as unknown as pdw.EntryPointLike[];
-        }
-        if (data.tagDefs !== undefined) {
-            data.tagDefs = data.tagDefs.map(element => this.translateElementToYaml(element)) as unknown as pdw.TagDefLike[];
-        }
-        if (data.tags !== undefined) {
-            data.tags = data.tags.map(element => this.translateElementToYaml(element)) as unknown as pdw.TagLike[];
-        }
-        return data;
-    }
-
-    translateElementToYaml(element: any): any {
-        if (element._tempCreated !== undefined) delete element._tempCreated
-        if (element._tempUpdated !== undefined) delete element._tempUpdated
-        let returnObj: any = {
-            uid: element._uid,
-            cre: pdw.parseTemporalFromEpochStr(element._created).toString().split('[')[0],
-            upd: pdw.parseTemporalFromEpochStr(element._updated).toString().split('[')[0],
-            del: element._deleted,
-        }
-        if (element._desc !== undefined) returnObj.dsc = element._desc
-        if (element._did !== undefined) returnObj.did = element._did
-        if (element._eid !== undefined) returnObj.eid = element._eid
-        if (element._pid !== undefined) returnObj.pid = element._pid
-        if (element._lbl !== undefined) returnObj.lbl = element._lbl
-        if (element._tid !== undefined) returnObj.tid = element._tid
-        if (element._emoji !== undefined) returnObj.emo = element._emoji
-        if (element._scope !== undefined) returnObj.scp = element._scope
-        if (element._type !== undefined) returnObj.typ = element._type
-        if (element._rollup !== undefined) returnObj.rlp = element._rollup
-        if (element._period !== undefined) returnObj.per = element._period
-        if (element._note !== undefined) returnObj.nte = element._note
-        if (element._val !== undefined) returnObj.val = element._val
-        return returnObj
-    }
-}
-
-
 /**
  * Let's party.
  */
-export class AsyncExcelNatural implements pdw.AsyncDataStore {
-    static entryShtName = 'Entries';
-    static elementsShtName = 'Elements';
+// export class AsyncExcelNatural implements pdw.AsyncDataStore {
+//     static entryShtName = 'Entries';
+//     static elementsShtName = 'Elements';
 
-    importFrom(filepath: string): pdw.CompleteDataset {
-        console.log('loading...');
-        let returnData: pdw.CompleteDataset = {}
-        XLSX.set_fs(fs);
-        let loadedWb = XLSX.readFile(filepath, { dense: true });
-        const shts = loadedWb.SheetNames;
-        const pdwRef = pdw.PDW.getInstance();
-        if (!shts.some(name => name === AsyncExcelNatural.elementsShtName)) {
-            console.warn('No Defs sheet found in ' + filepath);
-        } else {
-            const defSht = loadedWb.Sheets[AsyncExcelNatural.elementsShtName];
-            let defBaseRawArr = XLSX.utils.sheet_to_json(defSht, { header: 1 }) as pdw.DefLike[];
-            returnData.defs = defBaseRawArr.map(rawDef => AsyncExcelNatural.parseExcelDefRow(rawDef))
-            pdwRef.setDefs(returnData.defs);
-        }
+//     importFrom(filepath: string): pdw.CompleteDataset {
+//         console.log('loading...');
+//         let returnData: pdw.CompleteDataset = {}
+//         XLSX.set_fs(fs);
+//         let loadedWb = XLSX.readFile(filepath, { dense: true });
+//         const shts = loadedWb.SheetNames;
+//         const pdwRef = pdw.PDW.getInstance();
+//         if (!shts.some(name => name === AsyncExcelNatural.elementsShtName)) {
+//             console.warn('No Defs sheet found in ' + filepath);
+//         } else {
+//             const defSht = loadedWb.Sheets[AsyncExcelNatural.elementsShtName];
+//             let defBaseRawArr = XLSX.utils.sheet_to_json(defSht, { header: 1 }) as pdw.DefLike[];
+//             returnData.defs = defBaseRawArr.map(rawDef => AsyncExcelNatural.parseExcelDefRow(rawDef))
+//             pdwRef.setDefs(returnData.defs);
+//         }
 
-        if (!shts.some(name => name === AsyncExcelNatural.entryShtName)) {
-            console.warn('No Entry sheet found in ' + filepath);
-        } else {
-            const entrySht = loadedWb.Sheets[AsyncExcelNatural.entryShtName];
-            let entryRawArr = XLSX.utils.sheet_to_json(entrySht, { header: 1 }) as any[][];
-            let entriesAndEntryPoints: { entries: pdw.EntryLike[], entryPoints: pdw.EntryPointLike[] } = {
-                entries: [],
-                entryPoints: [],
-            }
-            entriesAndEntryPoints = this.parseEntrySht(entryRawArr);
-            pdwRef.setEntries(entriesAndEntryPoints.entries);
-            pdwRef.setEntryPoints(entriesAndEntryPoints.entryPoints);
-            // returnData.entryPoints = this.convertEntryShtToEntryPoints(entryRawArr, columns);
-            // pdwRef.setEntryPoints(returnData.entryPoints);
-        }
+//         if (!shts.some(name => name === AsyncExcelNatural.entryShtName)) {
+//             console.warn('No Entry sheet found in ' + filepath);
+//         } else {
+//             const entrySht = loadedWb.Sheets[AsyncExcelNatural.entryShtName];
+//             let entryRawArr = XLSX.utils.sheet_to_json(entrySht, { header: 1 }) as any[][];
+//             let entriesAndEntryPoints: { entries: pdw.EntryLike[], entryPoints: pdw.EntryPointLike[] } = {
+//                 entries: [],
+//                 entryPoints: [],
+//             }
+//             entriesAndEntryPoints = this.parseEntrySht(entryRawArr);
+//             pdwRef.setEntries(entriesAndEntryPoints.entries);
+//             pdwRef.setEntryPoints(entriesAndEntryPoints.entryPoints);
+//             // returnData.entryPoints = this.convertEntryShtToEntryPoints(entryRawArr, columns);
+//             // pdwRef.setEntryPoints(returnData.entryPoints);
+//         }
 
-        returnData = pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
+//         returnData = pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
 
-        return returnData;
-    }
+//         return returnData;
+//     }
 
-    private parseEntrySht(rawRows: any[][]): { entries: pdw.EntryLike[], entryPoints: pdw.EntryPointLike[] } {
-        let returnData: { entries: pdw.EntryLike[], entryPoints: pdw.EntryPointLike[] } = {
-            entries: [],
-            entryPoints: []
-        }
-        // if(entryRawArr[0].length !== columns.length - 1) throw new Error('Schema sheet should have exactly one more column than the Entries sheet')
-        return returnData
-    }
+//     private parseEntrySht(rawRows: any[][]): { entries: pdw.EntryLike[], entryPoints: pdw.EntryPointLike[] } {
+//         let returnData: { entries: pdw.EntryLike[], entryPoints: pdw.EntryPointLike[] } = {
+//             entries: [],
+//             entryPoints: []
+//         }
+//         // if(entryRawArr[0].length !== columns.length - 1) throw new Error('Schema sheet should have exactly one more column than the Entries sheet')
+//         return returnData
+//     }
 
-    static parseExcelDefRow(rawDef: pdw.DefLike): pdw.DefLike {
-        let parsedDef: pdw.MinimumDef = {
-            _lbl: rawDef._lbl
-        }
-        //#TODO - handle checks & variability
-        parsedDef._did = rawDef._did === undefined ? pdw.makeSmallID() : rawDef._did;
-        parsedDef._created = rawDef._created === undefined ? pdw.makeEpochStr() : AsyncExcelTabular.makeEpochStrFromExcelDate(rawDef._created);
-        parsedDef._updated = rawDef._updated === undefined ? pdw.makeEpochStr() : AsyncExcelTabular.makeEpochStrFromExcelDate(rawDef._updated);
-        parsedDef._deleted = rawDef._deleted === undefined ? false : rawDef._deleted.toString().toUpperCase() === 'TRUE';
-        parsedDef._emoji = rawDef._emoji === undefined ? '🆕' : rawDef._emoji;
-        parsedDef._desc = rawDef._desc === undefined ? '' : rawDef._desc;
-        parsedDef._scope = rawDef._scope === undefined ? pdw.Scope.SECOND : rawDef._scope;
-        parsedDef._uid = rawDef._uid === undefined ? pdw.makeUID() : rawDef._uid;
+//     static parseExcelDefRow(rawDef: pdw.DefLike): pdw.DefLike {
+//         let parsedDef: pdw.MinimumDef = {
+//             _lbl: rawDef._lbl
+//         }
+//         //#TODO - handle checks & variability
+//         parsedDef._did = rawDef._did === undefined ? pdw.makeSmallID() : rawDef._did;
+//         parsedDef._created = rawDef._created === undefined ? pdw.makeEpochStr() : AsyncExcelTabular.makeEpochStrFromExcelDate(rawDef._created);
+//         parsedDef._updated = rawDef._updated === undefined ? pdw.makeEpochStr() : AsyncExcelTabular.makeEpochStrFromExcelDate(rawDef._updated);
+//         parsedDef._deleted = rawDef._deleted === undefined ? false : rawDef._deleted.toString().toUpperCase() === 'TRUE';
+//         parsedDef._emoji = rawDef._emoji === undefined ? '🆕' : rawDef._emoji;
+//         parsedDef._desc = rawDef._desc === undefined ? '' : rawDef._desc;
+//         parsedDef._scope = rawDef._scope === undefined ? pdw.Scope.SECOND : rawDef._scope;
+//         parsedDef._uid = rawDef._uid === undefined ? pdw.makeUID() : rawDef._uid;
 
-        return parsedDef as pdw.DefLike
-    }
+//         return parsedDef as pdw.DefLike
+//     }
 
-    exportTo(data: pdw.CompleteDataset, filename: string) {
-        throw new Error('Method not implemented.');
+//     exportTo(data: pdw.CompleteDataset, filename: string) {
+//         throw new Error('Method not implemented.');
 
-        /*
-        XLSX.set_fs(fs);
-        const wb = XLSX.utils.book_new();
+//         /*
+//         XLSX.set_fs(fs);
+//         const wb = XLSX.utils.book_new();
 
-        if (data.overview !== undefined) {
-            let aoa = [];
-            aoa.push(['Store Name:', data.overview.storeName]);
-            aoa.push(['Last updated:', pdw.parseTemporalFromEpochStr(data.overview.lastUpdated).toLocaleString()]);
-            aoa.push(['Element Type', 'Count Active', 'Count Deleted']);
-            if (data.defs !== undefined) aoa.push(['defs', data.overview.defs.current, data.overview.defs.deleted]);
-            if (data.pointDefs !== undefined) aoa.push(['pointDefs', data.overview.pointDefs.current, data.overview.pointDefs.deleted]);
-            if (data.entries !== undefined) aoa.push(['entries', data.overview.entries.current, data.overview.entries.deleted]);
-            if (data.entryPoints !== undefined) aoa.push(['entryPoints', data.overview.entryPoints.current, data.overview.entryPoints.deleted]);
-            if (data.tagDefs !== undefined) aoa.push(['tagDefs', data.overview.tagDefs.current, data.overview.tagDefs.deleted]);
-            if (data.tags !== undefined) aoa.push(['tags', data.overview.tags.current, data.overview.tags.deleted]);
-            let overviewSht = XLSX.utils.aoa_to_sheet(aoa);
-            XLSX.utils.book_append_sheet(wb, overviewSht, ExcelTabularImportExport.overViewShtName);
-        }
+//         if (data.overview !== undefined) {
+//             let aoa = [];
+//             aoa.push(['Store Name:', data.overview.storeName]);
+//             aoa.push(['Last updated:', pdw.parseTemporalFromEpochStr(data.overview.lastUpdated).toLocaleString()]);
+//             aoa.push(['Element Type', 'Count Active', 'Count Deleted']);
+//             if (data.defs !== undefined) aoa.push(['defs', data.overview.defs.current, data.overview.defs.deleted]);
+//             if (data.pointDefs !== undefined) aoa.push(['pointDefs', data.overview.pointDefs.current, data.overview.pointDefs.deleted]);
+//             if (data.entries !== undefined) aoa.push(['entries', data.overview.entries.current, data.overview.entries.deleted]);
+//             if (data.entryPoints !== undefined) aoa.push(['entryPoints', data.overview.entryPoints.current, data.overview.entryPoints.deleted]);
+//             if (data.tagDefs !== undefined) aoa.push(['tagDefs', data.overview.tagDefs.current, data.overview.tagDefs.deleted]);
+//             if (data.tags !== undefined) aoa.push(['tags', data.overview.tags.current, data.overview.tags.deleted]);
+//             let overviewSht = XLSX.utils.aoa_to_sheet(aoa);
+//             XLSX.utils.book_append_sheet(wb, overviewSht, ExcelTabularImportExport.overViewShtName);
+//         }
 
-        if (data.defs !== undefined && data.defs.length > 0) {
-            let defBaseArr = data.defs.map(def => ExcelTabularImportExport.makeExcelDefRow(def));
-            defBaseArr.unshift(tabularHeaders.def);
+//         if (data.defs !== undefined && data.defs.length > 0) {
+//             let defBaseArr = data.defs.map(def => ExcelTabularImportExport.makeExcelDefRow(def));
+//             defBaseArr.unshift(tabularHeaders.def);
 
-            let defSht = XLSX.utils.aoa_to_sheet(defBaseArr);
-            XLSX.utils.book_append_sheet(wb, defSht, ExcelTabularImportExport.defShtName);
-        }
+//             let defSht = XLSX.utils.aoa_to_sheet(defBaseArr);
+//             XLSX.utils.book_append_sheet(wb, defSht, ExcelTabularImportExport.defShtName);
+//         }
 
-        if (data.pointDefs !== undefined && data.pointDefs.length > 0) {
-            let pointDefArr = data.pointDefs.map(pd => ExcelTabularImportExport.makeExcelPointDefRow(pd));
-            pointDefArr.unshift(tabularHeaders.pointDef);
+//         if (data.pointDefs !== undefined && data.pointDefs.length > 0) {
+//             let pointDefArr = data.pointDefs.map(pd => ExcelTabularImportExport.makeExcelPointDefRow(pd));
+//             pointDefArr.unshift(tabularHeaders.pointDef);
 
-            let pointDefSht = XLSX.utils.aoa_to_sheet(pointDefArr);
-            XLSX.utils.book_append_sheet(wb, pointDefSht, ExcelTabularImportExport.pointDefShtName);
-        }
+//             let pointDefSht = XLSX.utils.aoa_to_sheet(pointDefArr);
+//             XLSX.utils.book_append_sheet(wb, pointDefSht, ExcelTabularImportExport.pointDefShtName);
+//         }
 
-        if (data.entries !== undefined) {
-            let entryArr = data.entries.map(entry => ExcelTabularImportExport.makeExcelEntryRow(entry));
-            entryArr.unshift(tabularHeaders.entry);
+//         if (data.entries !== undefined) {
+//             let entryArr = data.entries.map(entry => ExcelTabularImportExport.makeExcelEntryRow(entry));
+//             entryArr.unshift(tabularHeaders.entry);
 
-            let entryBaseSht = XLSX.utils.aoa_to_sheet(entryArr);
-            XLSX.utils.book_append_sheet(wb, entryBaseSht, ExcelTabularImportExport.entryShtName);
-        }
+//             let entryBaseSht = XLSX.utils.aoa_to_sheet(entryArr);
+//             XLSX.utils.book_append_sheet(wb, entryBaseSht, ExcelTabularImportExport.entryShtName);
+//         }
 
-        if (data.entryPoints !== undefined) {
-            let entryPointArr = data.entryPoints.map(entryPoint => ExcelTabularImportExport.makeExcelEntryPointRow(entryPoint));
-            entryPointArr.unshift(tabularHeaders.entryPoint);
+//         if (data.entryPoints !== undefined) {
+//             let entryPointArr = data.entryPoints.map(entryPoint => ExcelTabularImportExport.makeExcelEntryPointRow(entryPoint));
+//             entryPointArr.unshift(tabularHeaders.entryPoint);
 
-            let entryPointSht = XLSX.utils.aoa_to_sheet(entryPointArr);
-            XLSX.utils.book_append_sheet(wb, entryPointSht, ExcelTabularImportExport.entryPointShtName);
-        }
+//             let entryPointSht = XLSX.utils.aoa_to_sheet(entryPointArr);
+//             XLSX.utils.book_append_sheet(wb, entryPointSht, ExcelTabularImportExport.entryPointShtName);
+//         }
 
-        if (data.tagDefs !== undefined) {
-            let tagDefArr = data.tagDefs.map(tagDef => ExcelTabularImportExport.makeExcelTagDefRow(tagDef))
-            tagDefArr.unshift(tabularHeaders.tagDef);
+//         if (data.tagDefs !== undefined) {
+//             let tagDefArr = data.tagDefs.map(tagDef => ExcelTabularImportExport.makeExcelTagDefRow(tagDef))
+//             tagDefArr.unshift(tabularHeaders.tagDef);
 
-            let tagDefSht = XLSX.utils.aoa_to_sheet(tagDefArr);
-            XLSX.utils.book_append_sheet(wb, tagDefSht, ExcelTabularImportExport.tagDefShtName);
-        }
+//             let tagDefSht = XLSX.utils.aoa_to_sheet(tagDefArr);
+//             XLSX.utils.book_append_sheet(wb, tagDefSht, ExcelTabularImportExport.tagDefShtName);
+//         }
 
-        if (data.tags !== undefined) {
-            let tagArr = data.tags.map(tag => ExcelTabularImportExport.makeExcelTagRow(tag))
-            tagArr.unshift(tabularHeaders.tag);
+//         if (data.tags !== undefined) {
+//             let tagArr = data.tags.map(tag => ExcelTabularImportExport.makeExcelTagRow(tag))
+//             tagArr.unshift(tabularHeaders.tag);
 
-            let tagSht = XLSX.utils.aoa_to_sheet(tagArr);
-            XLSX.utils.book_append_sheet(wb, tagSht, ExcelTabularImportExport.tagShtName);
-        }
+//             let tagSht = XLSX.utils.aoa_to_sheet(tagArr);
+//             XLSX.utils.book_append_sheet(wb, tagSht, ExcelTabularImportExport.tagShtName);
+//         }
 
-        XLSX.writeFile(wb, filename);
-        */
-    }
+//         XLSX.writeFile(wb, filename);
+//         */
+//     }
 
-}
+// }
+
+//#endregion
 
 //#region ### SHARED  ###
 export const tabularHeaders = {

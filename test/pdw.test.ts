@@ -1516,8 +1516,127 @@ test.skip('Query Basics', () => {
 test('Data Merge', () => {
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 
-    let inMemoryDataStoreTwo = new DefaultDataStore(pdwRef);
+    // let inMemoryDataStoreTwo = new DefaultDataStore(pdwRef);
 
+    let a = tinyDataA().defs!;
+    let b = tinyDataB().defs!;
+    expect(a.length).toBe(1);
+    expect(b.length).toBe(1);
+    let merge = pdw.PDW.merge(a,b);
+    expect(merge.length).toBe(2);
 
+    
+
+    function tinyDataA(): pdw.CompleteDataset{
+        return {
+            defs: [
+                {
+                    "_uid": "lkljr435-phsn",
+                    "_deleted": false,
+                    "_updated": "lkljr435",
+                    "_created": "lkljr435",
+                    "_did": "cccc",
+                    "_lbl": "Movie",
+                    "_desc": "Set a description",
+                    "_emoji": "🎬",
+                    "_scope": pdw.Scope.SECOND,
+                    "_pts": [
+                        {
+                            "_lbl": "Name",
+                            "_desc": "Set a description",
+                            "_emoji": "🎬",
+                            "_type": pdw.PointType.TEXT,
+                            "_rollup": pdw.Rollup.COUNT,
+                            "_active": true,
+                            "_pid": "ccc1"
+                        }
+                    ]
+                },
+            ],
+            entries: [
+                {
+                    "_uid": "lkljr4sj-grd4",
+                    "_deleted": false,
+                    "_updated": "lkljr4sk",
+                    "_created": "lkljr4sk",
+                    "_eid": "lkljr4sk-526e",
+                    "_note": "",
+                    "_did": "cccc",
+                    "_period": "2023-07-24T18:45:00",
+                    "_source": "",
+                    "ccc1": "Oppenheimer"
+                },
+            ],
+            tags: [
+                {
+                    "_uid": "lkljr437-8ff7",
+                    "_deleted": false,
+                    "_updated": "lkljr437",
+                    "_created": "lkljr437",
+                    "_tid": "tag1",
+                    "_lbl": "media",
+                    "_dids": [
+                        "cccc"
+                    ]
+                }
+            ]
+        }
+    }
+
+    function tinyDataB(): pdw.CompleteDataset{
+        return {
+            defs: [
+                {
+                    "_uid": "lkljr999-zzzz",
+                    "_deleted": false,
+                    "_updated": "lkljr999",
+                    "_created": "lkljr435",
+                    "_did": "cccc",
+                    "_lbl": "Movie",
+                    "_desc": "Now has a description!",
+                    "_emoji": "🎬",
+                    "_scope": pdw.Scope.SECOND,
+                    "_pts": [
+                        {
+                            "_lbl": "Name",
+                            "_desc": "This is now also described.",
+                            "_emoji": "🎬",
+                            "_type": pdw.PointType.TEXT,
+                            "_rollup": pdw.Rollup.COUNT,
+                            "_active": true,
+                            "_pid": "ccc1"
+                        }
+                    ]
+                },
+            ],
+            entries: [
+                {
+                    "_uid": "lkljr4sg-aayg",
+                    "_deleted": false,
+                    "_updated": "lkljr4si",
+                    "_created": "lkljr4sh",
+                    "_eid": "lkljr4sj-bulk",
+                    "_note": "",
+                    "_did": "cccc",
+                    "_period": "2023-07-24T13:15:00",
+                    "_source": "",
+                    "ccc1": "Barbie"
+                },
+            ],
+            tags: [
+                {
+                    "_uid": "lkljr437-8ff7",
+                    "_deleted": false,
+                    "_updated": "lkljr437",
+                    "_created": "lkljr437",
+                    "_tid": "tag1",
+                    "_lbl": "media",
+                    "_dids": [
+                        "cccc"
+                    ]
+                }
+            ]
+        }
+    }
 
 })
