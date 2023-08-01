@@ -10,9 +10,9 @@ const pdwRef = pdw.PDW.getInstance();
 
 // createTestDataSet();
 
-let a = tinyDataA().tags!;
-let b = tinyDataB().tags!;
-let merge = pdw.PDW.merge(a, b);
+let a = tinyDataA()!;
+let b = tinyDataB()!;
+let merge = pdw.PDW.mergeComplete(a, b);
 
 console.log(merge);
 
@@ -76,13 +76,35 @@ function tinyDataB(): pdw.CompleteDataset {
     return {
         defs: [
             {
+                "_uid": "lkljr888-zzzz",
+                "_deleted": true,
+                "_updated": "lkljr888",
+                "_created": "lkljr435",
+                "_did": "cccc",
+                "_lbl": "Movie",
+                "_desc": "Now has a description!",
+                "_emoji": "🎬",
+                "_scope": pdw.Scope.SECOND,
+                "_pts": [
+                    {
+                        "_lbl": "Name",
+                        "_desc": "This is now also described.",
+                        "_emoji": "🎬",
+                        "_type": pdw.PointType.TEXT,
+                        "_rollup": pdw.Rollup.COUNT,
+                        "_active": true,
+                        "_pid": "ccc1"
+                    }
+                ]
+            },
+            {
                 "_uid": "lkljr999-zzzz",
                 "_deleted": false,
                 "_updated": "lkljr999",
                 "_created": "lkljr435",
                 "_did": "cccc",
                 "_lbl": "Movie",
-                "_desc": "Now has a description!",
+                "_desc": "Now has an UPDATED description!",
                 "_emoji": "🎬",
                 "_scope": pdw.Scope.SECOND,
                 "_pts": [

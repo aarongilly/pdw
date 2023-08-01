@@ -663,72 +663,71 @@ export class PDW {
 
     static mergeComplete(a: CompleteDataset, b: CompleteDataset): CompleteDataset{
         let returnObj: CompleteDataset = {};
-        // //@ts-expect-error
-        // if(data.defs!==undefined) returnObj.defs = PDW.merge(data.defs);
-        // //@ts-expect-error
-        // if(data.entries!==undefined) returnObj.entries = PDW.merge(data.entries);
-        // //@ts-expect-error
-        // if(a.tags!==undefined) returnObj.tags = PDW.merge(a.tags);
+
+        if(a.defs!==undefined && b.defs!==undefined){
+            returnObj.defs = PDW.merge(a.defs, b.defs);
+        }else{
+            if(a.defs !== undefined) returnObj.defs = a.defs
+            if(b.defs !== undefined) returnObj.defs = b.defs
+        }
+        if(a.entries!==undefined && b.entries!==undefined){
+            returnObj.entries = PDW.merge(a.entries, b.entries);
+        }else{
+            if(a.entries !== undefined) returnObj.entries = a.entries
+            if(b.entries !== undefined) returnObj.entries = b.entries
+        }
+        if(a.tags!==undefined && b.tags!==undefined){
+            returnObj.tags = PDW.merge(a.tags, b.tags);
+        }else{
+            if(a.tags !== undefined) returnObj.tags = a.tags
+            if(b.tags !== undefined) returnObj.tags = b.tags
+        }
+
         return returnObj;
     }
 
+    /**
+     * Mergest two arrays of elements and returns a static COPY of the combined list
+     * without duplicates. Also handles marking things as updated & deleted when they
+     * are different in between lists (the most-recently-updated one stays, the rest
+     * are marked _deleted = true)
+     * @param a list of Elements or ElementLike
+     * @param b list of Elements or ElementLike
+     * @returns an array of separate, data-only copies of the merged elements
+     */
     static merge(a: ElementLike[], b: ElementLike[]): ElementLike[]{
-        let result: ElementLike[] = [];
+        //make static copy of A
+        let result = a.map(e=>Element.toData(e));
         
-        //this logic is probably slow, but easy to write
-        let onlyA = a.filter(eA=>!b.some(eB=>eB._uid === eA._uid));
-        let onlyB = b.filter(eB=>!a.some(eA=>eA._uid === eB._uid));
-
-        let both: ElementLike[] = [];
-
-        //same UID
-        a.forEach(eA => {
-            //if element A is already deleted, then it cannot replace anything in B,
-            //nor can it be updated by anything in B
-            if(eA._deleted) return;
-            let match = b.find(eB=>eB._uid! === eA._uid!);
+        b.forEach(eB=>{
+            let match = result.find(eA=>eA._uid === eB._uid);
+            if(match !== undefined && match._updated === eB._updated) return //result is identical
             if(match !== undefined){
-                //exact match
-                if(eA._updated! === match._updated!) return both.push(eA);
-                //eA is *newer* than eB
-                if(eA._updated! > match._updated!){
-                    match._updated = eA._updated;
-                    match._deleted = true;
-
-                }else{
-                    //eB is *newer* than eA
-                    eA._updated = match._updated;
-                    eA._deleted = true;    
-                }
-                both.push(match, eA);
+                if(match._updated! > eB._updated!) return //result is newer
+                match._updated = eB._updated;
+                match._deleted = eB._deleted; 
+                return //due to principle of not changing data on update, this makes match equal to eB
             }
-        })
-
-        //#TODO - this logic is not finished and definitely wrong
-        //different UID, same Element ID
-        a.forEach(eA => {
-            //if element A is already deleted, then it cannot replace anything in B,
-            //nor can it be updated by anything in B
-            if(eA._deleted) return;
-            let match = b.find(eB=>eB._uid! !== eA._uid! && Element.hasSameId(eA, eB));
+            let matches = result.filter(eA=>Element.hasSameId(eA, eB));
+            if(matches.length === 0){
+                result.push(Element.toData(eB));
+                return
+            }
+            if(matches.length > 1){
+                //keep the most recently updated one
+                match = matches.reduce((prev, current) => (prev._updated! > current._updated!) ? prev : current);
+            }else{
+                match = matches[0]
+            }
             if(match !== undefined){
-                //exact match
-                if(eA._updated! === match._updated!) return both.push(eA);
-                //eA is *newer* than eB
-                if(eA._updated! > match._updated!){
-                    match._updated = eA._updated;
-                    match._deleted = true;
-
-                }else{
-                    //eB is *newer* than eA
-                    eA._updated = match._updated;
-                    eA._deleted = true;    
-                }
-                both.push(match, eA);
+                if(match._updated! > eB._updated!) return
+                match._deleted = true; //match is outdated by new entry in b
+                match._updated = eB._created; //this seems appropriate
+                //intentionally not returning here, still need to push eB
             }
+            result.push(Element.toData(eB));
         })
-
-        return [...onlyA, ...onlyB, ...both];
+        return result;
     }
 
     /**
