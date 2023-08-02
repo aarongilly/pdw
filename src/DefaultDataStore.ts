@@ -30,7 +30,7 @@ export class DefaultDataStore implements pdw.DataStore {
         throw new Error("Method not implemented.");
     }
 
-    getAll(params: pdw.SanitizedParams): pdw.CompleteDataset {
+    getAll(params: pdw.SanitizedParams): pdw.CompleteishDataset {
         return {
             defs: this.getDefs(params),
             entries: this.getEntries(params),
@@ -116,7 +116,7 @@ export class DefaultDataStore implements pdw.DataStore {
         throw new Error("Method not implemented.");
     }
 
-    setAll(completeData: pdw.CompleteDataset): pdw.CompleteDataset {
+    setAll(completeData: pdw.CompleteishDataset): pdw.CompleteishDataset {
         throw new Error("Method not implemented.");
     }
 

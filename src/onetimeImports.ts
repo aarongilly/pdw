@@ -5,9 +5,9 @@ import * as pdw from './pdw.js';
 import { Temporal } from 'temporal-polyfill';
 import * as YAML from 'yaml';
 
-export function importPreviousCSV(filepath: string): pdw.CompleteDataset{
+export function importPreviousCSV(filepath: string): pdw.CompleteishDataset{
     console.log('loading...');
-        let returnData: pdw.CompleteDataset = {}
+        let returnData: pdw.CompleteishDataset = {}
         XLSX.set_fs(fs);
         let loadedWb = XLSX.readFile(filepath);
         const shts = loadedWb.SheetNames;
@@ -112,7 +112,7 @@ export function importPreviousCSV(filepath: string): pdw.CompleteDataset{
         }
 }
 
-export function importFirestore(filepath: string): pdw.CompleteDataset {
+export function importFirestore(filepath: string): pdw.CompleteishDataset {
     function xlateDate(oldDate: string): pdw.EpochStr {
         if (typeof oldDate !== 'string') {
             return pdw.makeEpochStr()
@@ -221,7 +221,7 @@ export function importFirestore(filepath: string): pdw.CompleteDataset {
     }
 
     const file = JSON.parse(fs.readFileSync(filepath).toString());
-    const returnData: pdw.CompleteDataset = {
+    const returnData: pdw.CompleteishDataset = {
         defs: file.defs,
         pointDefs: file.pointDefs,
         entries: file.entries,
@@ -297,7 +297,7 @@ export function importFirestore(filepath: string): pdw.CompleteDataset {
     return returnData;
 }
 
-export function importMongo(filepath: string): pdw.CompleteDataset {
+export function importMongo(filepath: string): pdw.CompleteishDataset {
     function xlateDate(oldDate: string): pdw.EpochStr {
         if (typeof oldDate !== 'string') {
             return pdw.makeEpochStr()
@@ -420,7 +420,7 @@ export function importMongo(filepath: string): pdw.CompleteDataset {
     }
 
     const file = JSON.parse(fs.readFileSync(filepath).toString());
-    const returnData: pdw.CompleteDataset = {
+    const returnData: pdw.CompleteishDataset = {
         defs: [],
         pointDefs: [],
         entries: [],
@@ -495,7 +495,7 @@ export function importMongo(filepath: string): pdw.CompleteDataset {
 
 export function importOldest(filepath: string) {
     console.log('loading...');
-    let returnData: pdw.CompleteDataset = {}
+    let returnData: pdw.CompleteishDataset = {}
     XLSX.set_fs(fs);
     let loadedWb = XLSX.readFile(filepath, { dense: true });
     const shts = loadedWb.SheetNames;
@@ -591,7 +591,7 @@ export function importOldest(filepath: string) {
 
 export function importOldV9(filepath: string) {
     console.log('loading...');
-    let returnData: pdw.CompleteDataset = {}
+    let returnData: pdw.CompleteishDataset = {}
     XLSX.set_fs(fs);
     let loadedWb = XLSX.readFile(filepath, { dense: true });
     const shts = loadedWb.SheetNames;

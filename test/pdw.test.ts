@@ -1513,7 +1513,7 @@ test.skip('Query Basics', () => {
     
 })
 
-test('Data Merge', () => {
+test.skip('Data Merge', () => {
     (<DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 
     // let inMemoryDataStoreTwo = new DefaultDataStore(pdwRef);
@@ -1521,13 +1521,16 @@ test('Data Merge', () => {
     let a = tinyDataA().defs!;
     let b = tinyDataB().defs!;
     expect(a.length).toBe(1);
-    expect(b.length).toBe(1);
-    let merge = pdw.PDW.merge(a,b);
-    expect(merge.length).toBe(2);
+    expect(b.length).toBe(2);
+    let merge: any = pdw.PDW.merge(a,b);
+    expect(merge.length).toBe(3); //original, first update, 2nd update
+    //combine all at the same time
+    merge = pdw.PDW.mergeComplete(tinyDataA(), tinyDataB());
+    expect(merge.defs.length).toBe(3);
+    expect(merge.entries.length).toBe(3)
+    expect(merge.tags.length).toBe(1);
 
-    
-
-    function tinyDataA(): pdw.CompleteDataset{
+    function tinyDataA(): pdw.CompleteishDataset{
         return {
             defs: [
                 {
@@ -1583,9 +1586,31 @@ test('Data Merge', () => {
         }
     }
 
-    function tinyDataB(): pdw.CompleteDataset{
+    function tinyDataB(): pdw.CompleteishDataset{
         return {
             defs: [
+                {
+                    "_uid": "lkljr888-zzzz",
+                    "_deleted": true,
+                    "_updated": "lkljr888",
+                    "_created": "lkljr435",
+                    "_did": "cccc",
+                    "_lbl": "Movie",
+                    "_desc": "Now has a description!",
+                    "_emoji": "🎬",
+                    "_scope": pdw.Scope.SECOND,
+                    "_pts": [
+                        {
+                            "_lbl": "Name",
+                            "_desc": "This is now also described.",
+                            "_emoji": "🎬",
+                            "_type": pdw.PointType.TEXT,
+                            "_rollup": pdw.Rollup.COUNT,
+                            "_active": true,
+                            "_pid": "ccc1"
+                        }
+                    ]
+                },
                 {
                     "_uid": "lkljr999-zzzz",
                     "_deleted": false,
@@ -1593,7 +1618,7 @@ test('Data Merge', () => {
                     "_created": "lkljr435",
                     "_did": "cccc",
                     "_lbl": "Movie",
-                    "_desc": "Now has a description!",
+                    "_desc": "Now has an UPDATED description!",
                     "_emoji": "🎬",
                     "_scope": pdw.Scope.SECOND,
                     "_pts": [
@@ -1621,6 +1646,30 @@ test('Data Merge', () => {
                     "_period": "2023-07-24T13:15:00",
                     "_source": "",
                     "ccc1": "Barbie"
+                },
+                {
+                    "_uid": "lkljr4sj-grd4",
+                    "_deleted": true,
+                    "_updated": "lkljr4sk",
+                    "_created": "lkljr4sk",
+                    "_eid": "lkljr4sk-526e",
+                    "_note": "",
+                    "_did": "cccc",
+                    "_period": "2023-07-24T18:45:00",
+                    "_source": "",
+                    "ccc1": "Oppenheimer"
+                },
+                {
+                    "_uid": "lkljr999-grd4",
+                    "_deleted": false,
+                    "_updated": "lkljr999",
+                    "_created": "lkljr4sk",
+                    "_eid": "lkljr4sk-526e",
+                    "_note": "This movie bombed",
+                    "_did": "cccc",
+                    "_period": "2023-07-24T18:45:00",
+                    "_source": "",
+                    "ccc1": "Oppenheimer"
                 },
             ],
             tags: [

@@ -1,0 +1,64 @@
+﻿Row Type,_uid,_created,_updated,_deleted,_did,_lbl,_emoji,_desc,_scope,_pid,_type,_rollup,_active,_opts,_eid,_period,_note,_source,_vals,_tid,_dids
+Def,lkljr430-u0fy,lkljr432,lkljr432,FALSE,aaaa,Nightly Review,👀,Set a description,DAY,,,,,,,,,,,,
+PointDef,lkljr430-u0fy,,,,aaaa,Review,👀,Your nightly review,,aaa1,MARKDOWN,COUNT,TRUE,,,,,,,,
+PointDef,lkljr430-u0fy,,,,aaaa,Work Status,👔,"Did you go in, if so where?",,aaa2,SELECT,COUNT,TRUE,"{
+  ""opt1"": ""Weekend/Holiday"",
+  ""opt2"": ""North"",
+  ""opt3"": ""WFH"",
+  ""opt4"": ""Vacation"",
+  ""opt5"": ""sickday""
+}",,,,,,,
+PointDef,lkljr430-u0fy,,,,aaaa,Satisfaction,1️⃣,10 perfect 1 horrid,,aaa3,NUMBER,COUNT,TRUE,,,,,,,,
+PointDef,lkljr430-u0fy,,,,aaaa,Physical Health,😥,10 perfect 1 horrid,,aaa4,NUMBER,COUNT,TRUE,,,,,,,,
+Def,lkljr434-o59g,lkljr434,lkljr434,FALSE,bbbb,Quotes,💬,Funny or good sayings,SECOND,,,,,,,,,,,,
+PointDef,lkljr434-o59g,,,,bbbb,Quote,💬,what was said,,bbb1,TEXT,COUNT,TRUE,,,,,,,,
+PointDef,lkljr434-o59g,,,,bbbb,Quoter,🙊,who said it,,bbb2,TEXT,COUNT,TRUE,,,,,,,,
+Def,lkljr435-phsn,lkljr435,lkljr435,FALSE,cccc,Movie,🎬,Set a description,SECOND,,,,,,,,,,,,
+PointDef,lkljr435-phsn,,,,cccc,Name,🎬,Set a description,,ccc1,TEXT,COUNT,TRUE,,,,,,,,
+PointDef,lkljr435-phsn,,,,cccc,First Watch?,🆕,Set a description,,ccc2,BOOL,COUNT,TRUE,,,,,,,,
+Def,lkljr436-0tyq,lkljr436,lkljr436,FALSE,dddd,Book,📖,Set a description,SECOND,,,,,,,,,,,,
+PointDef,lkljr436-0tyq,,,,dddd,Name,📖,Set a description,,ddd1,TEXT,COUNT,TRUE,,,,,,,,
+Entry,lkljr437-vqba,lkefsa6g,lkljr4sn,TRUE,bbbb,,,,,,,,,,lkfkuxon-f9ys,2023-07-21T14:02:13,Testing updates,,"{
+  ""bbb1"": ""You miss 100% of the shots you do not take"",
+  ""bbb2"": ""Michael Jordan""
+}",,
+Entry,lkfkuxo8-9ysw,lkdb20oo,lkdb20oo,FALSE,aaaa,,,,,,,,,,lkfkuxol-mnhe,2023-07-22,Original entry,,"{
+  ""aaa1"": ""Today I didn't do **anything**."",
+  ""aaa2"": ""opt1"",
+  ""aaa3"": 9,
+  ""aaa4"": 10
+}",,
+Entry,lkfkuxob-0av3,lkljr4s6,lkljr4s6,FALSE,aaaa,,,,,,,,,,lkljr4s7-0vtg,2023-07-23,,,"{
+  ""aaa1"": ""Today I wrote this line of code!"",
+  ""aaa2"": ""opt3"",
+  ""aaa3"": 5,
+  ""aaa4"": 9
+}",,
+Entry,lkljr4s7-00jo,lkbp6ooo,lkbp6ooo,FALSE,aaaa,,,,,,,,,,lkljr4s8-5rjq,2023-07-21,pretending I felt bad,,"{
+  ""aaa1"": ""This was a Friday. I did some stuff."",
+  ""aaa2"": ""opt2"",
+  ""aaa3"": 6,
+  ""aaa4"": 5
+}",,
+Entry,lkljr4s9-lttb,lkljr4s9,lkljr4sa,FALSE,dddd,,,,,,,,,,lkljr4sc-0cai,2023-07-27T14:27:41,,,"{
+  ""ddd1"": ""Oh the places you'll go!""
+}",,
+Entry,lkljr4sd-a117,lkljr4sd,lkljr4se,FALSE,dddd,,,,,,,,,,lkljr4se-thsr,2025-01-02T15:21:49,,,"{
+  ""ddd1"": ""The Time Traveller""
+}",,
+Entry,lkljr4sf-0dix,lkljr4sf,lkljr4sf,FALSE,dddd,,,,,,,,,,lkljr4sg-010g,2022-10-04T18:43:22,,,"{
+  ""ddd1"": ""The Time Traveller 2""
+}",,
+Entry,lkljr4sg-aayg,lkljr4sh,lkljr4si,FALSE,cccc,,,,,,,,,,lkljr4sj-bulk,2023-07-24T13:15:00,,,"{
+  ""ccc1"": ""Barbie"",
+  ""ccc2"": ""TRUE""
+}",,
+Entry,lkljr4sj-grd4,lkljr4sk,lkljr4sk,FALSE,cccc,,,,,,,,,,lkljr4sk-526e,2023-07-24T18:45:00,,,"{
+  ""ccc1"": ""Oppenheimer"",
+  ""ccc2"": ""TRUE""
+}",,
+Entry,lkljr4sl-aojw,lkefsa6g,lkljr4sl,FALSE,bbbb,,,,,,,,,,lkfkuxon-f9ys,2023-07-21T14:02:13,Testing updates,,"{
+  ""bbb1"": ""You miss 100% of the shots you do not take"",
+  ""bbb2"": ""Michael SCOTT""
+}",,
+Tag,lkljr437-8ff7,lkljr437,lkljr437,FALSE,,media,,,,,,,,,,,,,,tag1,"[""dddd"",""cccc""]"

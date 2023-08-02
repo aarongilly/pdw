@@ -130,7 +130,7 @@ export interface DataStore {
 
     getTags(params: SanitizedParams): TagLike[];
 
-    getAll(params: SanitizedParams): CompleteDataset;
+    getAll(params: SanitizedParams): CompleteishDataset;
 
 
 
@@ -140,7 +140,7 @@ export interface DataStore {
 
     setTags(tagData: Tag[]): TagLike[];
 
-    setAll(completeDataset: CompleteDataset): CompleteDataset;
+    setAll(completeDataset: CompleteishDataset): CompleteishDataset;
 
 
 
@@ -168,8 +168,8 @@ export interface DataStore {
  * place where the data was imported from until it's exported back to that place.
  */
 export interface AsyncDataStore {
-    importFrom(params: any): CompleteDataset,
-    exportTo(allData: CompleteDataset, params: any): any
+    importFrom(params: any): CompleteishDataset,
+    exportTo(allData: CompleteishDataset, params: any): any
 }
 
 /**
@@ -248,11 +248,18 @@ export interface SanitizedParams {
 /**
  * A map of arrays of all types of {@link Element}.
  */
-export interface CompleteDataset {
+export interface CompleteishDataset {
     overview?: DataStoreOverview;
     defs?: DefLike[];
     entries?: EntryLike[];
     tags?: TagLike[];
+}
+
+export interface CompleteDataset {
+    overview?: DataStoreOverview;
+    defs: DefData[];
+    entries: EntryData[];
+    tags: TagData[];
 }
 
 /**
@@ -415,6 +422,51 @@ export interface TagLike extends ElementLike {
     _dids?: SmallID[];
 }
 
+export interface ElementData {
+     _uid: UID;
+     _deleted: boolean;
+     _created: EpochStr;
+     _updated: EpochStr;
+     [x: string]: any;
+}
+
+export interface DefData extends ElementData{
+    _did: string;
+    _lbl: string;
+    _desc: string;
+    _emoji: string;
+    _scope: Scope;
+    _pts: PointDefData[];
+}
+
+export interface PointDefData {
+    _pid: SmallID
+    _lbl: string;
+    _desc: string;
+    _emoji: string;
+    _type: PointType;
+    _rollup: Rollup;
+    _active: boolean;
+    _opts: OptMap;    
+}
+
+export interface EntryData extends ElementData {
+    _eid: UID,
+    _note: string,
+    _period: PeriodStr,
+    _did: SmallID,
+    _source: string,
+    [_pid: string]: any
+}
+
+export interface TagData extends ElementData {
+    _tid: SmallID;
+    _lbl: string;
+    _dids: SmallID[];
+}
+
+
+
 /**
  * Option object, map with key = _oid, val = text label for option
  */
@@ -484,7 +536,7 @@ export class PDW {
         this.dataStores.push(storeInstance);
     }
 
-    getAll(rawParams: StandardParams): CompleteDataset {
+    getAll(rawParams: StandardParams): CompleteishDataset {
         const params = PDW.sanitizeParams(rawParams)
 
         let data = {
@@ -616,7 +668,7 @@ export class PDW {
         return tags
     }
 
-    setAll(completeDataset: CompleteDataset) {
+    setAll(completeDataset: CompleteishDataset) {
         if (completeDataset.defs !== undefined) this.setDefs(completeDataset.defs);
         if (completeDataset.entries !== undefined) this.setEntries(completeDataset.entries);
         if (completeDataset.tags !== undefined) this.setTags(completeDataset.tags);
@@ -661,8 +713,8 @@ export class PDW {
         return elements.map(e=>Element.toData(e));
     }
 
-    static mergeComplete(a: CompleteDataset, b: CompleteDataset): CompleteDataset{
-        let returnObj: CompleteDataset = {};
+    static mergeComplete(a: CompleteishDataset, b: CompleteishDataset): CompleteishDataset{
+        let returnObj: CompleteishDataset = {};
 
         if(a.defs!==undefined && b.defs!==undefined){
             returnObj.defs = PDW.merge(a.defs, b.defs);
@@ -815,7 +867,7 @@ export class PDW {
         return params as SanitizedParams
     }
 
-    static getDatasetLastUpdate(dataset: CompleteDataset): string {
+    static getDatasetLastUpdate(dataset: CompleteishDataset): string {
         let recents: ElementLike[] = [];
         if (dataset.defs !== undefined && dataset.defs.length > 0) recents.push(Element.getMostRecent(dataset.defs)!)
         if (dataset.entries !== undefined && dataset.entries.length > 0) recents.push(Element.getMostRecent(dataset.entries)!)
@@ -823,8 +875,8 @@ export class PDW {
         return Element.getMostRecent(recents)!._updated!
     }
 
-    static flattenCompleteDataset(data: CompleteDataset): CompleteDataset{
-        let returnObj: CompleteDataset = {};
+    static flattenCompleteDataset(data: CompleteishDataset): CompleteishDataset{
+        let returnObj: CompleteishDataset = {};
         //@ts-expect-error
         if(data.defs!==undefined) returnObj.defs = PDW.flatten(data.defs);
         //@ts-expect-error
@@ -834,7 +886,7 @@ export class PDW {
         return returnObj;
     }
 
-    static addOverviewToCompleteDataset(data: CompleteDataset, storeName?: string): CompleteDataset {
+    static addOverviewToCompleteDataset(data: CompleteishDataset, storeName?: string): CompleteishDataset {
         if (data.overview !== undefined) {
             console.warn('Tried to add an overview to a dataset that already had one:', data);
             return data
@@ -1153,7 +1205,7 @@ export abstract class Element implements ElementLike {
      * Create an object that is a non-referenced copy of the Element.
      * Also strips out meta-properties (those starting with double underscores).
      */
-    static toData(elementIn: any): ElementLike {
+    static toData(elementIn: any): ElementData {
         if (typeof elementIn !== 'object') return elementIn;
 
         let cloneData: ElementLike = {};
@@ -1178,6 +1230,11 @@ export abstract class Element implements ElementLike {
             }
         });
 
+        // if(cloneData._uid === undefined) throw new Error('no _uid created')
+        // if(cloneData._created === undefined) throw new Error('no _created created')
+        // if(cloneData._updated === undefined) throw new Error('no _updated created')
+        // if(cloneData._deleted === undefined) throw new Error('no _deleted created')
+        //@ts-expect-error
         return cloneData
     }
 
@@ -2636,25 +2693,27 @@ function maybeGetOnlyResult(arrayOfOneElement: any[]): any {
  * Used for .csv outputs, and probably SQL when I get around to that.
  * This is the order of all the headers.
  */
-export const canonicalHeaders = [ //#TODO - fix eventually
-    '_uid',
-    '_created',
-    '_updated',
-    '_deleted',
-    '_did',
-    '_pid',
-    '_eid',
-    '_tid',
-    '_lbl',
-    '_emoji',
-    '_desc',
-    '_scope',
-    '_type',
-    '_rollup',
-    '_period',
-    '_note',
-    '_source',
-    '_val'
-]
+// export const canonicalHeaders = [
+// '_uid',     //entry, tag, def
+// '_created', //entry, tag, def
+// '_updated', //entry, tag, def
+// '_deleted', //entry, tag, def
+// '_did',     //entry,    , def, pointDef
+// '_lbl',     //     , tag, def, pointDef
+// '_emoji',   //     ,    , def, pointDef
+// '_desc',    //     ,    , def, pointDef
+// '_scope',   //     ,    , def
+// '_pid',     //     ,    ,    , pointDef
+// '_type',    //     ,    ,    , pointDef
+// '_rollup',  //     ,    ,    , pointDef
+// '_active',  //     ,    ,    , pointDef
+// '_eid',     //entry
+// '_period',  //entry
+// '_note',    //entry
+// '_source',  //entry
+// '_vals',    //entry
+// '_tid',     //     , tag
+// '_dids'     //     , tag
+// ]
 
 //#endregion
