@@ -77,7 +77,7 @@ erDiagram
     ELEMENT ||--|| ENTRY : is
     ELEMENT ||--|| TAG : is
     ENTRYPOINT {
-        any pid "<- key is value of _pid from ass. PointDef"
+        any [pid] "<- key is value of _pid from ass. PointDef"
     }
     ENTRY ||--o{ ENTRYPOINT : owns
     POINTDEF ||--o{ ENTRYPOINT : describes
