@@ -28,8 +28,8 @@ export function importFromFile(filepath: string) {
 //#region #### DONE ####
 
 export class AsyncJson implements pdw.AsyncDataStore {
-
     exportTo(data: pdw.CompleteishDataset, filepath: string) {
+        data = pdw.PDW.flattenCompleteDataset(data); //remove circular references and stuff
         let json = JSON.stringify(data);
         fs.writeFile(filepath, json, 'utf8', () => { });
     }
@@ -138,9 +138,10 @@ export class AsyncYaml implements pdw.AsyncDataStore {
         if (element.rlp !== undefined) returnObj._rollup = element.rlp
         if (element.per !== undefined) returnObj._period = element.per
         if (element.nte !== undefined) returnObj._note = element.nte
+        if (element.src !== undefined) returnObj._source = element.src
         if (element.dids !== undefined) returnObj._dids = element.dids
         if (element.pts !== undefined) returnObj._pts = readPointDefMap(element.pts)//.map((pt: any) => translatePointDefFromYaml(pt))
-        if (element.ep !== undefined) {        
+        if (element.ep !== undefined) {
             Object.keys(element.ep).forEach(key => {
                 returnObj[key] = element.ep[key];
             })
@@ -150,7 +151,7 @@ export class AsyncYaml implements pdw.AsyncDataStore {
 
         function readPointDefMap(pdMap: any): any {
             const keys = Object.keys(pdMap);
-            return keys.map(key=>{
+            return keys.map(key => {
                 let pd = pdMap[key];
                 let returnObj: any = {};
                 if (pd.dsc !== undefined) returnObj._desc = pd.dsc
@@ -228,7 +229,7 @@ export class AsyncYaml implements pdw.AsyncDataStore {
 
         function makeYamlPointDefMap(pdArr: pdw.PointDefLike[]): any {
             let returnObj: any = {};
-            pdArr.forEach(pd=> {
+            pdArr.forEach(pd => {
                 if (pd.__def !== undefined) delete pd.__def;
                 returnObj[pd._pid!] = {} as any;
                 if (pd._desc !== undefined) returnObj[pd._pid!].dsc = pd._desc
@@ -247,9 +248,6 @@ export class AsyncYaml implements pdw.AsyncDataStore {
 
 //#endregion
 
-//#region #### #TODO ####
-//in order of priority, probably. 
-
 export class AsyncCSV implements pdw.AsyncDataStore {
     importFrom(filepath: string): pdw.CompleteishDataset {
         console.log('loading...');
@@ -261,55 +259,55 @@ export class AsyncCSV implements pdw.AsyncDataStore {
         const sht = loadedWb.Sheets[shts[0]];
         let elements = XLSX.utils.sheet_to_json(sht) as pdw.DefLike[];
 
-        let rawDefs: pdw.DefData[] = elements.filter(e=>e['Row Type'] === 'Def') as pdw.DefData[];
-        let rawPointDefs: pdw.PointDefData[] = elements.filter(e=>e['Row Type'] === 'PointDef') as pdw.PointDefData[];
-        let rawEntries: pdw.EntryData[] = elements.filter(e=>e['Row Type'] === 'Entry') as pdw.EntryData[];
-        let rawTags: pdw.TagData[] = elements.filter(e=>e['Row Type'] === 'Tag') as pdw.TagData[];
+        let rawDefs: pdw.DefData[] = elements.filter(e => e['Row Type'] === 'Def') as pdw.DefData[];
+        let rawPointDefs: pdw.PointDefData[] = elements.filter(e => e['Row Type'] === 'PointDef') as pdw.PointDefData[];
+        let rawEntries: pdw.EntryData[] = elements.filter(e => e['Row Type'] === 'Entry') as pdw.EntryData[];
+        let rawTags: pdw.TagData[] = elements.filter(e => e['Row Type'] === 'Tag') as pdw.TagData[];
 
-        let defs = rawDefs.map(rd=>makeDef(rd));
-        let entries = rawEntries.map(re=>makeEntry(re));
-        let tags = rawTags.map(rt=>makeTag(rt));
-        rawPointDefs.forEach((rpd: pdw.PointDefData)=>{
+        let defs = rawDefs.map(rd => makeDef(rd));
+        let entries = rawEntries.map(re => makeEntry(re));
+        let tags = rawTags.map(rt => makeTag(rt));
+        rawPointDefs.forEach((rpd: pdw.PointDefData) => {
             //@ts-expect-error
             delete rpd['Row Type'];
             //@ts-expect-error
-            let def = defs.find(d=>d._uid===rpd._uid);
+            let def = defs.find(d => d._uid === rpd._uid);
             //@ts-expect-error
             rpd._opts = rpd._opts === undefined ? [] : JSON.parse(rpd._opts)
             def!._pts.push(rpd);
         })
-        
+
         pdwRef.setDefs((<pdw.DefLike[]>defs));
         pdwRef.setEntries((<pdw.EntryLike[]>entries));
         pdwRef.setTags((<pdw.TagLike[]>tags));
-        
+
         return {
             defs: defs,
             entries: entries,
             tags: tags
         }
-        
-        function makeDef(data: pdw.DefData): pdw.DefData{
+
+        function makeDef(data: pdw.DefData): pdw.DefData {
             delete data['Row Type'];
             data._pts = [];
             return data
         }
-        function makeEntry(data: pdw.EntryData): pdw.EntryData{
+        function makeEntry(data: pdw.EntryData): pdw.EntryData {
             delete data['Row Type']
             data._period = parsePeriod(data._period);
             data = addVals(data);
             return data
         }
-        function makeTag(data: pdw.TagData): pdw.TagData{
+        function makeTag(data: pdw.TagData): pdw.TagData {
             delete data['Row Type']
             //@ts-expect-error
             data._dids = JSON.parse(data._dids);
             return data
         }
-        function addVals(data: any): any{
+        function addVals(data: any): any {
             let parsed = JSON.parse(data._vals);
             //cool object merging syntax
-            return { 
+            return {
                 ...data,
                 ...parsed
             }
@@ -359,14 +357,16 @@ export class AsyncCSV implements pdw.AsyncDataStore {
         }
     }
 
-    exportTo(allData: pdw.CompleteDataset, filename: string) {
+    exportTo(allData: pdw.CompleteishDataset, filename: string) {
         XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();
         const data: string[][] = []
         data.push(['Row Type', ...combinedTabularHeaders])
-
+        //@ts-ignore - i'm being lazy here
         if (allData.defs !== undefined) allData.defs.forEach(def => makeDefAndPointDefsRows(def))
+        //@ts-ignore - not worth the effort
         if (allData.entries !== undefined) allData.entries.forEach(entry => makeEntryRow(entry))
+        //@ts-ignore - unless you read this again and get mad at yourself
         if (allData.tags !== undefined) allData.tags.forEach(tag => makeTagRow(tag))
 
         let exportSht = XLSX.utils.aoa_to_sheet(data);
@@ -376,7 +376,7 @@ export class AsyncCSV implements pdw.AsyncDataStore {
 
         return
 
-        function makeDefAndPointDefsRows(def: pdw.DefData){
+        function makeDefAndPointDefsRows(def: pdw.DefData) {
             // console.log(data);
             data.push([
                 'Def',
@@ -402,7 +402,7 @@ export class AsyncCSV implements pdw.AsyncDataStore {
                 '',//'_tid',     //     , tag
                 '',//'_dids'     //     , tag
             ])
-            def._pts.forEach(pd=>{
+            def._pts.forEach(pd => {
                 data.push([
                     'PointDef',
                     def._uid, //'_uid',     //entry, tag, def
@@ -418,10 +418,10 @@ export class AsyncCSV implements pdw.AsyncDataStore {
                     pd._type, //'',//'_type',    //     ,    ,    , pointDef
                     pd._rollup, //'',//'_rollup',  //     ,    ,    , pointDef
                     pd._active.toString().toUpperCase(), //'',//'_active',  //     ,    ,    , pointDef
-                    
-                    JSON.stringify(pd._opts,null,2),//.replaceAll('"','""') + '"',//'_opts',    //     ,    ,    , pointDef
+
+                    JSON.stringify(pd._opts, null, 2),//.replaceAll('"','""') + '"',//'_opts',    //     ,    ,    , pointDef
                     // '"' + JSON.stringify(pd._opts).replaceAll('"','""') + '"',//'_opts',    //     ,    ,    , pointDef
-                    
+
                     '',//'_eid',     //entry
                     '',//'_period',  //entry
                     '',//'_note',    //entry
@@ -433,15 +433,16 @@ export class AsyncCSV implements pdw.AsyncDataStore {
             })
         }
 
-        function makeEntryRow(entry: pdw.EntryData){
+        function makeEntryRow(entry: pdw.EntryData) {
             let vals: any = {};
-            Object.keys(entry).forEach(key=>{
-                if(key.substring(0,1)==='_') return;
+            Object.keys(entry).forEach(key => {
+                if (key.substring(0, 1) === '_') return;
                 let val = entry[key];
-                if(typeof val === 'boolean') return vals[key] = val.toString().toUpperCase();
-                if(typeof val === 'number') return vals[key] = val;
-                if(typeof val === 'string') return vals[key] = val;
-                vals[key] = JSON.stringify(val,null,2);                
+                if (typeof val === 'boolean') return vals[key] = val.toString().toUpperCase();
+                if (typeof val === 'number') return vals[key] = val;
+                if (typeof val === 'string') return vals[key] = val;
+                vals[key] = JSON.stringify(val, null, 2);
+                return vals[key]
             })
             data.push([
                 'Entry',
@@ -463,13 +464,13 @@ export class AsyncCSV implements pdw.AsyncDataStore {
                 entry._period,//'',//'_period',  //entry
                 entry._note, //'',//'_note',    //entry
                 entry._source, //'',//'_source',  //entry
-                JSON.stringify(vals,null,2), //'',//'_vals',    //entry
+                JSON.stringify(vals, null, 2), //'',//'_vals',    //entry
                 '',//'_tid',     //     , tag
                 '',//'_dids'     //     , tag
             ])
         }
 
-        function makeTagRow(tag: pdw.TagData){
+        function makeTagRow(tag: pdw.TagData) {
             data.push([
                 'Tag',
                 tag._uid, //'_uid',     //entry, tag, def
@@ -529,13 +530,10 @@ export class AsyncCSV implements pdw.AsyncDataStore {
  * and are **not** the "natural" way of working within Excel
  */
 export class AsyncExcelTabular implements pdw.AsyncDataStore {
-    static overViewShtName = 'Overview';
-    static defShtName = 'Defs';
-    static pointDefShtName = 'Point Defs';
-    static entryShtName = "Entry";
-    static entryPointShtName = "Entry Points";
-    static tagDefShtName = "Tag Defs";
-    static tagShtName = "Tags"
+    static overViewShtName = '!Overview';
+    static defShtName = '!Defs';
+    static tagShtName = '!Tags';
+    static pointShtName = '!DefPoints';
 
     exportTo(data: pdw.CompleteishDataset, filename: string) {
         XLSX.set_fs(fs);
@@ -547,10 +545,7 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
             aoa.push(['Last updated:', pdw.parseTemporalFromEpochStr(data.overview.lastUpdated).toLocaleString()]);
             aoa.push(['Element Type', 'Count Active', 'Count Deleted']);
             if (data.defs !== undefined) aoa.push(['defs', data.overview.defs.current, data.overview.defs.deleted]);
-            if (data.pointDefs !== undefined) aoa.push(['pointDefs', data.overview.pointDefs.current, data.overview.pointDefs.deleted]);
             if (data.entries !== undefined) aoa.push(['entries', data.overview.entries.current, data.overview.entries.deleted]);
-            if (data.entryPoints !== undefined) aoa.push(['entryPoints', data.overview.entryPoints.current, data.overview.entryPoints.deleted]);
-            if (data.tagDefs !== undefined) aoa.push(['tagDefs', data.overview.tagDefs.current, data.overview.tagDefs.deleted]);
             if (data.tags !== undefined) aoa.push(['tags', data.overview.tags.current, data.overview.tags.deleted]);
             let overviewSht = XLSX.utils.aoa_to_sheet(aoa);
             XLSX.utils.book_append_sheet(wb, overviewSht, AsyncExcelTabular.overViewShtName);
@@ -559,41 +554,19 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
         if (data.defs !== undefined && data.defs.length > 0) {
             let defBaseArr = data.defs.map(def => AsyncExcelTabular.makeExcelDefRow(def));
             defBaseArr.unshift(tabularHeaders.def);
-
+            
+            let pointDefArr: any[] = [];
+            pointDefArr.unshift(tabularHeaders.pointDef);
+            data.defs.forEach(def=>{
+                def._pts?.forEach(point=>{
+                    pointDefArr.push(AsyncExcelTabular.makeExcelPointDefRow(point,def));
+                })
+            })
+            
             let defSht = XLSX.utils.aoa_to_sheet(defBaseArr);
             XLSX.utils.book_append_sheet(wb, defSht, AsyncExcelTabular.defShtName);
-        }
-
-        if (data.pointDefs !== undefined && data.pointDefs.length > 0) {
-            let pointDefArr = data.pointDefs.map(pd => AsyncExcelTabular.makeExcelPointDefRow(pd));
-            pointDefArr.unshift(tabularHeaders.pointDef);
-
-            let pointDefSht = XLSX.utils.aoa_to_sheet(pointDefArr);
-            XLSX.utils.book_append_sheet(wb, pointDefSht, AsyncExcelTabular.pointDefShtName);
-        }
-
-        if (data.entries !== undefined) {
-            let entryArr = data.entries.map(entry => AsyncExcelTabular.makeExcelEntryRow(entry));
-            entryArr.unshift(tabularHeaders.entry);
-
-            let entryBaseSht = XLSX.utils.aoa_to_sheet(entryArr);
-            XLSX.utils.book_append_sheet(wb, entryBaseSht, AsyncExcelTabular.entryShtName);
-        }
-
-        if (data.entryPoints !== undefined) {
-            let entryPointArr = data.entryPoints.map(entryPoint => AsyncExcelTabular.makeExcelEntryPointRow(entryPoint));
-            entryPointArr.unshift(tabularHeaders.entryPoint);
-
-            let entryPointSht = XLSX.utils.aoa_to_sheet(entryPointArr);
-            XLSX.utils.book_append_sheet(wb, entryPointSht, AsyncExcelTabular.entryPointShtName);
-        }
-
-        if (data.tagDefs !== undefined) {
-            let tagDefArr = data.tagDefs.map(tagDef => AsyncExcelTabular.makeExcelTagDefRow(tagDef))
-            tagDefArr.unshift(tabularHeaders.tagDef);
-
-            let tagDefSht = XLSX.utils.aoa_to_sheet(tagDefArr);
-            XLSX.utils.book_append_sheet(wb, tagDefSht, AsyncExcelTabular.tagDefShtName);
+            let pdSht = XLSX.utils.aoa_to_sheet(pointDefArr);
+            XLSX.utils.book_append_sheet(wb, pdSht, AsyncExcelTabular.pointShtName);
         }
 
         if (data.tags !== undefined) {
@@ -604,74 +577,17 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
             XLSX.utils.book_append_sheet(wb, tagSht, AsyncExcelTabular.tagShtName);
         }
 
+
+        //create one sheet per definition
+        if (data.entries !== undefined && data.defs !== undefined && data.defs.length > 0) {
+            data.defs.forEach(def => {
+                if (def._deleted) return; //don't make tabs for deleted defs
+                let entries = data.entries!.filter(entry => entry._did === def._did);
+                if (entries.length > 0) AsyncExcelTabular.createEntryTabFor(entries, def, wb);
+            })
+        }
+
         XLSX.writeFile(wb, filename);
-    }
-
-    importFrom(filepath: string): pdw.CompleteishDataset {
-        console.log('loading...');
-        let returnData: pdw.CompleteishDataset = {}
-        XLSX.set_fs(fs);
-        let loadedWb = XLSX.readFile(filepath);
-        const shts = loadedWb.SheetNames;
-        const pdwRef = pdw.PDW.getInstance();
-        if (!shts.some(name => name === AsyncExcelTabular.defShtName)) {
-            console.warn('No Defs sheet found in ' + filepath);
-        } else {
-            const defSht = loadedWb.Sheets[AsyncExcelTabular.defShtName];
-            let defBaseRawArr = XLSX.utils.sheet_to_json(defSht) as pdw.DefLike[];
-            returnData.defs = defBaseRawArr.map(rawDef => AsyncExcelTabular.parseExcelDefRow(rawDef))
-            pdwRef.setDefs(returnData.defs);
-        }
-
-        if (!shts.some(name => name === AsyncExcelTabular.pointDefShtName)) {
-            console.warn('No Point Defs sheet found in ' + filepath);
-        } else {
-            const pointDefSht = loadedWb.Sheets[AsyncExcelTabular.pointDefShtName];
-            let pointDefRawArr = XLSX.utils.sheet_to_json(pointDefSht) as pdw.PointDefLike[];
-            returnData.pointDefs = pointDefRawArr.map(rawPointDef => AsyncExcelTabular.parseExcelPointDefRow(rawPointDef))
-            pdwRef.setPointDefs(returnData.pointDefs);
-        }
-
-        if (!shts.some(name => name === AsyncExcelTabular.entryShtName)) {
-            console.warn('No Entry sheet found in ' + filepath);
-        } else {
-            const entrySht = loadedWb.Sheets[AsyncExcelTabular.entryShtName];
-            let entryRawArr = XLSX.utils.sheet_to_json(entrySht) as pdw.EntryLike[];
-            returnData.entries = entryRawArr.map(rawEntry => AsyncExcelTabular.parseExcelEntryRow(rawEntry))
-            pdwRef.setEntries(returnData.entries);
-        }
-
-        if (!shts.some(name => name === AsyncExcelTabular.entryPointShtName)) {
-            console.warn('No Entry sheet found in ' + filepath);
-        } else {
-            const entrySht = loadedWb.Sheets[AsyncExcelTabular.entryPointShtName];
-            let entryPointRawArr = XLSX.utils.sheet_to_json(entrySht) as pdw.EntryPointLike[];
-            returnData.entryPoints = entryPointRawArr.map(rawEntryPoint => AsyncExcelTabular.parseExcelEntryPointRow(rawEntryPoint))
-            pdwRef.setEntryPoints(returnData.entryPoints);
-
-        }
-
-        if (!shts.some(name => name === AsyncExcelTabular.tagDefShtName)) {
-            console.warn('No Entry sheet found in ' + filepath);
-        } else {
-            const entrySht = loadedWb.Sheets[AsyncExcelTabular.tagDefShtName];
-            let tagDefRawArr = XLSX.utils.sheet_to_json(entrySht) as pdw.TagDefLike[];
-            returnData.tagDefs = tagDefRawArr.map(rawTagDef => AsyncExcelTabular.parseExcelTagDefRow(rawTagDef))
-            pdwRef.setTagDefs(returnData.tagDefs);
-        }
-
-        if (!shts.some(name => name === AsyncExcelTabular.tagShtName)) {
-            console.warn('No Entry sheet found in ' + filepath);
-        } else {
-            const entrySht = loadedWb.Sheets[AsyncExcelTabular.tagShtName];
-            let tagRawArr = XLSX.utils.sheet_to_json(entrySht) as pdw.TagLike[];
-            returnData.tags = tagRawArr.map(rawTag => AsyncExcelTabular.parseExcelTagRow(rawTag))
-            pdwRef.setTags(returnData.tags);
-        }
-
-        returnData = pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
-
-        return returnData;
     }
 
     /**
@@ -687,28 +603,48 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
             def._lbl,
             def._emoji,
             def._desc,
-            def._scope.toString()
+            def._scope!.toString()
         ]
     }
 
-    /**
-     * Returns an array of arrays with the values of the
-     * def's points in accordance with the positions of the
-     * {@link tabularPointDefHeaders} positioning
-     */
-    static makeExcelPointDefRow(pointDef: pdw.PointDefLike) {
+    static makeExcelPointDefRow(pd: pdw.PointDefLike, def: pdw.DefLike) {
         return [
-            ...AsyncExcelTabular.makeExcelFirstFourColumns(pointDef),
-            pointDef._did,
-            pointDef._pid,
-            pointDef._lbl,
-            pointDef._emoji,
-            pointDef._desc,
-            pointDef._type,
-            pointDef._rollup,
+            ...AsyncExcelTabular.makeExcelFirstFourColumns(def),
+            def._did,
+            pd._active,
+            pd._pid,
+            pd._lbl,
+            pd._emoji,
+            pd._desc,
+            pd._type?.toString(),
+            pd._rollup?.toString(),
+            JSON.stringify(pd._opts, null, 2)
         ]
     }
 
+    static createEntryTabFor(entryData: pdw.EntryLike, def: pdw.DefLike, wb: XLSX.WorkBook) {
+        let headers = [...tabularHeaders.entry];
+        let lbls: string[] = [];
+        let pids: string[] = [];
+        def._pts?.forEach(pd => {
+            lbls.push(pd._lbl!)
+            pids.push(pd._pid!)
+        })
+        headers.push(...lbls);
+
+        let entryArr = [headers];
+        entryData.forEach((entry: pdw.EntryLike)=>{
+            let arr = this.makeExcelEntryRow(entry);
+            let vals = pids.map(pid=>{
+                if(entry[pid] !== undefined) return entry[pid];
+                return '';
+            })
+            entryArr.push([...arr, ...vals]);
+        })
+        
+        let entrySht = XLSX.utils.aoa_to_sheet(entryArr);
+        XLSX.utils.book_append_sheet(wb, entrySht, def._lbl);
+    }
 
     static makeExcelEntryRow(entryData: pdw.EntryLike) {
         return [
@@ -721,42 +657,59 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
         ]
     }
 
-    static makeExcelEntryPointRow(entryPointData: pdw.EntryPointLike) {
-        return [
-            ...AsyncExcelTabular.makeExcelFirstFourColumns(entryPointData),
-            entryPointData._did,
-            entryPointData._pid,
-            entryPointData._eid,
-            entryPointData._val.toString() //I think I want this
-        ]
-    }
-
-    static makeExcelTagDefRow(tagDefData: pdw.TagDefLike) {
-        return [
-            ...AsyncExcelTabular.makeExcelFirstFourColumns(tagDefData),
-            tagDefData._tid,
-            tagDefData._lbl
-        ]
-    }
-
     static makeExcelTagRow(tagData: pdw.TagLike) {
         return [
             ...AsyncExcelTabular.makeExcelFirstFourColumns(tagData),
-            tagData._did,
-            tagData._pid,
             tagData._tid,
+            tagData._lbl,
+            tagData._dids?.toString()
         ]
     }
 
     static makeExcelFirstFourColumns(elementData: pdw.ElementLike) {
         return [
             elementData._uid,
-            pdw.parseTemporalFromEpochStr(elementData._created).toPlainDateTime().toLocaleString(),
-            pdw.parseTemporalFromEpochStr(elementData._updated).toPlainDateTime().toLocaleString(),
+            pdw.parseTemporalFromEpochStr(elementData._created!).toPlainDateTime().toLocaleString(),
+            pdw.parseTemporalFromEpochStr(elementData._updated!).toPlainDateTime().toLocaleString(),
             // elementData._created,
             // elementData._updated,
             elementData._deleted ? "TRUE" : "FALSE",
         ]
+    }
+
+    importFrom(filepath: string): pdw.CompleteishDataset {
+        console.log('loading...');
+        let returnData: pdw.CompleteishDataset = {}
+        XLSX.set_fs(fs);
+        let loadedWb = XLSX.readFile(filepath);
+        const shts = loadedWb.SheetNames;
+        const pdwRef = pdw.PDW.getInstance();
+
+        shts.forEach(name=>{
+            if(name === AsyncExcelTabular.pointShtName) return; //skip
+            if(name === AsyncExcelTabular.defShtName){
+                if (!shts.some(name => name === AsyncExcelTabular.pointShtName)) {
+                    console.warn('No PointDefs sheet found, skipping Defs import');
+                } else {
+                    const defSht = loadedWb.Sheets[AsyncExcelTabular.defShtName];
+                    let defBaseRawArr = XLSX.utils.sheet_to_json(defSht) as pdw.DefLike[];
+                    const pdSht = loadedWb.Sheets[AsyncExcelTabular.pointShtName];
+                    let pdRawArr = XLSX.utils.sheet_to_json(defSht) as pdw.DefLike[];
+                    returnData.defs = [];
+                    
+                    defBaseRawArr.forEach(rawDef => {
+                        const points = pdRawArr.filter(row=> row._did === rawDef._did);
+                        AsyncExcelTabular.parseExcelDef(rawDef, points);
+                    });
+                    
+                    pdwRef.setDefs(returnData.defs);
+                }
+            }
+        });
+        
+        returnData = pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
+
+        return returnData;
     }
 
     /**
@@ -765,7 +718,7 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
      * Ying & Yang with {@link makeExcelDefRow}
      * @returns 
      */
-    static parseExcelDefRow(defRow: any): pdw.DefLike {
+    static parseExcelDef(defRow: any, points: any): pdw.DefLike {
         //check structure
         if (defRow._deleted == undefined
             || defRow._did == undefined)
@@ -807,7 +760,7 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
             } catch (e) {
                 try {
                     let temp = Temporal.Instant.fromEpochMilliseconds(new Date(dateCellVal).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone());
-                    return pdw.makeEpochStrFromTemporal(temp);
+                    return pdw.makeEpochStrFrom(temp);
                 } catch (etwo) {
                     console.error('Failed to make this into an EpochStr:', dateCellVal);
                     throw new Error('Could not parse Excel date');
@@ -815,7 +768,7 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
             }
         }
         if (typeof dateCellVal === 'number') {
-            return pdw.makeEpochStrFromTemporal(Temporal.Instant.fromEpochMilliseconds((dateCellVal - (25567 + 1)) * 86400 * 1000).toZonedDateTimeISO(Temporal.Now.timeZone()));
+            return pdw.makeEpochStrFrom(Temporal.Instant.fromEpochMilliseconds((dateCellVal - (25567 + 1)) * 86400 * 1000).toZonedDateTimeISO(Temporal.Now.timeZone()));
         }
     }
 
@@ -1062,10 +1015,10 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
 
 //#region ### SHARED  ###
 export const tabularHeaders = {
-    def:      ['_uid', '_created', '_updated', '_deleted', '_did', '_lbl', '_emoji', '_desc', '_scope'],
-    pointDef: ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_lbl', '_emoji', '_desc', '_type', '_rollup'],
-    entry:    ['_uid', '_created', '_updated', '_deleted', '_did', '_eid', '_period', '_note', '_source'],
-    tag:      ['_uid', '_created', '_updated', '_deleted', '_did', '_pid', '_tid']
+    def: ['_uid', '_created', '_updated', '_deleted', '_did', '_lbl', '_emoji', '_desc', '_scope'],
+    pointDef: ['def._uid', 'def._created', 'def._updated', 'def._deleted', 'def._did', '_active', '_pid', '_lbl', '_emoji', '_desc', '_type', '_rollup', '_opts'],
+    entry: ['_uid', '_created', '_updated', '_deleted', '_did', '_eid', '_period', '_note', '_source'],
+    tag: ['_uid', '_created', '_updated', '_deleted', '_tid', '_lbl', '_dids']
 }
 
 export const combinedTabularHeaders = [

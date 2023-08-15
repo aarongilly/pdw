@@ -7,16 +7,17 @@ import { importFirestore, importMongo, importOldV9, importOldest, importPrevious
 import { DefaultDataStore } from './DefaultDataStore.js';
 
 const pdwRef = pdw.PDW.getInstance();
-temp();
+// temp();
 // createTestDataSet();
 // console.log(pdwRef.getDefs({}).length);
-importFromFile('data-files/test.csv');
+importFromFile('data-files/test2.xlsx');
 // console.log(pdwRef.getDefs({}).length);
-let all = pdw.PDW.flattenCompleteDataset(pdwRef.getAll({includeDeleted:'yes'}));
+let all = pdwRef.getAll({includeDeleted:'yes'});
 // console.log(all);
 // exportToFile('data-files/test.csv', all);
-exportToFile('data-files/test2.json', all);
-
+// exportToFile('data-files/test.json', all);
+// exportToFile('data-files/test.yaml', all);
+exportToFile('data-files/test.xlsx', all);
 
 // importPreviousCSV('real-data/pre-de-flattening/consolidated.csv')
 
