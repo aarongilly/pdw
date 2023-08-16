@@ -1524,6 +1524,21 @@ test.skip('Data Merge', () => {
     expect(b.length).toBe(2);
     let merge: any = pdw.PDW.merge(a,b);
     expect(merge.length).toBe(3); //original, first update, 2nd update
+    
+    a = tinyDataA().entries!;
+    b = tinyDataB().entries!;
+    expect(a.length).toBe(1);
+    expect(b.length).toBe(3);
+    merge = pdw.PDW.merge(a,b);
+    expect(merge.length).toBe(3); //a was marked deleted in b
+
+    a = tinyDataA().tags!;
+    b = tinyDataB().tags!;
+    expect(a.length).toBe(1);
+    expect(b.length).toBe(1);
+    merge = pdw.PDW.merge(a,b);
+    expect(merge.length).toBe(1); //a is same as b
+    
     //combine all at the same time
     merge = pdw.PDW.mergeComplete(tinyDataA(), tinyDataB());
     expect(merge.defs.length).toBe(3);

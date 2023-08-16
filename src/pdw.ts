@@ -760,8 +760,8 @@ export class PDW {
             if(match !== undefined && match._updated === eB._updated) return //result is identical
             if(match !== undefined){
                 if(match._updated! > eB._updated!) return //result is newer
-                match._updated = eB._updated;
-                match._deleted = eB._deleted; 
+                match._updated = eB._updated!;
+                match._deleted = eB._deleted!; 
                 return //due to principle of not changing data on update, this makes match equal to eB
             }
             let matches = result.filter(eA=>Element.hasSameId(eA, eB));
@@ -778,7 +778,7 @@ export class PDW {
             if(match !== undefined){
                 if(match._updated! > eB._updated!) return
                 match._deleted = true; //match is outdated by new entry in b
-                match._updated = eB._created; //this seems appropriate
+                match._updated = eB._created!; //this seems appropriate
                 //intentionally not returning here, still need to push eB
             }
             result.push(Element.toData(eB));
