@@ -677,11 +677,18 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
         ]
     }
 
+
     importFrom(filepath: string): pdw.CompleteishDataset {
+        /**
+         * Note to self: ran into an issue with XLSX.JS wherein it doesn't like opening
+         * files with the .xlsx file type here on Mac. You could fight it later, perhaps.
+         */
+        throw new Error('Unimplemented due to Apple Numbers bug, I think')
         console.log('loading...');
         let returnData: pdw.CompleteishDataset = {}
         XLSX.set_fs(fs);
         let loadedWb = XLSX.readFile(filepath);
+        // let loadedWb = XLSX.
         const shts = loadedWb.SheetNames;
         const pdwRef = pdw.PDW.getInstance();
 

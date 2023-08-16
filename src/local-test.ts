@@ -10,7 +10,7 @@ const pdwRef = pdw.PDW.getInstance();
 // temp();
 // createTestDataSet();
 // console.log(pdwRef.getDefs({}).length);
-importFromFile('data-files/test2.xlsx');
+importFromFile('data-files/wholly_excel.xlsx');
 // console.log(pdwRef.getDefs({}).length);
 let all = pdwRef.getAll({includeDeleted:'yes'});
 // console.log(all);
