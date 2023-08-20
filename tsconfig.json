@@ -13,6 +13,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "esModuleInterop": true,
+    "declaration": true,
     // "noEmit": true,
     // "noUnusedLocals": true, //uncomment this for prod
     // "noUnusedParameters": true, //uncomment this for prod

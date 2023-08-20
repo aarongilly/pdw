@@ -5,19 +5,31 @@ import { exportToFile, importFromFile } from './dataStores/fileAsyncDataStores.j
 import { Temporal, toTemporalInstant } from 'temporal-polyfill';
 import { importFirestore, importMongo, importOldV9, importOldest, importPreviousCSV } from './onetimeImports.js'
 import { DefaultDataStore } from './DefaultDataStore.js';
+import { FireDataStore } from './dataStores/firestoreDataStore.js';
 
 const pdwRef = pdw.PDW.getInstance();
+
+pdwRef.dataStores = [];
+
+pdwRef.registerConnection(new FireDataStore(pdwRef));
+
+pdwRef.newDef({
+    _did: 'Test Def'
+})
+
+
+
 // temp();
 // createTestDataSet();
 // console.log(pdwRef.getDefs({}).length);
-importFromFile('data-files/wholly_excel.xlsx');
+// importFromFile('data-files/wholly_excel.xlsx');
 // console.log(pdwRef.getDefs({}).length);
-let all = pdwRef.getAll({includeDeleted:'yes'});
+// let all = pdwRef.getAll({includeDeleted:'yes'});
 // console.log(all);
 // exportToFile('data-files/test.csv', all);
 // exportToFile('data-files/test.json', all);
 // exportToFile('data-files/test.yaml', all);
-exportToFile('data-files/test.xlsx', all);
+// exportToFile('data-files/test.xlsx', all);
 
 // importPreviousCSV('real-data/pre-de-flattening/consolidated.csv')
 

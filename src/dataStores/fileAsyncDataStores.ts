@@ -422,7 +422,7 @@ export class AsyncCSV implements pdw.AsyncDataStore {
                     JSON.stringify(pd._opts, null, 2),//.replaceAll('"','""') + '"',//'_opts',    //     ,    ,    , pointDef
                     // '"' + JSON.stringify(pd._opts).replaceAll('"','""') + '"',//'_opts',    //     ,    ,    , pointDef
 
-                    '',//'_eid',     //entry
+                    '',//'_eid',     //entryß
                     '',//'_period',  //entry
                     '',//'_note',    //entry
                     '',//'_source',  //entry
@@ -676,7 +676,6 @@ export class AsyncExcelTabular implements pdw.AsyncDataStore {
             elementData._deleted ? "TRUE" : "FALSE",
         ]
     }
-
 
     importFrom(filepath: string): pdw.CompleteishDataset {
         /**

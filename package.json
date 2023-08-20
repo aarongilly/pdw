@@ -1,8 +1,15 @@
 {
-  "name": "pdw-lib",
-  "private": true,
-  "version": "0.0.0",
+  "name": "pdw",
+  "version": "0.0.1",
   "type": "module",
+  "main": "/out/pdw.js",
+  "types": "/out/pdw.d.ts",
+  "license": "MIT",
+  "files":
+  [
+     "/out/pdw.js",
+     "/out/pdw.d.ts"
+  ],
   "scripts": {
     "dev": "vite",
     "test": "vitest --reporter verbose",
