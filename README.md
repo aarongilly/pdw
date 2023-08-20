@@ -1,5 +1,7 @@
 # Personal Data Warehouse
 
+`pdw` is a library for creating a certain variety of quantified self(ish) applications. It's intended to make working with new datas
+
 This **README** is what generates the top-level TypeDoc documentation page. 
 
 The goal here is to have a pdw.ts library you could publish to NPM - along with a connector or two. This is a library development project, for a single codebase that can be used to interact with local data or data in the cloud, depending on the storage connector.
