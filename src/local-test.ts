@@ -4,7 +4,6 @@ import { Query, Scope } from './pdw.js'
 import { exportToFile, importFromFile } from './dataStores/fileAsyncDataStores.js';
 import { Temporal, toTemporalInstant } from 'temporal-polyfill';
 import { importFirestore, importMongo, importOldV9, importOldest, importPreviousCSV } from './onetimeImports.js'
-import { DefaultDataStore } from './DefaultDataStore.js';
 import { FireDataStore } from './dataStores/firestoreDataStore.js';
 
 const pdwRef = pdw.PDW.getInstance();
@@ -13,9 +12,9 @@ pdwRef.dataStores = [];
 
 pdwRef.registerConnection(new FireDataStore(pdwRef));
 
-pdwRef.newDef({
-    _did: 'Test Def'
-})
+// pdwRef.newDef({
+//     _did: 'Test Def'
+// })
 
 
 

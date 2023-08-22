@@ -1,5 +1,4 @@
 import { Temporal } from "temporal-polyfill";
-import { DefaultDataStore } from "./DefaultDataStore.js";
 
 //#region ### TYPES ###
 
@@ -2611,6 +2610,131 @@ export class Query {
             return a[this.sortBy] > b[this.sortBy] ? -1 : 1
         })
     }
+}
+
+export class DefaultDataStore implements DataStore {
+    serviceName: string;
+    pdw: PDW;
+    defs: Def[];
+    entries: Entry[];
+    tags: Tag[];
+
+    constructor(pdwRef: PDW) {
+        this.serviceName = 'In memory dataset';
+        this.pdw = pdwRef;
+        this.defs = [];
+        this.entries = [];
+        this.tags = [];
+    }
+
+    /**
+     * Reset all the arrays to nil.
+     * Right now only used for **testing**
+     */
+    clearAllStoreArrays() {
+        this.defs = [];
+        this.entries = [];
+        this.tags = [];
+    }
+
+    query(params: SanitizedParams): QueryResponse {
+        throw new Error("Method not implemented.");
+    }
+
+    getAll(params: SanitizedParams): CompleteishDataset {
+        return {
+            defs: this.getDefs(params),
+            entries: this.getEntries(params),
+            tags: this.getTags(params),
+        };
+    }
+
+    getDefs(params: SanitizedParams): DefLike[] {
+        const allMatches = this.defs.filter(def => def.passesFilters(params));
+        let noDupes = new Set(allMatches);
+        return Array.from(noDupes).map(def => def.makeStaticCopy())
+    }
+
+    /**
+     * For pulling entries that you know the eid of
+     * @param eids
+     * @param includeDeleted
+     * @returns an array of all entries matching the criteria
+     */
+    getEntries(params: SanitizedParams): EntryLike[] {
+        const allMatches = this.entries.filter(entry => entry.passesFilters(params));
+        let noDupes = new Set(allMatches);
+        return Array.from(noDupes).map(entry => new Entry(entry, false, entry.__def));
+    }
+
+    getTags(params: SanitizedParams): TagLike[] {
+        const allMatches = this.tags.filter(tag => tag.passesFilters(params));
+        let noDupes = new Set(allMatches);
+        return Array.from(noDupes).map(tag => new Tag(tag, false));
+    }
+
+    /**
+     * This function is a bit strange, but was extracted from
+     * the 6 functions below, which were duplicates code-wise
+     * @param elementsIn list of Elements (Defs, Entries, etc) to set
+     * @param elementRepo the existing set of Elements in the DataStore (this.defs, this.entries, etc)
+     */
+    setElementsInRepo(elementsIn: Element[], elementRepo: ElementLike[]) {
+        let newElements: Element[] = [];
+        elementsIn.forEach(el => {
+            //if we're *only* deleting or undeleting, this should find match.
+            let sameUid = elementRepo.find(existingElement => existingElement._uid == el._uid);
+            if(sameUid !== undefined){
+                //only replace if the setDefs def is newer, necessary for StorageConnector merges
+                if (sameUid.isOlderThan(el)) {
+                    sameUid._deleted = el._deleted;
+                    sameUid._updated = el._updated;
+                }
+                return
+            }
+            
+            //if we're *updating* then we need to find based on the same element ID
+            let sameId = elementRepo.find(existingElement => existingElement._deleted === false && existingElement.sameIdAs(el));
+            if (sameId !== undefined) {
+                //only replace if the setDefs def is newer, necessary for StorageConnector merges
+                if (sameId.isOlderThan(el)) {
+                    sameId._deleted = true;
+                    sameId._updated = makeEpochStr();
+                    newElements.push(el.makeStaticCopy());
+                }
+            } else {
+                newElements.push(el.makeStaticCopy());
+            }
+        });
+
+        elementRepo.push(...newElements);
+        return elementsIn;
+    }
+
+    setDefs(defsIn: Def[]): Def[] {
+        return this.setElementsInRepo(defsIn, this.defs) as Def[];
+    }
+
+    setEntries(entriesIn: Entry[]): Entry[] {
+        return this.setElementsInRepo(entriesIn, this.entries) as Entry[];
+    }
+
+    setTags(tagData: Tag[]): TagLike[] {
+        return this.setElementsInRepo(tagData, this.tags) as Tag[];
+    }
+
+    getOverview(): DataStoreOverview {
+        throw new Error("Method not implemented.");
+    }
+
+    setAll(completeData: CompleteishDataset): CompleteishDataset {
+        throw new Error("Method not implemented.");
+    }
+
+    connect(..._params: any): boolean {
+        throw new Error("Method not implemented.");
+    }
+
 }
 
 //#endregion

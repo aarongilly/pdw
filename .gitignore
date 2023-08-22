@@ -17,6 +17,7 @@ fs-test
 docs
 docs/*
 out/*
+__notes_to_self.md
 
 # Editor directories and files
 .vscode/*
