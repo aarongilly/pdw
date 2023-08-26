@@ -1,15 +1,14 @@
 {
   "name": "pdw",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "type": "module",
   "main": "/pdw.js",
   "types": "/pdw.d.ts",
   "license": "MIT",
-  "files":
-  [
-     "/out/pdw.js",
-     "/out/pdw.d.ts",
-     "/out/pdw.js.map"
+  "files": [
+    "/out/pdw.js",
+    "/out/pdw.d.ts",
+    "/out/pdw.js.map"
   ],
   "scripts": {
     "dev": "vite",
@@ -26,12 +25,6 @@
     "vitest": "^0.28.5"
   },
   "dependencies": {
-    "fast-csv": "^4.3.6",
-    "fs": "^0.0.1-security",
-    "node-fetch": "^3.3.0",
-    "sqlite3": "^5.1.4",
-    "temporal-polyfill": "^0.0.8",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.19.2/xlsx-0.19.2.tgz",
-    "yaml": "^2.2.1"
+    "temporal-polyfill": "^0.0.8"
   }
 }

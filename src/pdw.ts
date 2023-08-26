@@ -468,7 +468,45 @@ export interface TagData extends ElementData {
     _dids: SmallID[];
 }
 
+export interface PointRollupData {
+    pid: SmallID;
+    val: any;
+    method: Rollup
+}
 
+export interface EntryRollupData {
+    did: SmallID;
+    pts: PointRollupData[];
+    entries?: EntryData[];
+}
+
+export interface PeriodSummaryData{
+    period: PeriodStr | "all";
+    entries: EntryRollupData[];
+}
+
+export interface PointRollup {
+    pid: SmallID;
+    lbl: string;
+    val: any;
+    method: Rollup;
+    entries?: Entry[];
+    vals?: any[];
+}
+
+export interface EntryRollup{
+    did: SmallID;
+    lbl: string;
+    emoji: string;
+    pts: PointRollup;
+    entries?: Entry[];
+}
+
+export interface PeriodSummary{
+    period: Period | "all";
+    entryRollups: EntryRollup[] | Entry;
+    entries: Entry[]
+}
 
 /**
  * Option object, map with key = _oid, val = text label for option
@@ -875,6 +913,7 @@ export class PDW {
         if (dataset.defs !== undefined && dataset.defs.length > 0) recents.push(Element.getMostRecent(dataset.defs)!)
         if (dataset.entries !== undefined && dataset.entries.length > 0) recents.push(Element.getMostRecent(dataset.entries)!)
         if (dataset.tags !== undefined && dataset.tags.length > 0) recents.push(Element.getMostRecent(dataset.tags)!)
+        if (recents.length === 0) return '00000001'
         return Element.getMostRecent(recents)!._updated!
     }
 
@@ -911,6 +950,58 @@ export class PDW {
         }
         if (storeName) data.overview!.storeName = storeName
         return data
+    }
+
+    static rollupEntries(entries: Entry[]): EntryRollup{
+        console.log("I'd be summarizing:", entries);
+        const def = entries[0].getDef();
+        const pointDefs = def._pts;
+        let returnObj = {
+            did: def._did,
+            lbl: def._lbl,
+            emoji: def._emoji,
+            pts: {} as PointRollup
+        }
+        pointDefs.forEach(pd=>{
+            let vals: any[] = [];
+            entries.forEach(e=>{
+                if(e.hasOwnProperty(pd._pid)) vals.push(e[pd._pid]); 
+            })
+            let ptRlp: PointRollup = {
+                pid: pd._pid,
+                lbl: pd._lbl,
+                method: pd._rollup,
+                entries: entries,
+                vals: vals,
+                val: undefined
+            }
+            if(pd._rollup===Rollup.COUNT) ptRlp.val = vals.length;
+            if(pd._rollup===Rollup.AVERAGE) ptRlp.val = doAverage(vals);
+            if(pd._rollup===Rollup.SUM) ptRlp.val = doSum(vals);
+            if(pd._rollup===Rollup.COUNTOFEACH) ptRlp.val = doCountOfEach(vals);
+
+            //@ts-expect-error
+            returnObj.pts[pd._pid] = ptRlp;
+        })
+        return returnObj
+
+        function doAverage(vals: number[]){
+            let sum = doSum(vals)
+            return sum / vals.length;
+        }
+
+        function doSum(vals: number[]){
+            return vals.reduce((pv,val)=>pv+val,0);
+        }
+
+        function doCountOfEach(vals: string[]){
+            let strings = [...new Set(vals)];
+            let stringCounts = '';
+            strings.forEach(str=>{
+                stringCounts = stringCounts + ", " + str + ": " + vals.filter(s=>s==str).length;
+            })
+            return stringCounts
+        }
     }
 }
 
@@ -2108,8 +2199,8 @@ export class Period {
 
         if (this.scope === Scope.WEEK) {
             let numWks = Number.parseInt(this.periodStr.split('W')[1]) - 1;
-            //if the previous year had 53 weeks, this is necessary
-            if (Period.prevYearHas53Weeks(this.periodStr.substring(0, 4))) numWks = numWks + 1
+            //some years dont' start until after the 1st
+            if (Period.needsWeekShift(this.periodStr.substring(0, 4))) numWks = numWks + 1
             let init = Temporal.PlainDate.from(this.periodStr.split('-')[0] + '01-01')
 
             let sun = init.add({ days: 7 - init.dayOfWeek })
@@ -2200,7 +2291,7 @@ export class Period {
         if (this.scope === Scope.WEEK) {
             let numWks = Number.parseInt(this.periodStr.split('W')[1]) - 1;
             //if the previous year had 53 weeks, this is necessary
-            if (Period.prevYearHas53Weeks(this.periodStr.substring(0, 4))) numWks = numWks + 1
+            if (Period.needsWeekShift(this.periodStr.substring(0, 4))) numWks = numWks + 1
             let init = Temporal.PlainDate.from(this.periodStr.split('-')[0] + '01-01')
             let mon = init.add({ days: 1 - init.dayOfWeek }).add({ days: numWks * 7 })
             return new Period(mon.toString());
@@ -2288,9 +2379,8 @@ export class Period {
         return this.getStart().addDuration('-PT1S').zoomTo(this.scope);
     }
 
-    private static prevYearHas53Weeks(yearStr: string): boolean {
-        const prevYear = Number.parseInt(yearStr) - 1;
-        return Temporal.PlainDate.from(prevYear + '-12-31').weekOfYear == 53;
+    private static needsWeekShift(yearStr: string): boolean {
+        return Temporal.PlainDate.from(yearStr + '-01-01').dayOfWeek > 4;
 
     }
 
@@ -2609,6 +2699,64 @@ export class Query {
             //@ts-expect-error
             return a[this.sortBy] > b[this.sortBy] ? -1 : 1
         })
+    }
+}
+
+export class Summary{
+    private periods: PeriodSummary[];
+    constructor(entries: Entry[], scope: Scope){
+        if(entries.length === 0) throw new Error("No entries to summarize");
+        let periodStrs: PeriodStr[] = [...new Set(entries.map(e=>e._period))];
+        let earliest = periodStrs.reduce((prev, periodStr) => {
+            const start = new Period(periodStr).getStart().toString();
+            return start < prev ? start : prev
+        });
+        let latest = periodStrs.reduce((prev, periodStr) => {
+            const end = new Period(periodStr).getEnd().toString();
+            return end > prev ? end : prev
+        });
+        let periods = Period.allPeriodsIn(new Period(earliest), new Period(latest), scope, false) as Period[];
+        this.periods = periods.map(p=> {
+            let ents = entries.filter(e=>p.contains(e.getPeriod()));
+            let entsByType = splitEntriesByType(ents);
+            const keys = Object.keys(entsByType);
+            let entriesAndRollups: Array<Entry | EntryRollup> = [];
+            keys.forEach(key=>{
+                if(entsByType[key].length === 1){
+                    entriesAndRollups.push(entsByType[key][0])
+                }else{
+                    entriesAndRollups.push(PDW.rollupEntries(entsByType[key]));
+                }
+            })
+            return {
+                period: p,
+                entryRollups: entriesAndRollups,
+                entries: ents
+            }
+        })
+
+        function splitEntriesByType(entries: Entry[]): {[dids: string]: any;}{
+            let entryTypes: {[dids: string]: any;} = {};
+            entries.forEach(entry=>{
+                if(entryTypes.hasOwnProperty(entry._did)){
+                    entryTypes[entry._did].push(entry);
+                }else{
+                    entryTypes[entry._did] = [entry];
+                }
+            })
+            return entryTypes
+        }
+        
+        // if(typeof period === 'string') period = new Period(period);
+        // if(period.scope === Scope.SECOND) throw new Error('Cannot summarize to the 1-second level');
+        // this.entries = entries;
+        // this._def = entries[0].getDef();
+        // this.period = period;
+        let pivot: any[] = [];
+         
+    }
+    public get def(): Def {
+        return this._def;
     }
 }
 

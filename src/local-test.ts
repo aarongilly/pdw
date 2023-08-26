@@ -1,16 +1,24 @@
 //// @ts-nocheck
 import * as pdw from './pdw.js'
 import { Query, Scope } from './pdw.js'
-import { exportToFile, importFromFile } from './dataStores/fileAsyncDataStores.js';
+// import { exportToFile, importFromFile } from './dataStores/fileAsyncDataStores.js';
 import { Temporal, toTemporalInstant } from 'temporal-polyfill';
 import { importFirestore, importMongo, importOldV9, importOldest, importPreviousCSV } from './onetimeImports.js'
 import { FireDataStore } from './dataStores/firestoreDataStore.js';
 
+
 const pdwRef = pdw.PDW.getInstance();
 
-pdwRef.dataStores = [];
+createTestDataSet();
 
-pdwRef.registerConnection(new FireDataStore(pdwRef));
+let all = new pdw.Query().inPeriod(new pdw.Period('2023-07-21').zoomOut()).run().entries;
+
+let summary = new pdw.Summary(all, pdw.Scope.WEEK);
+
+console.log(summary);
+// pdwRef.dataStores = [];
+
+// pdwRef.registerConnection(new FireDataStore(pdwRef));
 
 // pdwRef.newDef({
 //     _did: 'Test Def'
@@ -57,6 +65,7 @@ function createTestDataSet() {
                 _lbl: 'Review',
                 _desc: 'Your nightly review',
                 _pid: 'aaa1',
+                _rollup: pdw.Rollup.COUNT,
                 _type: pdw.PointType.MARKDOWN
             },
             {
@@ -64,6 +73,7 @@ function createTestDataSet() {
                 _lbl: 'Work Status',
                 _desc: 'Did you go in, if so where?',
                 _pid: 'aaa2',
+                _rollup: pdw.Rollup.COUNTOFEACH,
                 _type: pdw.PointType.SELECT,
                 _opts: {
                     'opt1': 'Weekend/Holiday',
@@ -78,6 +88,7 @@ function createTestDataSet() {
                 _desc: '10 perfect 1 horrid',
                 _lbl: 'Satisfaction',
                 _pid: 'aaa3',
+                _rollup: pdw.Rollup.AVERAGE,
                 _type: pdw.PointType.NUMBER
             },
             {
@@ -85,6 +96,7 @@ function createTestDataSet() {
                 _desc: '10 perfect 1 horrid',
                 _lbl: 'Physical Health',
                 _pid: 'aaa4',
+                _rollup: pdw.Rollup.AVERAGE,
                 _type: pdw.PointType.NUMBER
             }
         ]
@@ -153,7 +165,20 @@ function createTestDataSet() {
         'bbb1': 'You miss 100% of the shots you do not take',
         'bbb2': 'Michael Jordan' //updated later
     });
-
+    nightly.newEntry({
+        _uid: 'lkfk3sge-3s3s',
+        _eid: 'lkfk3sge-bfbh',
+        _period: '2023-07-20',
+        _created: '2023-07-23T01:02:03Z',
+        _updated: '2023-07-23T01:02:03Z',
+        _deleted: false,
+        _source: 'Test data',
+        _note: 'Original entry',
+        'aaa1': "Nice little off",
+        'aaa2': 'opt1',
+        'aaa3': 7,
+        'aaa4': 10
+    });
     nightly.newEntry({
         _uid: 'lkfkuxo8-9ysw',
         _eid: 'lkfkuxol-mnhe',
@@ -189,7 +214,8 @@ function createTestDataSet() {
         'aaa4': 5
     });
     book.newEntry({
-        'ddd1': "Oh the places you'll go!"
+        'ddd1': "Oh the places you'll go!",
+        _period: '2023-07-21T18:34:38'
     })
     book.newEntry({
         _period: '2025-01-02T15:21:49',
@@ -353,7 +379,7 @@ function temp(){
                         "_desc": "Did you go in, if so where?",
                         "_emoji": "👔",
                         "_type": "SELECT",
-                        "_rollup": "COUNT",
+                        "_rollup": "COUNTOFEACH",
                         "_active": true,
                         "_opts": {
                             "opt1": "Weekend/Holiday",
@@ -369,7 +395,7 @@ function temp(){
                         "_desc": "10 perfect 1 horrid",
                         "_emoji": "1️⃣",
                         "_type": "NUMBER",
-                        "_rollup": "COUNT",
+                        "_rollup": "SUM",
                         "_active": true,
                         "_pid": "aaa3"
                     },
@@ -377,7 +403,7 @@ function temp(){
                         "_lbl": "Physical Health",
                         "_desc": "10 perfect 1 horrid",
                         "_emoji": "😥",
-                        "_type": "NUMBER",
+                        "_type": "AVERAGE",
                         "_rollup": "COUNT",
                         "_active": true,
                         "_pid": "aaa4"

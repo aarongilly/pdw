@@ -135,6 +135,13 @@ test('Period Hierarchy', ()=>{
     expect(per.periodStr).toBe('2023-04-27')
     expect(per.scope).toBe(Scope.DAY)
 
+    let day = new Period('2007-07-22');
+    let wk = new Period(day).zoomOut();
+    console.log(wk.toString());
+    console.log(wk.getStart().toString() + ' to ' + wk.getEnd().toString());
+    expect(wk.contains(day)).toBe(true);
+
+    
     per = new Period(per.zoomOut());
     expect(per.periodStr).toBe('2023-W17')
     expect(per.scope).toBe(Scope.WEEK)
@@ -150,8 +157,8 @@ test('Period Hierarchy', ()=>{
     //edge case -- zooming out twice goes from jan to feb due to week's weirdness
     const endOfJan = new Period('2023-01-31');
     const januaryDateButFirstWeekOfFeb = new Period(endOfJan.zoomOut());
-    // expect(januaryDateButFirstWeekOfFeb.periodStr).toBe('2023-W06'); //#BUG blocked by polyfill missing weekOfYear method
-    // expect(januaryDateButFirstWeekOfFeb.zoomOut().periodStr).toBe('2023-02')
+    expect(januaryDateButFirstWeekOfFeb.periodStr).toBe('2023-W05');
+    expect(januaryDateButFirstWeekOfFeb.zoomOut().periodStr).toBe('2023-02')
 
     per = new Period(per.zoomOut());
     expect(per.periodStr).toBe('2023-Q2')
@@ -173,7 +180,7 @@ test('Period Hierarchy', ()=>{
     expect(per.periodStr).toBe('2022-W52');
 
     per = new Period(per.zoomIn());
-    // expect(per.periodStr).toBe('2022-12-26'); //#BUG
+    expect(per.periodStr).toBe('2022-12-26');
     
     //temp while bug on line above this exists
     per = new Period('2022-12-26')
