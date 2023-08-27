@@ -628,6 +628,7 @@ test('Tag Basics', () => {
     //... I guess there's not a lot else to them outside of updates
 });
 
+//#TODO - basically rewrite all this
 test.skip('Update Logic', async () => {
     resetTestDataset();
 
@@ -1390,6 +1391,7 @@ test('Data Merge', () => {
                     "_created": "lkljr435",
                     "_did": "cccc",
                     "_lbl": "Movie",
+                    "_hide": false,
                     "_desc": "Set a description",
                     "_emoji": "🎬",
                     "_scope": pdw.Scope.SECOND,
@@ -1447,6 +1449,7 @@ test('Data Merge', () => {
                     "_created": "lkljr435",
                     "_did": "cccc",
                     "_lbl": "Movie",
+                    "_hide": false,
                     "_desc": "Now has a description!",
                     "_emoji": "🎬",
                     "_scope": pdw.Scope.SECOND,
@@ -1470,6 +1473,7 @@ test('Data Merge', () => {
                     "_created": "lkljr435",
                     "_did": "cccc",
                     "_lbl": "Movie",
+                    "_hide": false,
                     "_desc": "Now has an UPDATED description!",
                     "_emoji": "🎬",
                     "_scope": pdw.Scope.SECOND,
@@ -1543,6 +1547,7 @@ test('Data Merge', () => {
 
 })
 
+//#TODO - finish this
 test('Summarizer', () => {
     resetTestDataset() 
 
@@ -1556,7 +1561,7 @@ test('Summarizer', () => {
     let result = q.run();
     
     let summary = new pdw.Summary(result.entries, pdw.Scope.WEEK);
-    console.log(summary.def);
+    // console.log(summary.def);
     
     
 })

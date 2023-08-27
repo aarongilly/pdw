@@ -942,7 +942,6 @@ export class PDW {
     }
 
     static rollupEntries(entries: Entry[]): EntryRollup {
-        console.log("I'd be summarizing:", entries);
         const def = entries[0].getDef();
         const pointDefs = def.pts;
         let returnObj = {
