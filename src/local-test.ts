@@ -9,13 +9,40 @@ import { FireDataStore } from './dataStores/firestoreDataStore.js';
 
 const pdwRef = pdw.PDW.getInstance();
 
+let firstDef = pdwRef.newDef({
+    _did: 'aaaa',
+    _lbl: 'Def 1',
+    _pts: [
+        {
+            _pid: 'a111',
+            _lbl: 'Def 1 point 1',
+            _emoji: '1️⃣',
+            _desc: 'Text type',
+            _type: pdw.PointType.TEXT
+        },
+        {
+            _pid: 'a222',
+            _lbl: 'Def 1 point 2',
+            _emoji: '2️⃣',
+            _desc: "Boolean Type",
+            _type: pdw.PointType.BOOL
+        }
+    ]
+})
+
+
+
 createTestDataSet();
 
-let all = new pdw.Query().inPeriod(new pdw.Period('2023-07-21').zoomOut()).run().entries;
+// let all = new pdw.Query().inPeriod(new pdw.Period('2023-07-21').zoomOut()).run().entries;
 
-let summary = new pdw.Summary(all, pdw.Scope.WEEK);
+// let summary = new pdw.Summary(all, pdw.Scope.WEEK);
 
-console.log(summary);
+// console.log(summary);
+
+
+
+
 // pdwRef.dataStores = [];
 
 // pdwRef.registerConnection(new FireDataStore(pdwRef));
