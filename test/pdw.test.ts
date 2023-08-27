@@ -271,7 +271,7 @@ test('Def Creation and Getting', () => {
     //existance & type of prop
     expect(textType.opts).toEqual({});
     expect(typeof selectType.opts).toBe('object');
-    expect( typeof multiselectType.opts).toBe('object');
+    expect(typeof multiselectType.opts).toBe('object');
 
     /**
      * Invalid PointDef (bad Type)
@@ -310,7 +310,7 @@ test('Def Creation and Getting', () => {
      */
     expect(pdw.Def.isDefData(firstDef.data)).toBe(true);
     expect(pdw.Def.isDefData(point.data)).toBe(false);
-    
+
     /**
      * Vice Versa
      */
@@ -534,9 +534,9 @@ test('Entry Creation and Getting', () => {
                 _pid: 'c111',
                 _lbl: 'Select Point',
                 _type: pdw.PointType.SELECT,
-                _opts: { 
+                _opts: {
                     'ccc1': 'Opt 1',
-                    'ccc2': 'Opt 2' 
+                    'ccc2': 'Opt 2'
                 }
             }
         ]
@@ -569,9 +569,9 @@ test('Entry Creation and Getting', () => {
             {
                 _pid: 'd111',
                 _type: pdw.PointType.MULTISELECT,
-                _opts: { 
+                _opts: {
                     'ddd1': 'One',
-                    'ddd2': 'Two' 
+                    'ddd2': 'Two'
                 }
             }
         ]
@@ -629,7 +629,7 @@ test('Tag Basics', () => {
 });
 
 //#TODO - basically rewrite all this
-test.skip('Update Logic', async () => {
+test('Update Logic', async () => {
     resetTestDataset();
 
     let origUid = pdw.makeUID();
@@ -654,110 +654,103 @@ test.skip('Update Logic', async () => {
     });
 
     /**
-     * Element.deleteAndSave()
+     * Not modified to begin with.
      */
-    firstDef.deleteAndSave() as pdw.Def;
-    expect(firstDef.deleted).toBe(true);
-    expect(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(1);
-    // expect(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(1); //WHAT? 
-    /**
-     * note to self here - the above line works if ONLY THIS TEST is being run, 
-     * but BREAKS if any other test swuit is being run... and for some reason it's *just* this line.
-     */
-    expect(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(0);
-    //doing element.toData because __tempUpdated is 1 millisecond off & toData nukes metaproperties
-    expect(pdw.Element.toData(pdwRef.getDefs({ includeDeleted: 'only' })[0])).toEqual(pdw.Element.toData(firstDef));
+    expect(firstDef.isSaved()).toBe(true);
 
     /**
-     * Element.unDeleteAndSave()
-     */
-    firstDef.unDeleteAndSave() as pdw.Def;
-    expect(firstDef.deleted).toBe(false);
-    expect(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(1);
-    expect(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(0);
-    expect(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(1);
-
-    /**
-     * Update Props, don't save yet
-     */
-    firstDef.setProps({ _lbl: 'DEF ONE' });
-    expect(firstDef.lbl).toBe('DEF ONE');
-    let unmodified = pdwRef.getDefs()[0];
-    expect(unmodified.lbl).toBe('Def 1');
-    expect(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(1); //DataStore not changed yet
-
-    /**
-     * Save to DataStore after updating
-     */
-    firstDef.save();
-    expect(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(2);
-    expect(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(1);
-    let defs = pdwRef.getDefs({ did: 'aaaa', includeDeleted: 'yes' });
-    expect(defs.length).toBe(2);
-    expect(defs.find(def => def.deleted)!.lbl).toBe('Def 1'); //deleted one unchanged
-    expect(defs.find(def => !def.deleted)!.lbl).toBe('DEF ONE'); //new one reflects change
-
-    /**
-     * Set a few props & save
-     */
-    firstDef.setProps({ _desc: 'New Description', _emoji: '🧠' }).save() as pdw.Def;
-    expect(pdwRef.getDefs({ did: 'aaaa', includeDeleted: 'yes' }).length).toBe(3);
-    expect(pdwRef.getDefs({ did: 'aaaa', includeDeleted: 'no' }).length).toBe(1);
-    let fromStore: any = pdwRef.getDefs({ did: 'aaaa', includeDeleted: 'no' })[0];
-    // expect(modified).toEqual(fromStore); //_tempUpdated is slightly off? Weird.
-    expect(firstDef.updated).toEqual(fromStore.updated);
-    expect(fromStore.desc).toBe("New Description");
-    expect(fromStore.emoji).toBe("🧠");
-    let overwritenFromStore = pdwRef.getDefs({ did: 'aaaa', includeDeleted: 'only' });
-    expect(overwritenFromStore.length).toBe(2);
-    expect(overwritenFromStore[0].desc).toBe('Def Desc');
-    expect(overwritenFromStore[0]._emoji).toBe("🆕");
-    expect(overwritenFromStore[1]._desc).toBe('Def Desc');
-    expect(overwritenFromStore[1]._emoji).toBe("🆕");
-
-    /**
-     * Set single prop - calls "setProps" internally
-     */
-    firstDef.setProp('_lbl', 'New Label');
-    expect(firstDef.lbl).toBe('New Label');
-
-    /**
-     * setting no props doesn't change datastore
-     */
-    expect(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(3);
-    firstDef.setProps({});
-    expect(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(3);
-
-    /**
-     * Cannot set ID-like props
+     * Element.delete
     */
-    firstDef.setProps({ _did: 'bbbb' }) as pdw.Def; //should log warning about not updating ID
-    expect(firstDef.did).toBe('aaaa');
-    origUid = firstDef.uid;
-    firstDef = firstDef.setProps({ _uid: 'whatever' }) as pdw.Def; //should log warning about not updating ID
-    expect(firstDef.uid).toBe(origUid);
+    //modify Def
+    expect(firstDef.deleted).toBe(false);
+    firstDef.deleted = true;
+    expect(firstDef.deleted).toBe(true);
+    expect(firstDef.isSaved()).toBe(false);
+    //its counterpart in the DataStore isn't changed yet
+    let defFromStores = pdwRef.getDefs({ did: 'aaaa' });
+    expect(defFromStores.length).toBe(1);
+    let defFromStore = defFromStores[0];
+    expect(defFromStore.deleted).toBe(false);
+    expect(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(1);
+    expect(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(0);
+    //save it to the datastore
+    firstDef.save();
+    expect(firstDef.isSaved()).toBe(true);
+    //DataStore now has the deletion, but didnt' spawn any additional elements
+    expect(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(0);
+    expect(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(1);
+    //undelete the def in memory
+    firstDef.deleted = false;
+    expect(firstDef.isSaved()).toBe(false);
+    //data store didn't change
+    expect(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(0);
+    expect(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(1);
+    //write undelete back to datastore
+    firstDef.save();
+    expect(firstDef.isSaved()).toBe(true);
+    //DataStore now has the deletion, but didnt' spawn any additional elements
+    expect(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(1);
+    expect(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(0);
 
     /**
-     * Cannot set Scope
+     * Do other types of modifications.
      */
-    firstDef.setProps({_scope: pdw.Scope.QUARTER})
+    firstDef.lbl = "Def 1 with new Label";
+    expect(firstDef.isSaved()).toBe(false);
+    //no change yet
+    expect(pdwRef.getDefs({ includeDeleted: 'no' })[0].lbl).toBe('Def 1');
+    expect(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(0);
+    //write change to the data store
+    firstDef.save();
+    let notDeletedFromStore = pdwRef.getDefs({ includeDeleted: 'no' })
+    let deletedFromStore = pdwRef.getDefs({ includeDeleted: 'only' })
+    expect(notDeletedFromStore.length).toBe(1);
+    expect(notDeletedFromStore[0].lbl).toBe('Def 1 with new Label');
+    expect(deletedFromStore.length).toBe(1);
+    expect(deletedFromStore[0].lbl).toBe('Def 1');
+    
+    firstDef.created = pdw.makeEpochStr();
+    firstDef.lbl = 'Def ONE';
+    firstDef.emoji = '🤿';
+    firstDef.desc = 'Modify *then* verify';
+    firstDef.hide = true;
+    firstDef.save()
+    
+    deletedFromStore = pdwRef.getDefs({ includeDeleted: 'only' })
+    expect(deletedFromStore.length).toBe(2);
+    notDeletedFromStore = pdwRef.getDefs({ includeDeleted: 'no' });
+    expect(notDeletedFromStore[0].lbl).toBe('Def ONE');
+    expect(notDeletedFromStore[0].emoji).toBe('🤿');
+    expect(notDeletedFromStore[0].desc).toBe('Modify *then* verify');
+    expect(notDeletedFromStore[0].hide).toBe(true);
+    
+    /**
+     * Other base Def properties cannot be set due to lack of setter.
+     * Cannot change _uid, _did, or _scope
+     */
+    expect(()=>{
+        //@ts-expect-error
+        firstDef.did = 'fails'
+    }).toThrowError();
+
+    /**
+     * saving without any changes no props doesn't change datastore
+     */
+    expect(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(3);
+    firstDef.save();
+    expect(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(3);
 
     /**
      * Data validation for Emoji
      */
-    expect(firstDef.emoji).toBe("🧠");
-    firstDef.setEmoji("not an emoji");
-    expect(firstDef.emoji).toBe("🧠"); //won't update
-    firstDef.setProps({ _emoji: 'also not an emoji' }); //setProps forwards to setEmoji
-    expect(firstDef.emoji).toBe("🧠");
-    firstDef.setEmoji("🌭");
-    expect(firstDef.emoji).toBe("🌭"); //does work, though
+    firstDef.emoji = 'Something that is not an emoji';
+    expect(firstDef.emoji).toBe('🤿')
 
     /**
      * Data validation for _updated & _created
      */
     let stringDate = '2023-07-22T15:55:27'; //plaindatetime string
-    firstDef.setProps({ _created: stringDate });
+    firstDef.created = stringDate
     expect(firstDef.created).toBe('lkehoqoo') //lkehoqoo is right
     //console.log(pdw.parseTemporalFromEpochStr('lkehoqoo').toPlainDateTime().toString());
     let date = new Date();
@@ -765,24 +758,32 @@ test.skip('Update Logic', async () => {
 
     //#### Updating PointDef stuff ####
     /**
-     * Def.setPointProps()
+     * Def.addPoint
      */
-    let def = pdwRef.getDefs({ did: 'aaaa' })[0];
-    def.setPointProps('a111', { _desc: 'Updated Description' })
-    expect(def.getPoint('a111')._desc).toBe('Updated Description');
-    fromStore = pdwRef.getDefs({ did: 'aaaa', includeDeleted: 'no' })[0];
-    expect(fromStore.getPoint('a111')._desc).toBe('Point Desc'); //change isn't saved yet
-    def.save();
-    fromStore = pdwRef.getDefs({ did: 'aaaa', includeDeleted: 'no' })[0];
-    expect(fromStore.getPoint('a111')._desc).toBe('Updated Description'); //change is now saved
+    firstDef.addPoint({
+        _pid: 'a333',
+        _lbl: 'Added'
+    });
+    expect(firstDef.getPoint('a111').pid).toBe('a111');
+    expect(firstDef.getPoint('a222').pid).toBe('a222');
+    expect(firstDef.getPoint('a333').pid).toBe('a333');
 
     /**
-     * PointDef.setProps()
-    */
-    let point = def.getPoint('a111');
-    point.setProps({ _desc: 'Updated Description Again' });
-    expect(def.getPoint('a111')._desc).toBe('Updated Description Again');
-    //would need to save() to save changes to DataStore
+     * PointDef modification
+     */
+    let point = firstDef.getPoint('Added');
+    expect(point.pid).toBe('a333');
+    point.desc = "Added dynamically";
+    expect(point.desc).toBe('Added dynamically');
+    //added point hasn't effected the store yet
+    notDeletedFromStore = pdwRef.getDefs({ includeDeleted: 'no' });
+    expect(notDeletedFromStore.length).toBe(1);
+    expect(notDeletedFromStore[0].pts.length).toBe(2); 
+    point.save();
+    notDeletedFromStore = pdwRef.getDefs({ includeDeleted: 'no' });
+    expect(notDeletedFromStore.length).toBe(1);
+    expect(notDeletedFromStore[0].pts.length).toBe(3); 
+    expect(notDeletedFromStore[0].getPoint('a333').desc).toBe('Added dynamically'); 
 
     /**
      * PointDef.setProp - calls setProps() internally
@@ -913,9 +914,9 @@ test.skip('Update Logic', async () => {
         _pid: 'a444',
         _lbl: 'Multiselect Test',
         _type: pdw.PointType.MULTISELECT,
-        _opts: { 
+        _opts: {
             'aaaa': 'A',
-            'bbbb': 'B' 
+            'bbbb': 'B'
         }
     }).save(); //must save to make the new point available to new entries
     entry = def.newEntry({
@@ -994,7 +995,7 @@ test.skip('Update Logic', async () => {
 
 })
 
-test('Get All',()=>{
+test('Get All', () => {
     resetTestDataset();
     let def = pdwRef.newDef({
         _did: 'yoyo',
@@ -1012,13 +1013,13 @@ test('Get All',()=>{
     });
     def.addTag(tag); //updates the Tag
     def.save(); //updates the Def
-    let all = pdwRef.getAll({includeDeleted:'yes'});
-    expect(Object.keys(all)).toEqual(['defs','entries','tags','overview']);
+    let all = pdwRef.getAll({ includeDeleted: 'yes' });
+    expect(Object.keys(all)).toEqual(['defs', 'entries', 'tags', 'overview']);
     expect(all.defs![0]);
 })
 
 test('Query Basics', () => {
-    resetTestDataset() 
+    resetTestDataset()
 
     createTestDataSet();
 
@@ -1065,14 +1066,14 @@ test('Query Basics', () => {
     expect(origResult.count).toBe(3);
     q.forDids('aaaa'); //converted to array internally
     expect(q.run()).toEqual(origResult);
-    let def = pdwRef.getDefs({did: 'aaaa'})[0];
+    let def = pdwRef.getDefs({ did: 'aaaa' })[0];
     q.forDefs([def]);
     expect(q.run()).toEqual(origResult);
     q.forDefs(def); //converted to array internally
-    expect(q.run()).toEqual(origResult);    
+    expect(q.run()).toEqual(origResult);
     q.forDefsLbld('Nightly Review'); //label for that def
     expect(q.run()).toEqual(origResult);
-    
+
     /**
      * Query.uids()
      */
@@ -1089,9 +1090,9 @@ test('Query Basics', () => {
     q.includeDeleted();
     result = q.run();
     expect(result.count).toBe(2); //now returning both versions
-    expect(result.entries.map(e=>e.getPointVal('bbb2'))).toEqual(['Michael Jordan', 'Michael SCOTT'])
+    expect(result.entries.map(e => e.getPointVal('bbb2'))).toEqual(['Michael Jordan', 'Michael SCOTT'])
 
-    
+
     /**
      * Created & Updated, both Before & After
     */
@@ -1103,7 +1104,7 @@ test('Query Basics', () => {
     q = new pdw.Query().includeDeleted();
     expect(q.createdAfter('2023-07-23').run().entries.length).toBe(6);
     q = new pdw.Query().includeDeleted();
-    expect(q.updatedBefore('2023-07-23').run().entries.length).toBe(2);    
+    expect(q.updatedBefore('2023-07-23').run().entries.length).toBe(2);
     q = new pdw.Query().includeDeleted();
     expect(q.updatedAfter('2023-07-23').run().entries.length).toBe(8);
     //all of which also works with epochStr, Dates, Temporal.ZonedDateTimes and full ISO strings;
@@ -1138,7 +1139,7 @@ test('Query Basics', () => {
     expect(q.run().entries).toEqual(fromTo);
     q = new pdw.Query();
     q.inPeriod('2022'); //same as specifying from().to() for same period
-    expect(q.run().entries.map(e=>e.getPoint('ddd1')!.val)).toEqual(['The Time Traveller 2']);
+    expect(q.run().entries.map(e => e.getPoint('ddd1')!.val)).toEqual(['The Time Traveller 2']);
 
     /**
      * Tags
@@ -1149,10 +1150,10 @@ test('Query Basics', () => {
     expect(origResult.entries.length).toBe(5);
     q.tagsLbld('media');
     expect(q.run()).toEqual(origResult);
-    let tag = pdwRef.getTags({tagLbl: 'media'})[0];
+    let tag = pdwRef.getTags({ tagLbl: 'media' })[0];
     q.tags(tag);
     expect(q.run()).toEqual(origResult);
-    
+
     /**
      * Scopes
      */
@@ -1161,7 +1162,7 @@ test('Query Basics', () => {
     expect(q.run().count).toBe(3);
     q.scopes([pdw.Scope.DAY, pdw.Scope.SECOND]);
     expect(q.run().count).toBe(9);
-    
+
     q.scopeMax(pdw.Scope.YEAR); //statement doesn't filter anything, but won't break anything
     expect(q.run().count).toBe(9);
     q.scopeMax(pdw.Scope.SECOND);
@@ -1177,7 +1178,7 @@ test('Query Basics', () => {
      */
     q = new pdw.Query();
     q.forDefsLbld('Nightly Review');
-    q.sort('_updated','asc');
+    q.sort('_updated', 'asc');
 
     // function createTestDataSet(){
     //     const nightly = pdwRef.newDef({
@@ -1287,7 +1288,7 @@ test('Query Basics', () => {
     //         'bbb1': 'You miss 100% of the shots you do not take',
     //         'bbb2': 'Michael Jordan' //updated later
     //     });
-    
+
     //     nightly.newEntry({
     //         _uid: 'lkfkuxo8-9ysw',
     //         _eid: 'lkfkuxol-mnhe',
@@ -1343,10 +1344,10 @@ test('Query Basics', () => {
     //         'ccc1': 'Oppenheimer',
     //         'ccc2': true
     //     });
-    
+
     //     quote.setPointVal('bbb2', 'Michael SCOTT').save();
     // }
-    
+
 })
 
 test('Data Merge', () => {
@@ -1358,30 +1359,30 @@ test('Data Merge', () => {
     let b: pdw.ElementData[] = tinyDataB().defs!;
     expect(a.length).toBe(1);
     expect(b.length).toBe(2);
-    let merge: any = pdw.PDW.merge(a,b);
+    let merge: any = pdw.PDW.merge(a, b);
     expect(merge.length).toBe(3); //original, first update, 2nd update
-    
+
     a = tinyDataA().entries!;
     b = tinyDataB().entries!;
     expect(a.length).toBe(1);
     expect(b.length).toBe(3);
-    merge = pdw.PDW.merge(a,b);
+    merge = pdw.PDW.merge(a, b);
     expect(merge.length).toBe(3); //a was marked deleted in b
 
     a = tinyDataA().tags!;
     b = tinyDataB().tags!;
     expect(a.length).toBe(1);
     expect(b.length).toBe(1);
-    merge = pdw.PDW.merge(a,b);
+    merge = pdw.PDW.merge(a, b);
     expect(merge.length).toBe(1); //a is same as b
-    
+
     //combine all at the same time
     merge = pdw.PDW.mergeComplete(tinyDataA(), tinyDataB());
     expect(merge.defs.length).toBe(3);
     expect(merge.entries.length).toBe(3)
     expect(merge.tags.length).toBe(1);
 
-    function tinyDataA(): pdw.CompleteishDataset{
+    function tinyDataA(): pdw.CompleteishDataset {
         return {
             defs: [
                 {
@@ -1439,7 +1440,7 @@ test('Data Merge', () => {
         }
     }
 
-    function tinyDataB(): pdw.CompleteishDataset{
+    function tinyDataB(): pdw.CompleteishDataset {
         return {
             defs: [
                 {
@@ -1549,7 +1550,7 @@ test('Data Merge', () => {
 
 //#TODO - finish this
 test('Summarizer', () => {
-    resetTestDataset() 
+    resetTestDataset()
 
     createTestDataSet();
 
@@ -1559,14 +1560,14 @@ test('Summarizer', () => {
 
     q.inPeriod(period).forDids('aaaa');
     let result = q.run();
-    
+
     let summary = new pdw.Summary(result.entries, pdw.Scope.WEEK);
     // console.log(summary.def);
-    
-    
+
+
 })
 
-function createTestDataSet(){
+function createTestDataSet() {
     const nightly = pdwRef.newDef({
         _did: 'aaaa',
         _lbl: 'Nightly Review',
@@ -1587,12 +1588,12 @@ function createTestDataSet(){
                 _pid: 'aaa2',
                 _type: pdw.PointType.SELECT,
                 _opts: {
-                        'opt1': 'Weekend/Holiday',
-                        'opt2': 'North',
-                        'opt3': 'WFH',
-                        'opt4': 'Vacation',
-                        'opt5': 'sickday',
-                    }
+                    'opt1': 'Weekend/Holiday',
+                    'opt2': 'North',
+                    'opt3': 'WFH',
+                    'opt4': 'Vacation',
+                    'opt5': 'sickday',
+                }
             },
             {
                 _emoji: '1️⃣',
@@ -1659,7 +1660,7 @@ function createTestDataSet(){
      */
     const mediaTag = pdwRef.newTag({
         _lbl: 'media',
-        _dids: ['dddd','cccc'],
+        _dids: ['dddd', 'cccc'],
         _tid: 'tag1'
     });
     /**

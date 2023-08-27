@@ -1,4 +1,3 @@
-//// @ts-nocheck
 import * as pdw from './pdw.js'
 import { Query, Scope } from './pdw.js'
 // import { exportToFile, importFromFile } from './dataStores/fileAsyncDataStores.js';
@@ -9,28 +8,52 @@ import { FireDataStore } from './dataStores/firestoreDataStore.js';
 
 const pdwRef = pdw.PDW.getInstance();
 
+let origUid = pdw.makeUID();
+
 let firstDef = pdwRef.newDef({
+    _uid: origUid,
     _did: 'aaaa',
     _lbl: 'Def 1',
+    _desc: 'Def Desc',
     _pts: [
         {
             _pid: 'a111',
             _lbl: 'Def 1 point 1',
-            _emoji: '1️⃣',
-            _desc: 'Text type',
-            _type: pdw.PointType.TEXT
+            _desc: 'Point Desc'
         },
         {
             _pid: 'a222',
             _lbl: 'Def 1 point 2',
-            _emoji: '2️⃣',
-            _desc: "Boolean Type",
-            _type: pdw.PointType.BOOL
+            _desc: 'Numero Dos'
         }
     ]
-})
+});
 
+/**
+ * Not modified to begin with.
+ */
+console.log(firstDef.__modified);
 
+/**
+ * Element.deleteAndSave()
+ */
+firstDef.deleted = true;
+firstDef.save();
+firstDef.deleted = false;
+firstDef.save();
+firstDef.lbl = 'hi mom';
+firstDef.save();
+
+firstDef.addPoint({
+    _pid: 'a333',
+    _lbl: 'Added'
+});
+let point = firstDef.getPoint('a333');
+point.desc = "Added dynamically";
+point.save();
+let notDeletedFromStore = pdwRef.getDefs({ includeDeleted: 'no' })
+let deletedFromStore = pdwRef.getDefs({ includeDeleted: 'only' })
+let def = pdwRef.getDefs({ includeDeleted: 'only' });
 
 createTestDataSet();
 

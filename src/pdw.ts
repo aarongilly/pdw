@@ -657,7 +657,9 @@ export class PDW {
         if (!Array.isArray(defs)) return;
         if (defs.length === 0) return;
         defs.forEach((def: any) => {
-            const existsAt = this.manifest.indexOf(def);
+            //find def with the same _did, if you find it, replace it
+            //if you don't, add it
+            const existsAt = this.manifest.findIndex(mD=>mD.data._did === def.data._did);
             if (existsAt === -1) this.manifest.push(def);
             if (existsAt !== -1) this.manifest[existsAt] = def;
         })
@@ -1000,6 +1002,7 @@ export class PDW {
 export abstract class Element {
     data: ElementData;
     __modified: boolean;
+    __deletionChange?: boolean;
     readonly tempCreated: Temporal.ZonedDateTime;
     readonly tempUpdated: Temporal.ZonedDateTime;
 
@@ -1018,10 +1021,10 @@ export abstract class Element {
     get uid() {
         return this.data._uid;
     }
-    get created():string {
+    get created(): string {
         return this.data._created as string;
     }
-    get updated():string {
+    get updated(): string {
         return this.data._updated as string;
     }
     get deleted() {
@@ -1037,7 +1040,8 @@ export abstract class Element {
     }
     set deleted(isDeleted: boolean) {
         this.data._deleted = isDeleted;
-        this.__modified = true;
+        this.__modified = true; 
+        this.__deletionChange = isDeleted;
     }
 
     toData(): ElementData | DefData | EntryData | TagData {
@@ -1050,35 +1054,51 @@ export abstract class Element {
      * @returns this
      */
     save() {
-        if (this.__modified !== true) {
-            console.warn('Called save even though the "modified" flag was false... is there an error? Will save anyway');
+        if(this.__modified === false){
+            console.warn('Tried saving an unchanged Element, ignoring request');
+            return;
         }
         const oldId = this.data._uid;
         const changeTime = makeEpochStr();
-
-        const deletionMessage = {
-            _uid: oldId,
-            _deleted: true,
-            _updated: changeTime
+        let toWriteToStores: ElementLike[] = [];
+        //deletions and un-deletions need to be handled differently, since they don't spawn 
+        //new elements to be created. Right now I'm handling it this way.
+        if (this.__deletionChange !== undefined) { //indicates 'delete' was changed.
+            this.data._updated = changeTime;
+            toWriteToStores.push(this.data);
+            this.__deletionChange = undefined;
+        } else {
+            //generate a deletion message for stores
+            toWriteToStores.push(
+                {
+                    _uid: oldId,
+                    _deleted: true,
+                    _updated: changeTime,
+                    _tid: this.data._tid,
+                    _eid: this.data._eid,
+                    _did: this.data._did,
+                }
+            )
+            const newId = makeUID();
+            this.data._updated = changeTime;
+            this.data._uid = newId;
+            toWriteToStores.push(this.data);
         }
 
-        const newId = makeUID();
-        this.data._updated = changeTime;
-        this.data._uid = newId;
         //return the 'modified' flag to false to indicate it's not been deleted
         this.__modified = false;
 
         const elementType = this.getType();
         if (elementType === 'DefData') {
-            PDW.getInstance().setDefs([this.data, deletionMessage])
+            PDW.getInstance().setDefs(toWriteToStores)
             return this
         }
         if (elementType === 'EntryData') {
-            PDW.getInstance().setEntries([this.data, deletionMessage])
+            PDW.getInstance().setEntries(toWriteToStores)
             return this
         }
         if (elementType === 'TagData') {
-            PDW.getInstance().setTags([this.data, deletionMessage])
+            PDW.getInstance().setTags(toWriteToStores)
             return this
         }
         throw new Error('What kind of element is this anyway? ' + elementType)
@@ -1098,8 +1118,8 @@ export abstract class Element {
      * @returns true if argument is updated more recently than this
      */
     isOlderThan(elementData: ElementData | Element) {
-        if(elementData.hasOwnProperty('__modified')) return this.data._updated < elementData.updated;
-        if(elementData.hasOwnProperty('_updated')) return this.data._updated < (<ElementData>elementData)._updated;
+        if (elementData.hasOwnProperty('__modified')) return this.data._updated < elementData.updated;
+        if (elementData.hasOwnProperty('_updated')) return this.data._updated < (<ElementData>elementData)._updated;
         throw new Error('What props does it have?')
         //ran into a situation one time where I saved something twice on successive
         //lines nad only the first one was taken due to the "strictly olderthan",
@@ -1131,13 +1151,13 @@ export abstract class Element {
      * @param comparison Element to compare against
      */
     sameIdAs(comparison: ElementData | Element) {
-        if(comparison.hasOwnProperty('__modified')) return Element.hasSameId(this.data, comparison.data);
-        return Element.hasSameId(this.data, (<ElementData> comparison));
+        if (comparison.hasOwnProperty('__modified')) return Element.hasSameId(this.data, comparison.data);
+        return Element.hasSameId(this.data, (<ElementData>comparison));
     }
 
     sameTypeAs(comparison: ElementData | Element) {
-        if(comparison.hasOwnProperty('__modified')) return this.getType() === Element.getTypeOfElement(comparison.data);
-        return this.getType() === Element.getTypeOfElement((<ElementData> comparison));
+        if (comparison.hasOwnProperty('__modified')) return this.getType() === Element.getTypeOfElement(comparison.data);
+        return this.getType() === Element.getTypeOfElement((<ElementData>comparison));
     }
 
     passesFilters(params: SanitizedParams) {
@@ -1208,8 +1228,8 @@ export abstract class Element {
     }
 
     static shouldReplace(thing: ElementData | Element, thingItMayReplace: ElementData | Element): boolean {
-        if(thing.hasOwnProperty('__modified')) thing = thing.data
-        if(thingItMayReplace.hasOwnProperty('__modified')) thingItMayReplace = thingItMayReplace.data
+        if (thing.hasOwnProperty('__modified')) thing = thing.data
+        if (thingItMayReplace.hasOwnProperty('__modified')) thingItMayReplace = thingItMayReplace.data
 
         if (!Element.hasSameId((<ElementData>thing), (<ElementData>thingItMayReplace))) return false;
         if ((<ElementData>thing)._updated! > (<ElementData>thingItMayReplace)._updated!) return true;
@@ -1362,19 +1382,19 @@ export class Def extends Element {
         return this._pts;
     }
 
-    set lbl(newLbl:string){
+    set lbl(newLbl: string) {
         this.data._lbl = newLbl;
         this.__modified = true;
     }
-    set desc(newDesc:string){
+    set desc(newDesc: string) {
         this.data._desc = newDesc;
         this.__modified = true;
     }
-    set hide(newHide:boolean){
+    set hide(newHide: boolean) {
         this.data._hide = newHide;
         this.__modified = true;
     }
-    set emoji(newEmoji:string){
+    set emoji(newEmoji: string) {
         if (!Def.isSingleEmoji(newEmoji)) {
             console.warn('Tried to set an emoji with something that was too long, emoji will not change');
             return
@@ -1390,9 +1410,11 @@ export class Def extends Element {
         throw new Error('No point found with pid or lbl when getting "' + pidOrLbl + '" for the Def labeled "' + this.lbl + '"');
     }
 
-    addPoint(pointInfo: PointDefData): Def {
+    addPoint(pointInfo: PointDefLike): Def {
         let newPoint = new PointDef(pointInfo, this);
         this.pts.push(newPoint);
+        this.data._pts.push(newPoint.toData())
+        this.__modified = true;
         return this
     }
 
@@ -1433,7 +1455,7 @@ export class Def extends Element {
     /**
      * Marks the pointDef as _hide = false
      */
-    hidePoint(pointIdentifier: string | PointDef, isReactivate = false) {
+    hidePoint(pointIdentifier: string | PointDef, isUnhide = false) {
         let assPoint: undefined | PointDef
         if (typeof pointIdentifier === undefined) throw new Error("Must send a string or object as a point identifier");
         if (typeof pointIdentifier === 'string') {
@@ -1442,8 +1464,8 @@ export class Def extends Element {
             assPoint = pointIdentifier;
             if (!PointDef.isPointDefData(assPoint)) throw new Error("pointIdentifier passed in wasn't PointDefData")
         }
-        assPoint.hide = isReactivate;
-        this.setUpdatedToNow();
+        assPoint.hide = isUnhide;
+        this.__modified = true;
     }
 
     /**
@@ -1501,6 +1523,12 @@ export class PointDef {
         if (newPointDefData._pid === undefined) throw new Error("No PointDef _pid supplied.");
         if (newPointDefData._type !== undefined && !PointDef.isValidType(newPointDefData._type)) throw new Error('Cannot parse point type ' + newPointDefData._type);
         if (newPointDefData._rollup !== undefined && !PointDef.isValidRollup(newPointDefData._rollup)) throw new Error('Cannot parse point rollup ' + newPointDefData._rollup);
+        
+        //#BUG
+        //There are two references to PointDef.data. Changing them here doesn't seem to change them on the def.
+        //....how do you handle that?
+        this._def = def;
+        
         this.data = {
             _pid: newPointDefData._pid,
             _lbl: newPointDefData._lbl ?? 'Label unset',
@@ -1516,7 +1544,6 @@ export class PointDef {
             this.data._opts = PointDef.validateOptsArray(newPointDefData._opts);
         }
 
-        this._def = def;
 
         if (!PointDef.isPointDefData(this.data)) throw new Error('Mal-formed PointDef')
     }
@@ -1554,10 +1581,17 @@ export class PointDef {
     }
     set desc(newDesc: string) {
         this.data._desc = newDesc
+        this.def.data._pts.find(dp=>dp._pid === this.data._pid)!._desc = newDesc;
+        // this.def.getPoint(this.data._pid).data._desc = newDesc;
         this.def.__modified = true;
     }
     set emoji(newEmoji: string) {
+        if (!PointDef.isSingleEmoji(newEmoji)) {
+            console.warn('Tried to set an emoji with something that was too long, emoji will not change');
+            return
+        }
         this.data._emoji = newEmoji
+        this.def.getPoint(this.data._pid).data._emoji = newEmoji;
         this.def.__modified = true;
     }
     set hide(hideIt: boolean) {
@@ -1585,7 +1619,7 @@ export class PointDef {
             return this
         }
         this.opts![oid] = newLbl;
-        this.def.setUpdatedToNow();
+        this.def.__modified = true;
         return this
     }
 
@@ -1618,7 +1652,7 @@ export class PointDef {
         }
         if (oid === undefined) oid = makeSmallID();
         this.opts![oid] = lbl;
-        this.def.setUpdatedToNow();
+        this.def.__modified = true;
         return this;
     }
 
@@ -1630,7 +1664,7 @@ export class PointDef {
         if (this.opts![oid!] !== undefined) {
             delete this.opts![oid!]
         }
-        this.def.setUpdatedToNow();
+        this.def.__modified = true;
         return this
     }
 
@@ -1836,18 +1870,18 @@ export class Entry extends Element {
     public get period(): Period {
         return this._period;
     }
-    get note(){
+    get note() {
         return this.data._note;
     }
-    get source(){
+    get source() {
         return this.data._source;
     }
 
-    set note(newNote: string){
+    set note(newNote: string) {
         this.data._note = newNote;
         this.__modified = true;
     }
-    set source(newSource: string){
+    set source(newSource: string) {
         this.data._source = newSource;
         this.__modified = true;
     }
@@ -1966,24 +2000,24 @@ export class Tag extends Element {
             throw new Error('TagDef created is not TagDefData');
         }
     }
-    get tid(){
+    get tid() {
         return this.data._tid;
     }
-    get lbl(){
+    get lbl() {
         return this.data._lbl;
     }
-    get dids(){
+    get dids() {
         return this.data._dids;
     }
-    set tid(newTid: string){
+    set tid(newTid: string) {
         this.data._tid = newTid;
         this.__modified = true;
     }
-    set lbl(newLbl: string){
+    set lbl(newLbl: string) {
         this.data.lbl = newLbl;
         this.__modified = true;
     }
-    set dids(newDids: string[]){
+    set dids(newDids: string[]) {
         this.data._did = newDids;
         this.__modified = true;
     }
