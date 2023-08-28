@@ -659,7 +659,7 @@ export class PDW {
         defs.forEach((def: any) => {
             //find def with the same _did, if you find it, replace it
             //if you don't, add it
-            const existsAt = this.manifest.findIndex(mD=>mD.data._did === def.data._did);
+            const existsAt = this.manifest.findIndex(mD => mD.data._did === def.data._did);
             if (existsAt === -1) this.manifest.push(def);
             if (existsAt !== -1) this.manifest[existsAt] = def;
         })
@@ -1040,7 +1040,7 @@ export abstract class Element {
     }
     set deleted(isDeleted: boolean) {
         this.data._deleted = isDeleted;
-        this.__modified = true; 
+        this.__modified = true;
         this.__deletionChange = isDeleted;
     }
 
@@ -1054,7 +1054,7 @@ export abstract class Element {
      * @returns this
      */
     save() {
-        if(this.__modified === false){
+        if (this.__modified === false) {
             console.warn('Tried saving an unchanged Element, ignoring request');
             return;
         }
@@ -1413,7 +1413,7 @@ export class Def extends Element {
     addPoint(pointInfo: PointDefLike): Def {
         let newPoint = new PointDef(pointInfo, this);
         this.pts.push(newPoint);
-        this.data._pts.push(newPoint.toData())
+        this.data._pts.push(newPoint.data)
         this.__modified = true;
         return this
     }
@@ -1455,7 +1455,7 @@ export class Def extends Element {
     /**
      * Marks the pointDef as _hide = false
      */
-    hidePoint(pointIdentifier: string | PointDef, isUnhide = false) {
+    hidePoint(pointIdentifier: string | PointDef, isUnhide = true) {
         let assPoint: undefined | PointDef
         if (typeof pointIdentifier === undefined) throw new Error("Must send a string or object as a point identifier");
         if (typeof pointIdentifier === 'string') {
@@ -1473,7 +1473,7 @@ export class Def extends Element {
      * @param pointIdentifier the point to set as active again
      */
     unhidePoint(pointIdentifier: string | PointDef) {
-        this.hidePoint(pointIdentifier, true)
+        this.hidePoint(pointIdentifier, false)
     }
 
     newEntry(entryData: EntryLike): Entry {
@@ -1523,12 +1523,9 @@ export class PointDef {
         if (newPointDefData._pid === undefined) throw new Error("No PointDef _pid supplied.");
         if (newPointDefData._type !== undefined && !PointDef.isValidType(newPointDefData._type)) throw new Error('Cannot parse point type ' + newPointDefData._type);
         if (newPointDefData._rollup !== undefined && !PointDef.isValidRollup(newPointDefData._rollup)) throw new Error('Cannot parse point rollup ' + newPointDefData._rollup);
-        
-        //#BUG
-        //There are two references to PointDef.data. Changing them here doesn't seem to change them on the def.
-        //....how do you handle that?
+
         this._def = def;
-        
+
         this.data = {
             _pid: newPointDefData._pid,
             _lbl: newPointDefData._lbl ?? 'Label unset',
@@ -1543,7 +1540,6 @@ export class PointDef {
         if (this.shouldHaveOpts() && newPointDefData._opts !== undefined) {
             this.data._opts = PointDef.validateOptsArray(newPointDefData._opts);
         }
-
 
         if (!PointDef.isPointDefData(this.data)) throw new Error('Mal-formed PointDef')
     }
@@ -1581,7 +1577,7 @@ export class PointDef {
     }
     set desc(newDesc: string) {
         this.data._desc = newDesc
-        this.def.data._pts.find(dp=>dp._pid === this.data._pid)!._desc = newDesc;
+        this.def.data._pts.find(dp => dp._pid === this.data._pid)!._desc = newDesc;
         // this.def.getPoint(this.data._pid).data._desc = newDesc;
         this.def.__modified = true;
     }
@@ -1886,9 +1882,11 @@ export class Entry extends Element {
         this.__modified = true;
     }
     public set period(value: Period | string) {
-        if (typeof value !== 'string') value = value.toString();
-        this.data._period = value;
-        this._period = new Period(value);
+        if (typeof value === 'string') value = new Period(value);
+        //ensure scope agreement
+        value = value.zoomTo(this.getDef().scope)
+        this.data._period = value.toString();
+        this._period = value;
         this.__modified = true;
     }
 
@@ -2018,7 +2016,7 @@ export class Tag extends Element {
         this.__modified = true;
     }
     set dids(newDids: string[]) {
-        this.data._did = newDids;
+        this.data._dids = newDids;
         this.__modified = true;
     }
 
@@ -2033,9 +2031,11 @@ export class Tag extends Element {
     }
 
     addDef(defOrDid: Def | string) {
-        let did = defOrDid as string;
-        if (typeof did !== 'string' && Def.isDefData(defOrDid)) {
-            did = (<Def>defOrDid).did
+        let did = '';
+        if(typeof defOrDid !== 'string' && defOrDid.hasOwnProperty('__modified')){
+            did = (<Def>defOrDid).data._did;
+        } else{
+            did = (<string>defOrDid);
         }
         if (this.data._dids.indexOf(did) === -1) this.data._dids.push(did);
         this.__modified = true;
@@ -2043,13 +2043,13 @@ export class Tag extends Element {
     }
 
     removeDef(defOrDid: Def | string) {
-        if (Def.isDefData(defOrDid)) {
-            //@ts-expect-error
-            this._dids = this._dids.filter(d => d !== ((<Def>defOrDid)._did));
-        } else {
-            //@ts-expect-error
-            this._dids = this._dids.filter(d => d !== ((<string>defOrDid)));
+        let did = '';
+        if(typeof defOrDid !== 'string' && defOrDid.hasOwnProperty('__modified')){
+            did = (<Def>defOrDid).data._did;
+        } else{
+            did = (<string>defOrDid);
         }
+        this.data._dids = this.data._dids.filter(d => d !== did);
         this.__modified = true;
         return this
     }

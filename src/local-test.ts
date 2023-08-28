@@ -8,9 +8,10 @@ import { FireDataStore } from './dataStores/firestoreDataStore.js';
 
 const pdwRef = pdw.PDW.getInstance();
 
+
 let origUid = pdw.makeUID();
 
-let firstDef = pdwRef.newDef({
+let def = pdwRef.newDef({
     _uid: origUid,
     _did: 'aaaa',
     _lbl: 'Def 1',
@@ -32,28 +33,319 @@ let firstDef = pdwRef.newDef({
 /**
  * Not modified to begin with.
  */
-console.log(firstDef.__modified);
+//(def.isSaved()).toBe(true);
 
 /**
- * Element.deleteAndSave()
- */
-firstDef.deleted = true;
-firstDef.save();
-firstDef.deleted = false;
-firstDef.save();
-firstDef.lbl = 'hi mom';
-firstDef.save();
+ * Element.delete
+*/
+//modify Def
+//(def.deleted).toBe(false);
+def.deleted = true;
+//(def.deleted).toBe(true);
+//(def.isSaved()).toBe(false);
+//its counterpart in the DataStore isn't changed yet
+let defFromStores = pdwRef.getDefs({ did: 'aaaa' });
+//(defFromStores.length).toBe(1);
+let defFromStore = defFromStores[0];
+//(defFromStore.deleted).toBe(false);
+//(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(1);
+//(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(0);
+//save it to the datastore
+def.save();
+//(def.isSaved()).toBe(true);
+//DataStore now has the deletion, but didnt' spawn any additional elements
+//(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(0);
+//(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(1);
+//undelete the def in memory
+def.deleted = false;
+//(def.isSaved()).toBe(false);
+//data store didn't change
+//(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(0);
+//(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(1);
+//write undelete back to datastore
+def.save();
+//(def.isSaved()).toBe(true);
+//DataStore now has the deletion, but didnt' spawn any additional elements
+//(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(1);
+//(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(0);
 
-firstDef.addPoint({
-    _pid: 'a333',
-    _lbl: 'Added'
-});
-let point = firstDef.getPoint('a333');
-point.desc = "Added dynamically";
-point.save();
+/**
+ * Do other types of modifications.
+ */
+def.lbl = "Def 1 with new Label";
+//(def.isSaved()).toBe(false);
+//no change yet
+//(pdwRef.getDefs({ includeDeleted: 'no' })[0].lbl).toBe('Def 1');
+//(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(0);
+//write change to the data store
+def.save();
 let notDeletedFromStore = pdwRef.getDefs({ includeDeleted: 'no' })
 let deletedFromStore = pdwRef.getDefs({ includeDeleted: 'only' })
-let def = pdwRef.getDefs({ includeDeleted: 'only' });
+//(notDeletedFromStore.length).toBe(1);
+//(notDeletedFromStore[0].lbl).toBe('Def 1 with new Label');
+//(deletedFromStore.length).toBe(1);
+//(deletedFromStore[0].lbl).toBe('Def 1');
+
+def.created = pdw.makeEpochStr();
+def.lbl = 'Def ONE';
+def.emoji = '🤿';
+def.desc = 'Modify *then* verify';
+def.hide = true;
+def.save()
+
+deletedFromStore = pdwRef.getDefs({ includeDeleted: 'only' })
+//(deletedFromStore.length).toBe(2);
+notDeletedFromStore = pdwRef.getDefs({ includeDeleted: 'no' });
+//(notDeletedFromStore[0].lbl).toBe('Def ONE');
+//(notDeletedFromStore[0].emoji).toBe('🤿');
+//(notDeletedFromStore[0].desc).toBe('Modify *then* verify');
+//(notDeletedFromStore[0].hide).toBe(true);
+
+/**
+ * Other base Def properties cannot be set due to lack of setter.
+ * Cannot change _uid, _did, or _scope
+ */
+
+/**
+ * saving without any changes no props doesn't change datastore
+ */
+//(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(3);
+def.save();
+//(pdwRef.getDefs({ includeDeleted: 'yes' }).length).toBe(3);
+
+/**
+ * Data validation for Emoji
+ */
+def.emoji = 'Something that is not an emoji';
+//(def.emoji).toBe('🤿')
+
+/**
+ * Data validation for _updated & _created
+ */
+let stringDate = '2023-07-22T15:55:27'; //plaindatetime string
+def.created = stringDate
+//(def.created).toBe('lkehoqoo') //lkehoqoo is right
+//console.log(pdw.parseTemporalFromEpochStr('lkehoqoo').toPlainDateTime().toString());
+let date = new Date();
+//firstDef.setProps({_created: date}); //also works, but difficult to prove again and again
+
+//#### Updating PointDef stuff ####
+/**
+ * Def.addPoint
+ */
+def.addPoint({
+    _pid: 'a333',
+    _lbl: 'Added',
+    _type: pdw.PointType.SELECT
+});
+//(def.getPoint('a111').pid).toBe('a111');
+//(def.getPoint('a222').pid).toBe('a222');
+//(def.getPoint('a333').pid).toBe('a333');
+
+/**
+ * PointDef modification
+ */
+let point = def.getPoint('Added');
+//(point.pid).toBe('a333');
+point.desc = "Added dynamically";
+//(point.desc).toBe('Added dynamically');
+//added point hasn't effected the store yet
+notDeletedFromStore = pdwRef.getDefs({ includeDeleted: 'no' });
+//(notDeletedFromStore.length).toBe(1);
+//(notDeletedFromStore[0].pts.length).toBe(2); 
+point.save();
+notDeletedFromStore = pdwRef.getDefs({ includeDeleted: 'no' });
+//(notDeletedFromStore.length).toBe(1);
+//(notDeletedFromStore[0].pts.length).toBe(3); 
+//(notDeletedFromStore[0].getPoint('a333').desc).toBe('Added dynamically'); 
+
+/**
+ * Data Validation on PointDef.setProps on emoji, rollup, and type
+ */
+//(point.emoji).toBe('🆕');
+point.emoji =  'Invalid emoji';
+//(point.emoji).toBe('🆕'); //no change
+//(point.rollup).toBe(pdw.Rollup.COUNT);
+//@ts-expect-error - typescript warning, nice
+point.rollup = 'Invalid rollup';
+//(point.rollup).toBe(pdw.Rollup.COUNT); //no change
+
+/**
+ * Def.hidePoint()
+ */
+//(def.pts.map(p=>p.hide)).toEqual([false,false,false]);
+def.hidePoint('a222');
+//(def.pts.length).toBe(3); //still got 3
+//(def.pts.filter(p => p.hide===false).length).toBe(2); //but only 2 are active
+
+/**
+ * Def.reactivatePoint()
+ */
+def.unhidePoint('a222');
+//(def.pts.map(p=>p.hide)).toEqual([false,false,false]);
+
+/**
+ * Opts
+ */
+point = def.getPoint('a333');
+//(point.shouldHaveOpts()).toBe(true);
+point.addOpt('Option 1', 'o111'); //specified _oid
+//(Object.keys(point.opts).length).toBe(1);
+point.addOpt('Option 2'); //unspecified _oid => one is made for it
+
+//(Object.keys(point.opts).length).toBe(2);
+point.addOpt('Option 3', 'o333'); //needed for later
+point.setOpt('o111', 'New Title');
+//(point.getOptLbl('o111')).toBe('New Title'); //get by opt._oid
+//(point.getOptOid('New Title')).toBe('o111'); //get by opt._lbl
+point.removeOpt('Option 2');
+//(Object.keys(point.opts).length).toBe(2); //literally removes the option from the array
+point.setOpt('o333', 'New Option 2'); //a common real world use case, I imagine
+//(Object.keys(point.opts).length).toBe(2);
+//(point.getOptLbl('o333')).toBe('New Option 2');
+
+/**
+ * Entries
+ */
+let entry = pdwRef.newEntry({ //minimal entry input using newEntry on PDW
+    _did: def.did,
+    'Added': 'o111', //addressed using point.lbl
+    'a222': 'Point value' //addressed using point.pid
+});
+
+/**
+ * Base entry props updating
+ */
+//(entry.note).toBe('');
+//(entry.getPointVal('a222')).toBe('Point value');
+//(entry.isSaved()).toBe(true);
+entry.note = "Added note";
+//(entry.isSaved()).toBe(false);
+//(entry.note).toBe('Added note');
+entry.source = 'Test procedure';
+//(entry.source).toBe('Test procedure');
+
+entry.period = '2023-07-21T14:04:33';
+//(entry.period.toString()).toBe('2023-07-21T14:04:33');
+let fromStore: any = pdwRef.getEntries()[0];
+//(fromStore.note).toBe(''); //store not updated yet
+entry.save(); //update stored entry
+fromStore = pdwRef.getEntries({ includeDeleted: 'no' })[0];
+//(fromStore.note).toBe('Added note'); //store updated with new entry
+//(fromStore.getPointVal('a222')).toBe('Point value'); //point is retained
+let original = pdwRef.getEntries({ includeDeleted: 'only' })[0];
+//(original.note).toBe(''); //original entry retained unchanged
+//(original.uid !== fromStore.uid).toBe(true); //uid is different
+//(original.eid === fromStore.eid).toBe(true); //eid is the same
+
+/**
+ * Entry Point Values
+ */
+entry.setPointVals([
+    { 'a333': 'o333' },
+    { 'a222': 'Other point new value!' }
+]);
+//(entry.getPoint('a222')!.val).toBe('Other point new value!');
+//(entry.getPoint('a333')!.val).toBe('o333');
+//or set one at a time:
+entry.setPointVal('a333', 'o111');
+//(entry.getPoint('a333')!.val).toBe('o111');
+
+/**
+ * Multiselect Opts
+ */
+def.addPoint({
+    _pid: 'a444',
+    _lbl: 'Multiselect Test',
+    _type: pdw.PointType.MULTISELECT,
+    _opts: {
+        'aaaa': 'A',
+        'bbbb': 'B'
+    }
+}).save(); //must save to make the new point available to new entries
+entry = def.newEntry({
+    'a444': []
+});
+//(entry.getPoint('Multiselect Test')!.val).toEqual([]);
+entry.setPointVal('a444', ['aaaa', 'bbbb']); //change multiselect selections
+//(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa', 'bbbb']); //works
+entry.setPointVal('a444', 'aaaa, bbbb, cccc'); //can also just have comma-delimited string
+//(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa', 'bbbb', 'cccc']); //works, doesn't care about the non-existant 'cccc' opt
+entry.setPointVal('a444', 'aaaa,bbbb'); //spacing on a comma-delimited string is ignored
+//(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa', 'bbbb']); //works
+entry.setPointVal('a444', 'aaaa'); //and a single string value is converted to an array
+//(entry.getPoint('Multiselect Test')!.val).toEqual(['aaaa']); //works
+
+/**
+ * Entry Period scope protection
+ */
+entry.period = '2023-07-21';
+//(entry.period.toString()).toBe('2023-07-21T00:00:00');
+
+/**
+ * Tags
+ */
+let tag = pdwRef.newTag({
+    _tid: 'taga',
+    _lbl: 'My tag',
+    _dids: []
+});
+//(tag.dids).toEqual([]);
+tag.dids = [def.did];
+//(tag.dids).toEqual([def.did]);
+fromStore = pdwRef.getTags()[0];
+//(fromStore.dids).toEqual([]); //stores not updated yet.
+tag.save();
+fromStore = pdwRef.getTags()[0];
+//(fromStore.dids).toEqual([def.did]); //now it is
+
+let tagTwo = pdwRef.newTag({
+    _tid: 'tagb',
+    _lbl: 'Other tag'
+})
+/**
+ * Adding and removing defs
+ */
+tagTwo.addDef(def); //by def ref
+//(tagTwo.dids).toEqual([def.did]);
+tagTwo.removeDef(def); //by def ref
+//(tagTwo.dids).toEqual([]);
+tagTwo.addDef(def.did); //by _did
+//(tagTwo.dids).toEqual([def.did]);
+tagTwo.addDef(def.did); //adding the same did doesn't create a duplicate entry
+//(tagTwo.dids).toEqual([def.did]);
+tagTwo.removeDef(def.did); //by _did
+//(tagTwo.dids).toEqual([]);
+
+/**
+ * Tagging Def *from the Def*
+ */
+def.addTag(tagTwo); //by tag ref
+//(tagTwo.getDefs()[0].lbl).toBe(def.lbl);
+def.removeTag(tagTwo); //by tag ref
+//(tagTwo.getDefs().length).toBe(0);
+
+def.addTag(tagTwo.tid); //by tid
+tagTwo = pdwRef.getTags({ tid: 'tagb' })[0]; //updated tag object is in stores
+//(tagTwo.getDefs()[0].lbl).toBe(def.lbl);
+
+def.removeTag(tagTwo.tid); //by tid
+tagTwo = pdwRef.getTags({ tid: 'tagb' })[0];
+//(tagTwo.getDefs().length).toBe(0);
+
+// tagTwo.save();
+// def.save();
+
+def.addTag(tagTwo.lbl); //by tag label
+//tagTwo in-memory object cannot be updated this way, it's updated via stores, gotta reload
+tagTwo = pdwRef.getTags({tid:'tagb'})[0]; //this took me forever to realize
+console.log(tagTwo.getDefs()[0].lbl);
+tagTwo = pdwRef.getTags({ tid: 'tagb' })[0];
+
+def.removeTag(tagTwo.lbl); //by tag label
+tagTwo = pdwRef.getTags({ tid: 'tagb' })[0];
+//(tagTwo.getDefs().length).toBe(0);
+
 
 createTestDataSet();
 
@@ -289,12 +581,12 @@ function createTestDataSet() {
     quote.setPointVal('bbb2', 'Michael SCOTT').save();
 }
 
-// expect(entry.__tempCreated.epochMilliseconds).toBeGreaterThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString()) - 5000) //created not long ago...
-// expect(entry.__tempCreated.epochMilliseconds).toBeLessThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString())) //...but not in the future
-// expect(entry._period).toBe(sameSecond); //technically could fail every 1000 or so runs
-// expect(entry._pts.length).toBe(0); //points weren't supplied, they aren't generated
-// expect(entry._note).toBe(''); //default
-// expect(entry._source).toBe(''); //default
+// //(entry.__tempCreated.epochMilliseconds).toBeGreaterThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString()) - 5000) //created not long ago...
+// //(entry.__tempCreated.epochMilliseconds).toBeLessThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString())) //...but not in the future
+// //(entry._period).toBe(sameSecond); //technically could fail every 1000 or so runs
+// //(entry._pts.length).toBe(0); //points weren't supplied, they aren't generated
+// //(entry._note).toBe(''); //default
+// //(entry._source).toBe(''); //default
 
 // importFromFile('data-files/OutJSON.json');
 // altTempImport('data-files/SmallNested.yaml');
@@ -365,7 +657,7 @@ function createTestDataSet() {
 
 // createTestFiles();
 
-// this worked. Old data, updated, import of new data merge behaved as expected
+// this worked. Old data, updated, import of new data merge behaved as //ed
 // importFromFile('data-files/OutExcel1.xlsx');
 // pdw.newEntry({
 //     _did: '0m7w',
