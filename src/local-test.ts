@@ -12,7 +12,7 @@ createSummaryDataSet();
 
 let all = new pdw.Query().inPeriod(new pdw.Period('2023-08-21').zoomOut()).run().entries;
 
-let summary = new pdw.Summary(all, pdw.Scope.WEEK);
+let summary = new pdw.Summary(all, pdw.Scope.DAY);
 
 console.log(summary);
 
@@ -244,49 +244,6 @@ function createTestDataSet() {
 
 
 function createSummaryDataSet(){
-    const nightly = pdwRef.newDef({
-        _did: 'aaaa',
-        _lbl: 'Nightly Review',
-        _scope: pdw.Scope.DAY,
-        _emoji: '👀',
-        _pts: [
-            {
-                _emoji: '👀',
-                _lbl: 'Review',
-                _desc: 'Your nightly review',
-                _pid: 'aaa1',
-                _type: pdw.PointType.MARKDOWN
-            },
-            {
-                _emoji: '👔',
-                _lbl: 'Work Status',
-                _desc: 'Did you go in, if so where?',
-                _pid: 'aaa2',
-                _type: pdw.PointType.SELECT,
-                _opts: {
-                    'opt1': 'Weekend/Holiday',
-                    'opt2': 'North',
-                    'opt3': 'WFH',
-                    'opt4': 'Vacation',
-                    'opt5': 'sickday',
-                }
-            },
-            {
-                _emoji: '1️⃣',
-                _desc: '10 perfect 1 horrid',
-                _lbl: 'Satisfaction',
-                _pid: 'aaa3',
-                _type: pdw.PointType.NUMBER
-            },
-            {
-                _emoji: '😥',
-                _desc: '10 perfect 1 horrid',
-                _lbl: 'Physical Health',
-                _pid: 'aaa4',
-                _type: pdw.PointType.NUMBER
-            }
-        ]
-    });
     const nap = pdwRef.newDef({
         _lbl: "Nap",
         _scope: pdw.Scope.SECOND,
@@ -325,18 +282,18 @@ function createSummaryDataSet(){
         "b222": false,
         'b333': '02:28:29'
     })
-    // nap.newEntry({
-    //     _period: "2023-08-21T17:42:26",
-    //     'b111': "PT2H11M",
-    //     "b222": true,
-    //     'b333': '17:42:26'
-    // })
-    // nap.newEntry({
-    //     _period: "2023-08-22T16:30:29",
-    //     'b111': "PT1H5M",
-    //     "b222": true,
-    //     'b333': '16:30:29'
-    // })
+    nap.newEntry({
+        _period: "2023-08-21T17:42:26",
+        'b111': "PT2H11M",
+        "b222": true,
+        'b333': '17:42:26'
+    })
+    nap.newEntry({
+        _period: "2023-08-22T16:30:29",
+        'b111': "PT1H5M",
+        "b222": true,
+        'b333': '16:30:29'
+    })
 }
 
 // //(entry.__tempCreated.epochMilliseconds).toBeGreaterThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString()) - 5000) //created not long ago...

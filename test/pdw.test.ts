@@ -708,14 +708,14 @@ test.skip('Update Logic', async () => {
     expect(notDeletedFromStore[0].lbl).toBe('Def 1 with new Label');
     expect(deletedFromStore.length).toBe(1);
     expect(deletedFromStore[0].lbl).toBe('Def 1');
-    
+
     def.created = pdw.makeEpochStr();
     def.lbl = 'Def ONE';
     def.emoji = '🤿';
     def.desc = 'Modify *then* verify';
     def.hide = true;
     def.save()
-    
+
     deletedFromStore = pdwRef.getDefs({ includeDeleted: 'only' })
     expect(deletedFromStore.length).toBe(2);
     notDeletedFromStore = pdwRef.getDefs({ includeDeleted: 'no' });
@@ -723,12 +723,12 @@ test.skip('Update Logic', async () => {
     expect(notDeletedFromStore[0].emoji).toBe('🤿');
     expect(notDeletedFromStore[0].desc).toBe('Modify *then* verify');
     expect(notDeletedFromStore[0].hide).toBe(true);
-    
+
     /**
      * Other base Def properties cannot be set due to lack of setter.
      * Cannot change _uid, _did, or _scope
      */
-    expect(()=>{
+    expect(() => {
         //@ts-expect-error
         def.did = 'fails'
     }).toThrowError();
@@ -779,18 +779,18 @@ test.skip('Update Logic', async () => {
     //added point hasn't effected the store yet
     notDeletedFromStore = pdwRef.getDefs({ includeDeleted: 'no' });
     expect(notDeletedFromStore.length).toBe(1);
-    expect(notDeletedFromStore[0].pts.length).toBe(2); 
+    expect(notDeletedFromStore[0].pts.length).toBe(2);
     point.save();
     notDeletedFromStore = pdwRef.getDefs({ includeDeleted: 'no' });
     expect(notDeletedFromStore.length).toBe(1);
-    expect(notDeletedFromStore[0].pts.length).toBe(3); 
-    expect(notDeletedFromStore[0].getPoint('a333').desc).toBe('Added dynamically'); 
+    expect(notDeletedFromStore[0].pts.length).toBe(3);
+    expect(notDeletedFromStore[0].getPoint('a333').desc).toBe('Added dynamically');
 
     /**
      * Data Validation on PointDef.setProps on emoji, rollup, and type
      */
     expect(point.emoji).toBe('🆕');
-    point.emoji =  'Invalid emoji';
+    point.emoji = 'Invalid emoji';
     expect(point.emoji).toBe('🆕'); //no change
     expect(point.rollup).toBe(pdw.Rollup.COUNT);
     //@ts-expect-error - typescript warning, nice
@@ -800,16 +800,16 @@ test.skip('Update Logic', async () => {
     /**
      * Def.hidePoint()
      */
-    expect(def.pts.map(p=>p.hide)).toEqual([false,false,false]);
+    expect(def.pts.map(p => p.hide)).toEqual([false, false, false]);
     def.hidePoint('a222');
     expect(def.pts.length).toBe(3); //still got 3
-    expect(def.pts.filter(p => p.hide===false).length).toBe(2); //but only 2 are active
-   
+    expect(def.pts.filter(p => p.hide === false).length).toBe(2); //but only 2 are active
+
     /**
      * Def.reactivatePoint()
      */
     def.unhidePoint('a222');
-    expect(def.pts.map(p=>p.hide)).toEqual([false,false,false]);
+    expect(def.pts.map(p => p.hide)).toEqual([false, false, false]);
 
     /**
      * Opts
@@ -962,7 +962,7 @@ test.skip('Update Logic', async () => {
 
     def.addTag(tagTwo.lbl); //by tag label
     //tagTwo in-memory object cannot be updated this way, it's updated via stores, gotta reload
-    tagTwo = pdwRef.getTags({tid:'tagb'})[0]; //this took me forever to realize
+    tagTwo = pdwRef.getTags({ tid: 'tagb' })[0]; //this took me forever to realize
     expect(tagTwo.getDefs()[0].lbl).toBe(def.lbl);
     tagTwo = pdwRef.getTags({ tid: 'tagb' })[0];
 
@@ -1526,26 +1526,32 @@ test.skip('Data Merge', () => {
 })
 
 //#TODO - finish this
-test('Summarizer', () => {
+test.skip('Summarizer', () => {
     resetTestDataset()
 
-    createTestDataSet();
+    createSummaryDataSet();
 
-    let all = pdwRef.getAll({});
     let q = new pdw.Query();
-    let period = new pdw.Period('2023-07-21').zoomOut();
 
-    q.inPeriod(period).forDids('aaaa');
-    let result = q.run();
+    let all = new pdw.Query().inPeriod(new pdw.Period('2023-08-21').zoomOut()).run().entries;
 
-    let summary = new pdw.Summary(result.entries, pdw.Scope.WEEK);
-    // console.log(summary.def);
-
-
+    let summary = new pdw.Summary(all, pdw.Scope.WEEK);
+    expect(summary.periods.length).toBe(1);
+    expect(summary.periods[0].entryRollups[0].pts['b111'].val).toBe('PT14760S')
+    expect(summary.periods[0].entryRollups[0].pts['b222'].val).toBe('false: 1, true: 3')
+    expect(summary.periods[0].entryRollups[0].pts['b333'].val).toBe('21:02:58')
+    summary = new pdw.Summary(all, pdw.Scope.DAY);
+    expect(summary.periods.length).toBe(3);
+    expect(summary.periods[0].entryRollups[0].pts['b111'].val).toBe('PT9360S')
+    expect(summary.periods[0].entryRollups[0].pts['b222'].val).toBe('true: 1, false: 1')
+    expect(summary.periods[0].entryRollups[0].pts['b333'].val).toBe('22:05:28')
 })
 
-test.skip('DataStore', ()=>{
+test('DataStore Tester', async () => {
+    resetTestDataset();
 
+    let ds = new pdw.DefaultDataStore(pdwRef);
+    
 })
 
 function createTestDataSet() {
@@ -1716,50 +1722,7 @@ function createTestDataSet() {
     quote.setPointVal('bbb2', 'Michael SCOTT').save();
 }
 
-function createSummaryDataSet(){
-    const nightly = pdwRef.newDef({
-        _did: 'aaaa',
-        _lbl: 'Nightly Review',
-        _scope: pdw.Scope.DAY,
-        _emoji: '👀',
-        _pts: [
-            {
-                _emoji: '👀',
-                _lbl: 'Review',
-                _desc: 'Your nightly review',
-                _pid: 'aaa1',
-                _type: pdw.PointType.MARKDOWN
-            },
-            {
-                _emoji: '👔',
-                _lbl: 'Work Status',
-                _desc: 'Did you go in, if so where?',
-                _pid: 'aaa2',
-                _type: pdw.PointType.SELECT,
-                _opts: {
-                    'opt1': 'Weekend/Holiday',
-                    'opt2': 'North',
-                    'opt3': 'WFH',
-                    'opt4': 'Vacation',
-                    'opt5': 'sickday',
-                }
-            },
-            {
-                _emoji: '1️⃣',
-                _desc: '10 perfect 1 horrid',
-                _lbl: 'Satisfaction',
-                _pid: 'aaa3',
-                _type: pdw.PointType.NUMBER
-            },
-            {
-                _emoji: '😥',
-                _desc: '10 perfect 1 horrid',
-                _lbl: 'Physical Health',
-                _pid: 'aaa4',
-                _type: pdw.PointType.NUMBER
-            }
-        ]
-    });
+function createSummaryDataSet() {
     const nap = pdwRef.newDef({
         _lbl: "Nap",
         _scope: pdw.Scope.SECOND,
@@ -1785,28 +1748,28 @@ function createSummaryDataSet(){
                 _type: pdw.PointType.TIME
             }
         ]
-    });
+    })
     nap.newEntry({
         _period: "2023-08-23T16:30:29",
-        'b111': "P25M",
+        'b111': "PT25M",
         "b222": true,
-        'b333': "16:30:29"
+        'b333': "23:30:29"
     })
     nap.newEntry({
         _period: "2023-08-21T12:42:26",
-        'b111': "P25M",
+        'b111': "PT25M",
         "b222": false,
-        'b333': '12:42:26'
+        'b333': '02:28:29'
     })
     nap.newEntry({
         _period: "2023-08-21T17:42:26",
-        'b111': "P2H11M",
+        'b111': "PT2H11M",
         "b222": true,
         'b333': '17:42:26'
     })
     nap.newEntry({
         _period: "2023-08-22T16:30:29",
-        'b111': "P1H5M",
+        'b111': "PT1H5M",
         "b222": true,
         'b333': '16:30:29'
     })

@@ -2688,7 +2688,7 @@ export class Query {
 }
 
 export class Summary {
-    private periods: PeriodSummary[];
+    private _periods: PeriodSummary[];
     constructor(entries: Entry[], scope: Scope) {
         if (entries.length === 0) throw new Error("No entries to summarize");
         let periodStrs: PeriodStr[] = [...new Set(entries.map(e => e.period.toString()))];
@@ -2701,7 +2701,7 @@ export class Summary {
             return end > prev ? end : prev
         });
         let periods = Period.allPeriodsIn(new Period(earliest), new Period(latest), scope, false) as Period[];
-        this.periods = periods.map(p => {
+        this._periods = periods.map(p => {
             let ents = entries.filter(e => p.contains(e.period));
             let entsByType = splitEntriesByType(ents);
             const keys = Object.keys(entsByType);
@@ -2733,6 +2733,9 @@ export class Summary {
         // this._def = entries[0].getDef();
         // this.period = period;
         let pivot: any[] = [];
+    }
+    public get periods(): PeriodSummary[] {
+        return this._periods;
     }
 }
 
