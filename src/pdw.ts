@@ -67,7 +67,9 @@ export enum PointType {
      */
     BOOL = 'BOOL', //true false
     /**
-     * A Temporal Duration string, starting with the 'P' to really ensure no ambiguity
+     * A Temporal Duration string, starting with the 'P' (and usually also 'T') to really ensure no ambiguity
+     * P3M = 3 Months
+     * PT3M = 3 Minutes
      */
     DURATION = 'DURATION',
     /**
@@ -109,7 +111,6 @@ export enum Rollup {
     SUM = 'SUM',
     AVERAGE = 'AVERAGE',
     COUNTOFEACH = 'COUNTOFEACH',
-    AVERAGEABOUT430AM = 'AVERAGEABOUT430AM' //for type =  TYPE.TIME
 }
 
 //#endregion
@@ -967,8 +968,21 @@ export class PDW {
                 val: undefined
             }
             if (pd.rollup === Rollup.COUNT) ptRlp.val = vals.length;
-            if (pd.rollup === Rollup.AVERAGE) ptRlp.val = doAverage(vals);
-            if (pd.rollup === Rollup.SUM) ptRlp.val = doSum(vals);
+            if (pd.rollup === Rollup.AVERAGE){
+                const type = pd.type;
+                if(type === PointType.NUMBER) ptRlp.val = doAverage(vals);
+                if(type === PointType.DURATION) ptRlp.val = doAverageDuration(vals);
+                if(type === PointType.TIME) ptRlp.val = doAverageTime(vals);
+                if(type !== PointType.NUMBER && type !== PointType.DURATION && type !== PointType.TIME){
+                    console.warn('Tried averaging a point with unsupported type ' + type);
+                    ptRlp.val = -1; //hint at an error in the UI
+                }
+            }
+            if (pd.rollup === Rollup.SUM){
+                const type = pd.type;
+                if(type === PointType.NUMBER) ptRlp.val = doSum(vals);
+                if(type === PointType.DURATION) ptRlp.val = doSumDuration(vals);
+            } 
             if (pd.rollup === Rollup.COUNTOFEACH) ptRlp.val = doCountOfEach(vals);
 
             //@ts-expect-error
@@ -981,17 +995,54 @@ export class PDW {
             return sum / vals.length;
         }
 
+        function doAverageDuration(vals: string[]): string {
+            if(typeof vals[0] !== 'string') throw new Error('Period average saw a non-string')
+            // let temp = Temporal.Duration.from(vals[0]).total('seconds');
+            const sum = vals.reduce((pv, val) => pv + Temporal.Duration.from(val).total('seconds'), 0);
+            const ave = sum / vals.length;
+            return Temporal.Duration.from({seconds: ave}).toLocaleString();
+        }
+        
+        function doAverageTime(vals: string[]){// Temporal.PlainTime {
+            //want average to be about 4pm, so any time *before* 4pm I add 1-day's worth of seconds to
+            let runningTotalInSeconds = 0;
+            vals.forEach(val=>{
+                const time = Temporal.PlainTime.from(val)
+                let delta = Temporal.PlainTime.from('00:00:00').until(time)
+                const hrs = delta.hours;
+                const mins = delta.minutes;
+                const secs = delta.seconds;
+                //add 24hrs if its before 4am
+                if(hrs<4) runningTotalInSeconds = runningTotalInSeconds + 86400; //add 24 hrs if its before 4am
+                runningTotalInSeconds = runningTotalInSeconds + hrs * 3600;
+                runningTotalInSeconds = runningTotalInSeconds + mins * 60;
+                runningTotalInSeconds = runningTotalInSeconds + secs;
+
+            })
+            // let sum = doSum(vals)
+            const averageSeconds = Math.round(runningTotalInSeconds / vals.length);
+            const timeAverage = Temporal.PlainTime.from('00:00:00').add({seconds: averageSeconds})
+            return timeAverage.toString();
+        }
+
         function doSum(vals: number[]) {
             return vals.reduce((pv, val) => pv + val, 0);
+        }
+
+        function doSumDuration(vals: string[]) {
+            if(typeof vals[0] !== 'string') throw new Error('Period average saw a non-string')
+            // let temp = Temporal.Duration.from(vals[0]).total('seconds');
+            const sum = vals.reduce((pv, val) => pv + Temporal.Duration.from(val).total('seconds'), 0);
+            return Temporal.Duration.from({seconds: sum}).toLocaleString();
         }
 
         function doCountOfEach(vals: string[]) {
             let strings = [...new Set(vals)];
             let stringCounts = '';
             strings.forEach(str => {
-                stringCounts = stringCounts + ", " + str + ": " + vals.filter(s => s == str).length;
+                stringCounts = str + ": " + vals.filter(s => s == str).length + ", " + stringCounts;
             })
-            return stringCounts
+            return stringCounts.substring(0,stringCounts.length-2);
         }
     }
 }

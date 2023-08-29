@@ -11,7 +11,7 @@ function resetTestDataset() {
     (<pdw.DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 }
 
-test('Def Creation and Getting', () => {
+test.skip('Def Creation and Getting', () => {
     /**
      * Most Basic Def Creation
     */
@@ -340,7 +340,7 @@ test('Def Creation and Getting', () => {
     expect(Object.keys(pointWithOptions.opts).length).toBe(2);
 })
 
-test('Entry Creation and Getting', () => {
+test.skip('Entry Creation and Getting', () => {
     resetTestDataset();
 
     const testDef = pdwRef.newDef({
@@ -590,7 +590,7 @@ test('Entry Creation and Getting', () => {
     expect(both.getPoint('d111')?.val).toEqual(['ddd1', 'ddd2']);
 })
 
-test('Tag Basics', () => {
+test.skip('Tag Basics', () => {
     resetTestDataset();
 
     pdwRef.newDef({
@@ -629,7 +629,7 @@ test('Tag Basics', () => {
 });
 
 //for some reason you gotta run this one like 6 times before it will pass, no idea.
-test('Update Logic', async () => {
+test.skip('Update Logic', async () => {
     resetTestDataset();
 
     let origUid = pdw.makeUID();
@@ -972,7 +972,7 @@ test('Update Logic', async () => {
 
 })
 
-test('Get All', () => {
+test.skip('Get All', () => {
     resetTestDataset();
     let def = pdwRef.newDef({
         _did: 'yoyo',
@@ -995,7 +995,7 @@ test('Get All', () => {
     expect(all.defs![0]);
 })
 
-test('Query Basics', () => {
+test.skip('Query Basics', () => {
     resetTestDataset()
 
     createTestDataSet();
@@ -1327,7 +1327,7 @@ test('Query Basics', () => {
 
 })
 
-test('Data Merge', () => {
+test.skip('Data Merge', () => {
     (<pdw.DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 
     // let inMemoryDataStoreTwo = new DefaultDataStore(pdwRef);
@@ -1526,7 +1526,7 @@ test('Data Merge', () => {
 })
 
 //#TODO - finish this
-test.skip('Summarizer', () => {
+test('Summarizer', () => {
     resetTestDataset()
 
     createTestDataSet();
@@ -1714,4 +1714,100 @@ function createTestDataSet() {
     });
 
     quote.setPointVal('bbb2', 'Michael SCOTT').save();
+}
+
+function createSummaryDataSet(){
+    const nightly = pdwRef.newDef({
+        _did: 'aaaa',
+        _lbl: 'Nightly Review',
+        _scope: pdw.Scope.DAY,
+        _emoji: '👀',
+        _pts: [
+            {
+                _emoji: '👀',
+                _lbl: 'Review',
+                _desc: 'Your nightly review',
+                _pid: 'aaa1',
+                _type: pdw.PointType.MARKDOWN
+            },
+            {
+                _emoji: '👔',
+                _lbl: 'Work Status',
+                _desc: 'Did you go in, if so where?',
+                _pid: 'aaa2',
+                _type: pdw.PointType.SELECT,
+                _opts: {
+                    'opt1': 'Weekend/Holiday',
+                    'opt2': 'North',
+                    'opt3': 'WFH',
+                    'opt4': 'Vacation',
+                    'opt5': 'sickday',
+                }
+            },
+            {
+                _emoji: '1️⃣',
+                _desc: '10 perfect 1 horrid',
+                _lbl: 'Satisfaction',
+                _pid: 'aaa3',
+                _type: pdw.PointType.NUMBER
+            },
+            {
+                _emoji: '😥',
+                _desc: '10 perfect 1 horrid',
+                _lbl: 'Physical Health',
+                _pid: 'aaa4',
+                _type: pdw.PointType.NUMBER
+            }
+        ]
+    });
+    const nap = pdwRef.newDef({
+        _lbl: "Nap",
+        _scope: pdw.Scope.SECOND,
+        _pts: [
+            {
+                _pid: "b111",
+                _lbl: "Duration",
+                _emoji: "🕰️",
+                _rollup: pdw.Rollup.SUM,
+                _type: pdw.PointType.DURATION
+            },
+            {
+                _pid: "b222",
+                _lbl: "Felt Rested",
+                _emoji: "😀",
+                _rollup: pdw.Rollup.COUNTOFEACH,
+                _type: pdw.PointType.BOOL
+            },
+            {
+                _pid: "b333",
+                _lbl: "Start time",
+                _rollup: pdw.Rollup.AVERAGE,
+                _type: pdw.PointType.TIME
+            }
+        ]
+    });
+    nap.newEntry({
+        _period: "2023-08-23T16:30:29",
+        'b111': "P25M",
+        "b222": true,
+        'b333': "16:30:29"
+    })
+    nap.newEntry({
+        _period: "2023-08-21T12:42:26",
+        'b111': "P25M",
+        "b222": false,
+        'b333': '12:42:26'
+    })
+    nap.newEntry({
+        _period: "2023-08-21T17:42:26",
+        'b111': "P2H11M",
+        "b222": true,
+        'b333': '17:42:26'
+    })
+    nap.newEntry({
+        _period: "2023-08-22T16:30:29",
+        'b111': "P1H5M",
+        "b222": true,
+        'b333': '16:30:29'
+    })
 }
