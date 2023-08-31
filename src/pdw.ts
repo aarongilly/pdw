@@ -89,11 +89,14 @@ export enum PointType {
      */
     PHOTO = 'PHOTO', //url?
     /**
-     * Literally JSON
+     * Literally JSON - circular references are **not** supported. You have to be able to run JSON.parse(JSON.stringify(Entry))
      */
     JSON = 'JSON'
 }
 
+/**
+ * Level of granularity. Assigned to each {@link Def}
+ */
 export enum Scope {
     SECOND = 'SECOND',
     MINUTE = 'MINUTE',
@@ -105,6 +108,10 @@ export enum Scope {
     YEAR = 'YEAR',
 }
 
+/**
+ * Default operation to apply when performing a {@link PointRollup}. 
+ * Each {@link PointDef} is associated with one Rollup.
+ */
 export enum Rollup {
     COUNT = 'COUNT',
     COUNTUNIQUE = 'COUNTUNIQUE',
@@ -119,7 +126,7 @@ export enum Rollup {
 
 /**
  * The `DataStore` interface is what you must implement when creating code to
- * hook up a new database. It is what sits between the data store of choice and the PDW.
+ * hook up a new database. It is what sits between the database of choice and the PDW.
  * It's designed to be as simple-to-implement as possible.
  * 
  * The parameter sanitization & merge logic are handled by the PDW.
@@ -127,6 +134,14 @@ export enum Rollup {
  * It's *very much* a work in progress.
  */
 export interface DataStore {
+    //#TODO - change all this to be more like the below
+    /*
+    reducedQuery(params: ReducedParams): ReducedQueryResponse;
+    commit(trans: Transaction): CommitResponse;
+    getOverview(): DataStoreOverview;
+    
+    ...keep connect, serviceName, and PDW
+    */
 
     getDefs(params: SanitizedParams): DefData[];
 
@@ -192,21 +207,88 @@ export interface StandardParams {
      * only - only include deleted things
      */
     includeDeleted?: 'yes' | 'no' | 'only',
+    /**
+     * Lower-bound of Entry.period.
+     * Like all Periods, does not contain Time Zone info.
+     * Will be treated as the FIRST SECOND of the Period or PeriodStr provided.
+     * Example:
+     * "2023-Q2" would be synonymous with "2023-04-01T:00:00:00"
+     */
     from?: Period | PeriodStr,
+    /**
+     * Upper-bound of Entry.period. 
+     * Like all Periods, does not contain Time Zone info.
+     * Will be treated as the LAST SECOND of the Period or PeriodStr provided.
+     * Example:
+     * "2023-Q2" would be synonymous with "2023-08-31T:23:59:59"
+     */
     to?: Period | PeriodStr,
+    /**
+     * The lower-bound of Element.created, represented as an {@link EpochStr}
+     * or Temporal.ZonedDateTime. 
+     */
     createdAfter?: Temporal.ZonedDateTime | EpochStr,
+    /**
+     * The upper-bound of Element.created, represented as an {@link EpochStr}
+     * or Temporal.ZonedDateTime. 
+     */
     createdBefore?: Temporal.ZonedDateTime | EpochStr,
+    /**
+     * The lower-bound of Element.updated, represented as an {@link EpochStr}
+     * or Temporal.ZonedDateTime. 
+     */
     updatedAfter?: Temporal.ZonedDateTime | EpochStr,
+    /**
+     * The upper-bound of Element.updated, represented as an {@link EpochStr}
+     * or Temporal.ZonedDateTime. 
+     */
     updatedBefore?: Temporal.ZonedDateTime | EpochStr,
+    /**
+     * A list of Element.uid. Will filter to Elements in the list.
+     */ 
     uid?: UID[] | UID,
+    /**
+     * A list of {@link SmallID}.
+     * For Entry and Def elements, will return those with Element.did in the list.
+     * For Tag, will return tags whose _dids[] contain the SmallID
+     */ 
     did?: SmallID[] | SmallID,
-    pid?: SmallID[] | SmallID,
+    //pid?: SmallID[] | SmallID, //#THINK - should this be supported on StandardParams?
+    /**
+     * A list of {@link UID}.
+     * Will return any Entry instance(s) whose Entry.eid is in the list.
+     */    
     eid?: UID[] | UID,
+    /**
+     * A list of {@link SmallID}
+     * Will return any Tag instance(s) whose Tag.tid is in the list.
+     * Will NOT returns Def or Entry instances
+     */
     tid?: SmallID[] | SmallID,
+    /**
+     * A list of strings for the associated with Def.lbl
+     * Internally, this is translated into a list of _did strings, and behaves like
+     * {@link StandardParams.did}
+     * For Entry and Def elements, will return those with Element.did in the list.
+     * For Tag, will return tags whose _dids[] contain the SmallID
+     */
     defLbl?: string[] | string,
-    pointLbl?: string[] | string,
+    //pointLbl?: string[] | string, do you want to support this
+    /**
+     * A list of strings.
+     * Will return any Tag(s) whose Tag.lbl is in the list.
+     */
     tagLbl?: string[] | string,
+    /**
+     * A limit on the number of responses returned. Probably unsorted and therefore
+     * not super helpful, but this is something I'd like to support.
+     */ 
     limit?: number,//#TODO
+    /**
+     * If an empty query is sent without this field, the query is rejected.
+     * This is prevent the error trap of accidentally asking for *everything*,
+     * which could be expensive in cloud-based datastores.
+     */ 
     allOnPurpose?: boolean
 }
 
@@ -237,14 +319,15 @@ export interface SanitizedParams {
 
     updatedAfter?: Temporal.ZonedDateTime,
     updatedAfterEpochStr?: EpochStr,
+    
     uid?: UID[],
     did?: SmallID[],
-    pid?: SmallID[],
+    //pid?: SmallID[],
     eid?: UID[],
     tid?: SmallID[],
     defLbl?: string[],
     pointLbl?: string[],
-    tagLbl?: string[],
+    //tagLbl?: string[],
     limit?: number, //#TODO
     allOnPurpose?: boolean
 }
@@ -258,6 +341,7 @@ export interface CompleteishDataset {
     entries?: EntryData[];
     tags?: TagData[];
 }
+
 
 export interface CompleteDataset {
     overview?: DataStoreOverview;
@@ -755,6 +839,10 @@ export class PDW {
         return elements.map(e => e.toData());
     }
 
+    /**
+     * Combines two complete(ish) datasets ({@link CompleteishDataset}). 
+     * Returns a CompleteishDataset that merges each type of ElementData
+     */
     static mergeComplete(a: CompleteishDataset, b: CompleteishDataset): CompleteishDataset {
         let returnObj: CompleteishDataset = {};
 
@@ -911,6 +999,10 @@ export class PDW {
         return params as SanitizedParams
     }
 
+    /**
+     * Finds the most-recently updated Element from a {@link CompleteishDataset}
+     * @returns EpochStr of the most recently-updated thing in the set
+     */
     static getDatasetLastUpdate(dataset: CompleteishDataset): string {
         let recents: ElementData[] = [];
         if (dataset.defs !== undefined && dataset.defs.length > 0) recents.push(Element.getMostRecent(dataset.defs)!)
@@ -920,6 +1012,9 @@ export class PDW {
         return Element.getMostRecent(recents)!._updated!
     }
 
+    /**
+     * Slap a {@link DatasetOverview} to a {@link CompleteishDataset}
+     */
     static addOverviewToCompleteDataset(data: CompleteishDataset, storeName?: string): CompleteishDataset {
         if (data.overview !== undefined) {
             console.warn('Tried to add an overview to a dataset that already had one:', data);
@@ -944,7 +1039,11 @@ export class PDW {
         return data
     }
 
-    static rollupEntries(entries: Entry[]): EntryRollup {
+    /**
+     * Takes in an array of {@link Entry} instances and applies the default rollup to 
+     * each of the EntryPoints contained in the Entries. Produces an {@link EntryRollup}
+     */
+    static rollupEntries(entries: Entry[]): EntryRollup { //#TODO - add RollupOverride param
         const def = entries[0].getDef();
         const pointDefs = def.pts;
         let returnObj = {
@@ -1069,15 +1168,33 @@ export abstract class Element {
         this.__modified = false;
     }
 
+    /**
+     * The unique identifier of the Element instance. Should not have any duplicates 
+     * anywhere in the PDW.
+     */
     get uid() {
         return this.data._uid;
     }
+    /**
+     * An {@link EpochStr} describing when the Element was created.
+     * If an Element is updated, the _created property will be carried forward.
+     */ 
     get created(): string {
         return this.data._created as string;
-    }
+    } 
+    /**
+     * An {@link EpochStr} describing when the Element was most recently updated.
+     * If an Element is updated, the _updated property will be set to the moment that Element
+     * instance was created. The _updated property will also be set to the time the Element
+     * class instance was marked as Deleted (or Undeleted).
+     */ 
     get updated(): string {
         return this.data._updated as string;
     }
+    /**
+    * If an Element should be considered deleted, because things aren't actually *deleted* in 
+    * order to make it possible to combine datasets and maintain integrity.
+    */
     get deleted() {
         return this.data._deleted;
     }
@@ -1095,6 +1212,9 @@ export abstract class Element {
         this.__deletionChange = isDeleted;
     }
 
+    /**
+     * Create a **static** copy of the Element's ElementData.
+     */
     toData(): ElementData | DefData | EntryData | TagData {
         return JSON.parse(JSON.stringify(this.data));
     }
