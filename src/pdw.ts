@@ -329,26 +329,40 @@ export interface SanitizedParams {
     pointLbl?: string[],
     //tagLbl?: string[],
     limit?: number, //#TODO
+    type: "Entry" | "Def" | "Tag" | "All" //#TODO
     allOnPurpose?: boolean
 }
 
-/**
- * A map of arrays of all types of {@link Element}.
- */
-export interface CompleteishDataset {
-    overview?: DataStoreOverview;
-    defs?: DefData[];
-    entries?: EntryData[];
-    tags?: TagData[];
-}
-
-
-export interface CompleteDataset {
-    overview?: DataStoreOverview;
+export interface ElementDataMap {
     defs: DefData[];
     entries: EntryData[];
     tags: TagData[];
 }
+
+
+export interface CompleteDataset extends ElementDataMap {
+    overview?: DataStoreOverview;
+}
+
+export interface Transaction {
+    create: ElementDataMap;
+    update: ElementDataMap;
+    delete: DeletionMsgMap;
+}
+
+export interface DeletionMsg {
+    uid: UID;
+    deleted: boolean;
+    updated: EpochStr;
+}
+
+export interface DeletionMsgMap {
+    defs: DeletionMsg[];
+    entries: DeletionMsg[];
+    tags: DeletionMsg[];
+}
+
+
 
 /**
  * This interface is extended by the interfaces for the base Elements
@@ -514,6 +528,7 @@ export interface TagLike extends ElementLike {
 }
 
 export interface ElementData {
+    __modified: boolean:
     _uid: UID;
     _deleted: boolean;
     _created: EpochStr;
@@ -1362,7 +1377,7 @@ export abstract class Element {
 
     /**
      * Make a de-referenced COPY of this Element. 
-     * NOTE: Not it's *data*, that woudl be the {@link toData} method.
+     * NOTE: Not the Element's *data*, that would be the {@link toData} method.
      * @returns an instance of {@link Tag}, {@link Def}, or {@link Entry} that is a de-referenced copy of this
      */
     makeStaticCopy(): Tag | Def | Entry {
@@ -2130,7 +2145,7 @@ export class Entry extends Element {
 
     /**
     * Predicate to check if an object has all {@link EntryData} properties
-    * AND they are the right type.
+    * AND they are the right type. Does not check for EntryPoints or their types.
     * @param data data to check
     * @returns true if data have all required properties of {@link DefData}
     */
@@ -2199,6 +2214,11 @@ export class Tag extends Element {
         if (typeof data._tid !== 'string') return false
         if (typeof data._lbl !== 'string') return false
         return true;
+    }
+    
+    includesDef(defOrDid: Def | SmallID){
+      if(typeof defOrDid !== "string" && defOrDid.hasOwnProperty("__modified")) defOrDid = defOrDid.did;
+      return this.data._dids.some(did=>did===defOrDid);
     }
 
     addDef(defOrDid: Def | string) {
@@ -2753,6 +2773,10 @@ export class Query {
         this.params.to = period;
         return this
     }
+    scope(scope: Scope) {
+        this.params.scope = scope;
+        return this;
+    }
 
     /**
      * How to sort the entries in the result.
@@ -2872,6 +2896,11 @@ export class DefaultDataStore implements DataStore {
         this.defs = [];
         this.entries = [];
         this.tags = [];
+    }
+    
+    commit(trans: Transaction){
+      //#TODO
+      
     }
 
     /**
