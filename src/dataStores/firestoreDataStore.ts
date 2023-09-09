@@ -20,16 +20,16 @@ export class FireDataStore implements pdw.DataStore{
         this._isConnected = false;
     }
 
-    getDefs(params: pdw.SanitizedParams): pdw.DefLike[] {
+    getDefs(params: pdw.ReducedParams): pdw.DefLike[] {
         throw new Error("Method not implemented.");
     }
-    getEntries(params: pdw.SanitizedParams): pdw.EntryLike[] {
+    getEntries(params: pdw.ReducedParams): pdw.EntryLike[] {
         throw new Error("Method not implemented.");
     }
-    getTags(params: pdw.SanitizedParams): pdw.TagLike[] {
+    getTags(params: pdw.ReducedParams): pdw.TagLike[] {
         throw new Error("Method not implemented.");
     }
-    getAll(params: pdw.SanitizedParams): pdw.CompleteishDataset {
+    getAll(params: pdw.ReducedParams): pdw.CompleteishDataset {
         throw new Error("Method not implemented.");
     }
     setDefs(defs: pdw.Def[]): pdw.Def[] {
@@ -46,7 +46,7 @@ export class FireDataStore implements pdw.DataStore{
     setAll(completeDataset: pdw.CompleteishDataset): pdw.CompleteishDataset {
         throw new Error("Method not implemented.");
     }
-    query(params: pdw.SanitizedParams): pdw.QueryResponse {
+    reducedQuery(params: pdw.ReducedParams): pdw.QueryResponse {
         throw new Error("Method not implemented.");
     }
     getOverview(): pdw.DataStoreOverview {

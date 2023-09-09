@@ -134,36 +134,9 @@ export enum Rollup {
  * It's *very much* a work in progress.
  */
 export interface DataStore {
-    //#TODO - change all this to be more like the below
-    /*
-    reducedQuery(params: ReducedParams): ReducedQueryResponse;
     commit(trans: Transaction): CommitResponse;
-    getOverview(): DataStoreOverview;
-    
-    ...keep connect, serviceName, and PDW
-    */
 
-    getDefs(params: SanitizedParams): DefData[];
-
-    getEntries(params: SanitizedParams): EntryData[];
-
-    getTags(params: SanitizedParams): TagData[];
-
-    getAll(params: SanitizedParams): CompleteishDataset;
-
-
-
-    setDefs(defs: Def[]): DefData[];
-
-    setEntries(entries: Entry[]): EntryData[];
-
-    setTags(tagData: Tag[]): TagData[];
-
-    setAll(completeDataset: CompleteishDataset): CompleteishDataset;
-
-
-
-    query(params: SanitizedParams): QueryResponse;
+    reducedQuery(params: ReducedParams): ReducedQueryResponse;
 
     getOverview(): DataStoreOverview;
 
@@ -187,14 +160,14 @@ export interface DataStore {
  * place where the data was imported from until it's exported back to that place.
  */
 export interface AsyncDataStore {
-    importFrom(params: any): CompleteishDataset,
-    exportTo(allData: CompleteishDataset, params: any): any
+    importFrom(params: any): CompleteDataset,
+    exportTo(allData: CompleteDataset, params: any): any
 }
 
 /**
  * Basic data filtering parameters, supported by the {@link PDW} methods for
  * {@link getDefs} & the 2 other element "getters". The {@link DataStore} methods
- * will get {@link SanitizedParams} passed to them by the PDW methods, which will
+ * will get {@link ReducedParams} passed to them by the PDW methods, which will
  * perform the sanitization.
  * Not all parameters are considered for each getter, but it should make
  * things a bit simpler to standardize the params
@@ -245,19 +218,19 @@ export interface StandardParams {
     updatedBefore?: Temporal.ZonedDateTime | EpochStr,
     /**
      * A list of Element.uid. Will filter to Elements in the list.
-     */ 
+     */
     uid?: UID[] | UID,
     /**
      * A list of {@link SmallID}.
      * For Entry and Def elements, will return those with Element.did in the list.
      * For Tag, will return tags whose _dids[] contain the SmallID
-     */ 
+     */
     did?: SmallID[] | SmallID,
     //pid?: SmallID[] | SmallID, //#THINK - should this be supported on StandardParams?
     /**
      * A list of {@link UID}.
      * Will return any Entry instance(s) whose Entry.eid is in the list.
-     */    
+     */
     eid?: UID[] | UID,
     /**
      * A list of {@link SmallID}
@@ -280,15 +253,21 @@ export interface StandardParams {
      */
     tagLbl?: string[] | string,
     /**
+     * Reduces the resulting {@link Def} and {@link} Entry results to those whose
+     * scope is in the provided list.
+     */
+    scope?: Scope | Scope[];
+    /**
      * A limit on the number of responses returned. Probably unsorted and therefore
      * not super helpful, but this is something I'd like to support.
-     */ 
+     */
     limit?: number,//#TODO
+    type?: "Entry" | "Def" | "Tag" | "All" //#TODO
     /**
      * If an empty query is sent without this field, the query is rejected.
      * This is prevent the error trap of accidentally asking for *everything*,
      * which could be expensive in cloud-based datastores.
-     */ 
+     */
     allOnPurpose?: boolean
 }
 
@@ -297,7 +276,7 @@ export interface StandardParams {
  * development of any new {@link DataStore} **EASIER** to implement. SanitizedParams are
  * what DataStore versions of the main setter/getter functions respond to.  
  */
-export interface SanitizedParams {
+export interface ReducedParams {
     /**
      * yes - excludes deleted stuff
      * no - returns deleted & undeleted stuff
@@ -319,7 +298,7 @@ export interface SanitizedParams {
 
     updatedAfter?: Temporal.ZonedDateTime,
     updatedAfterEpochStr?: EpochStr,
-    
+
     uid?: UID[],
     did?: SmallID[],
     //pid?: SmallID[],
@@ -327,9 +306,15 @@ export interface SanitizedParams {
     tid?: SmallID[],
     defLbl?: string[],
     pointLbl?: string[],
-    //tagLbl?: string[],
+    tagLbl?: string[],
+
     limit?: number, //#TODO
-    type: "Entry" | "Def" | "Tag" | "All" //#TODO
+    type?: "Entry" | "Def" | "Tag" | "All" //#TODO
+    /**
+     * Reduces the resulting {@link Def} and {@link} Entry results to those whose
+     * scope is in the provided list.
+     */
+    scope?: Scope[];
     allOnPurpose?: boolean
 }
 
@@ -339,14 +324,20 @@ export interface ElementDataMap {
     tags: TagData[];
 }
 
+export interface ElementMap {
+    defs: Def[];
+    entries: Entry[];
+    tags: Tag[];
+}
+
 
 export interface CompleteDataset extends ElementDataMap {
     overview?: DataStoreOverview;
 }
 
 export interface Transaction {
-    create: ElementDataMap;
-    update: ElementDataMap;
+    create: ElementMap;
+    update: ElementMap;
     delete: DeletionMsgMap;
 }
 
@@ -361,8 +352,6 @@ export interface DeletionMsgMap {
     entries: DeletionMsg[];
     tags: DeletionMsg[];
 }
-
-
 
 /**
  * This interface is extended by the interfaces for the base Elements
@@ -528,7 +517,6 @@ export interface TagLike extends ElementLike {
 }
 
 export interface ElementData {
-    __modified: boolean:
     _uid: UID;
     _deleted: boolean;
     _created: EpochStr;
@@ -622,10 +610,23 @@ export interface OptMap {
 export interface QueryResponse {
     success: boolean;
     count: number;
-    messages?: string;
+    msgs?: string[];
     params: { paramsIn: object, asParsed: object };
     entries: Entry[];
     // defs: Def[]; //maybe not needed? Entry contains Def
+}
+
+export interface ReducedQueryResponse {
+    success: boolean;
+    entries: EntryData[];
+    defs: DefData[];
+    tags: TagData[];
+    msgs?: string[];
+}
+
+export interface CommitResponse {
+    success: boolean;
+    msgs?: string[]
 }
 
 interface CurrentAndDeletedCounts {
@@ -681,20 +682,17 @@ export class PDW {
         this.dataStores.push(storeInstance);
     }
 
-    getAll(rawParams: StandardParams): CompleteishDataset {
+    getAll(rawParams: StandardParams): CompleteDataset {
         const params = PDW.sanitizeParams(rawParams)
-
-        let data = {
-            defs: this.dataStores[0].getDefs(params),
-            entries: this.dataStores[0].getEntries(params),
-            tags: this.dataStores[0].getTags(params),
-        }
+        let data = this.dataStores[0].reducedQuery(params);
+        delete data.msgs
         return PDW.addOverviewToCompleteDataset(data);
     }
 
     getDefs(rawParams?: StandardParams): Def[] {
         if (rawParams === undefined) rawParams = {};
         const params = PDW.sanitizeParams(rawParams);
+        params.type = 'Def';
 
         //this if block will cause the function to return Defs from
         //the manifest of defs, if the query should
@@ -713,8 +711,8 @@ export class PDW {
 
         //if there's only 1 DataStore, bypass the combining stuff to save time
         if (this.dataStores.length == 1) {
-            let defDatas = this.dataStores[0].getDefs(params);
-            let defs = defDatas.map(dl => new Def(dl));
+            let defDatas = this.dataStores[0].reducedQuery(params);
+            let defs = defDatas.defs.map(dl => new Def(dl));
             this.pushDefsToManifest(defs);
             return defs;
         }
@@ -724,8 +722,8 @@ export class PDW {
         //compile defs from all attached DataStores
         //#UNTESTED - test this!
         this.dataStores.forEach(dataStore => {
-            let thisStoreDefDatas = dataStore.getDefs(params);
-            let thisStoreDefs = thisStoreDefDatas.map(tsdl => new Def(tsdl));
+            let thisStoreDefDatas = dataStore.reducedQuery(params);
+            let thisStoreDefs = thisStoreDefDatas.defs.map(tsdl => new Def(tsdl));
             thisStoreDefs.forEach(def => {
                 let existingCopy = combinedDefs.find(cd => cd.sameIdAs(def.data));
                 if (existingCopy !== undefined) {
@@ -768,10 +766,11 @@ export class PDW {
     getEntries(rawParams?: StandardParams): Entry[] {
         if (rawParams === undefined) rawParams = {};
         const params = PDW.sanitizeParams(rawParams);
+        params.type = 'Entry';
 
         if (this.dataStores.length == 1) {
-            let entries = this.dataStores[0].getEntries(params);
-            return entries.map(entry => new Entry(entry));
+            let entries = this.dataStores[0].reducedQuery(params);
+            return entries.entries.map(entry => new Entry(entry));
         }
 
         throw new Error('Multiple datastores not yet implemented');
@@ -780,42 +779,95 @@ export class PDW {
     getTags(rawParams?: StandardParams): Tag[] {
         if (rawParams === undefined) rawParams = {};
         const params = PDW.sanitizeParams(rawParams)
+        params.type = 'Tag';
 
         //if there's only DataStore, bypass the combining stuff to save time
         if (this.dataStores.length == 1) {
-            let tagDatas = this.dataStores[0].getTags(params)
-            return tagDatas.map(tdl => new Tag(tdl));
+            let tagDatas = this.dataStores[0].reducedQuery(params)
+            return tagDatas.tags.map(tdl => new Tag(tdl));
         }
 
         throw new Error('Multiple datastores not yet implemented');
     }
 
-    setDefs(defsIn: DefLike[]): Def[] {
-        let defs: Def[] = defsIn.map(defData => new Def(defData));
+    setDefs(createDefs: DefLike[] = [], updateDefs: DefLike[] = [], deletionDefs: DeletionMsg[] = []): Def[] {
+        let trans: Transaction = {
+            create: {
+                defs: createDefs.map(def => new Def(def)),
+                entries: [],
+                tags: []
+            },
+            update: {
+                defs: updateDefs.map(def => new Def(def)),
+                entries: [],
+                tags: []
+            },
+            delete: {
+                defs: deletionDefs,
+                entries: [],
+                tags: []
+            }
+        }
         this.dataStores.forEach(connection => {
-            connection.setDefs(defs)
+            connection.commit(trans)
         });
+        const defs = [...trans.create.defs, ...trans.update.defs];
         this.pushDefsToManifest(defs);
-        return defs
+        return defs.map(e=>e.makeStaticCopy()) as Def[]
     }
 
-    setEntries(entryData: EntryLike[]): Entry[] {
-        let entries: Entry[] = entryData.map(entry => new Entry(entry));
+    setEntries(createEntries: EntryLike[] = [], updateEntries: EntryLike[] = [], deletionEntries: DeletionMsg[] = []): Entry[] {
+        let trans: Transaction = {
+            create: {
+                defs: [],
+                entries: createEntries.map(entry => new Entry(entry)),
+                tags: []
+            },
+            update: {
+                defs: [],
+                entries: updateEntries.map(entry => new Entry(entry)),
+                tags: []
+            },
+            delete: {
+                defs: [],
+                entries: deletionEntries,
+                tags: []
+            }
+        }
         this.dataStores.forEach(connection => {
-            connection.setEntries(entries)
-        })
-        return entries
+            connection.commit(trans)
+        });
+        const entries = [...trans.create.entries, ...trans.update.entries];
+        
+        return entries.map(e=>e.makeStaticCopy()) as Entry[]
     }
 
-    setTags(tagsIn: TagLike[]): Tag[] {
-        let tags: Tag[] = tagsIn.map(tag => new Tag(tag));
+    setTags(createTags: TagLike[] = [], updateTags: TagLike[] = [], deletionEntries: DeletionMsg[] = []): Tag[] {
+        let trans: Transaction = {
+            create: {
+                defs: [],
+                tags: createTags.map(tag => new Tag(tag)),
+                entries: []
+            },
+            update: {
+                defs: [],
+                tags: updateTags.map(tag => new Tag(tag)),
+                entries: []
+            },
+            delete: {
+                defs: [],
+                tags: deletionEntries,
+                entries: []
+            }
+        }
         this.dataStores.forEach(connection => {
-            connection.setTags(tags)
-        })
-        return tags
+            connection.commit(trans)
+        });
+        const tags = [...trans.create.tags, ...trans.update.tags];
+        return tags.map(e=>e.makeStaticCopy()) as Tag[]
     }
 
-    setAll(completeDataset: CompleteishDataset) {
+    setAll(completeDataset: CompleteDataset) {
         if (completeDataset.defs !== undefined) this.setDefs(completeDataset.defs);
         if (completeDataset.entries !== undefined) this.setEntries(completeDataset.entries);
         if (completeDataset.tags !== undefined) this.setTags(completeDataset.tags);
@@ -824,15 +876,48 @@ export class PDW {
     newDef(defInfo: DefLike): Def {
         let newDef = new Def(defInfo, false);
         this.dataStores.forEach(connection => {
-            connection.setDefs([newDef])
+            connection.commit({
+                create: {
+                    defs: [newDef],
+                    entries: [],
+                    tags: []
+                },
+                update: {
+                    defs: [],
+                    entries: [],
+                    tags: []
+                },
+                delete: {
+                    defs: [],
+                    entries: [],
+                    tags: []
+                },
+            })
         })
-        return newDef
+        this.manifest.push(newDef)        
+        return newDef.makeStaticCopy() as Def
     }
 
     newEntry(entryInfo: EntryLike): Entry {
         let newEntry = new Entry(entryInfo, false);
         this.dataStores.forEach(connection => {
-            connection.setEntries([newEntry])
+            connection.commit({
+                create: {
+                    defs: [],
+                    entries: [newEntry],
+                    tags: []
+                },
+                update: {
+                    defs: [],
+                    entries: [],
+                    tags: []
+                },
+                delete: {
+                    defs: [],
+                    entries: [],
+                    tags: []
+                },
+            })
         })
         return newEntry;
     }
@@ -840,7 +925,23 @@ export class PDW {
     newTag(tagInfo: TagLike): Tag {
         let newTag = new Tag(tagInfo, false);
         this.dataStores.forEach(connection => {
-            connection.setTags([newTag])
+            connection.commit({
+                create: {
+                    defs: [],
+                    entries: [],
+                    tags: [newTag]
+                },
+                update: {
+                    defs: [],
+                    entries: [],
+                    tags: []
+                },
+                delete: {
+                    defs: [],
+                    entries: [],
+                    tags: []
+                },
+            })
         })
         return newTag;
     }
@@ -855,29 +956,33 @@ export class PDW {
     }
 
     /**
-     * Combines two complete(ish) datasets ({@link CompleteishDataset}). 
-     * Returns a CompleteishDataset that merges each type of ElementData
+     * Combines two complete(ish) datasets ({@link CompleteDataset}). 
+     * Returns a CompleteDataset that merges each type of ElementData
      */
-    static mergeComplete(a: CompleteishDataset, b: CompleteishDataset): CompleteishDataset {
-        let returnObj: CompleteishDataset = {};
+    static mergeComplete(a: CompleteDataset, b: CompleteDataset): CompleteDataset {
+        let returnObj: CompleteDataset = {
+            defs: [],
+            entries: [],
+            tags: []
+        };
 
-        if (a.defs !== undefined && b.defs !== undefined) {
+        if (a.defs.length > 0 && b.defs.length > 0) {
             returnObj.defs = PDW.merge(a.defs, b.defs) as DefData[];
         } else {
-            if (a.defs !== undefined) returnObj.defs = a.defs
-            if (b.defs !== undefined) returnObj.defs = b.defs
+            if (a.defs.length > 0) returnObj.defs = a.defs
+            if (b.defs.length > 0) returnObj.defs = b.defs
         }
-        if (a.entries !== undefined && b.entries !== undefined) {
+        if (a.entries.length > 0 && b.entries.length > 0) {
             returnObj.entries = PDW.merge(a.entries, b.entries) as EntryData[];
         } else {
-            if (a.entries !== undefined) returnObj.entries = a.entries
-            if (b.entries !== undefined) returnObj.entries = b.entries
+            if (a.entries.length > 0) returnObj.entries = a.entries
+            if (b.entries.length > 0) returnObj.entries = b.entries
         }
-        if (a.tags !== undefined && b.tags !== undefined) {
+        if (a.tags.length > 0 && b.tags.length > 0) {
             returnObj.tags = PDW.merge(a.tags, b.tags) as TagData[];
         } else {
-            if (a.tags !== undefined) returnObj.tags = a.tags
-            if (b.tags !== undefined) returnObj.tags = b.tags
+            if (a.tags.length > 0) returnObj.tags = a.tags
+            if (b.tags.length > 0) returnObj.tags = b.tags
         }
 
         return returnObj;
@@ -935,7 +1040,7 @@ export class PDW {
      * @param params rawParams in
      * @returns santized params out
      */
-    static sanitizeParams(params: StandardParams | SanitizedParams): SanitizedParams {
+    static sanitizeParams(params: StandardParams | ReducedParams): ReducedParams {
         //ensure default
         if (params.includeDeleted === undefined) params.includeDeleted = 'no';
 
@@ -961,64 +1066,65 @@ export class PDW {
         if (params.createdAfter !== undefined) {
             if (typeof params.createdAfter === 'string') {
                 params.createdAfter = parseTemporalFromEpochStr(params.createdAfter);
-                (<SanitizedParams>params).createdAfterEpochStr = makeEpochStrFrom(params.createdAfter);
+                (<ReducedParams>params).createdAfterEpochStr = makeEpochStrFrom(params.createdAfter);
             } else {
-                (<SanitizedParams>params).createdAfterEpochStr = makeEpochStrFrom(params.createdAfter);
-                params.createdAfter = parseTemporalFromEpochStr((<SanitizedParams>params).createdAfterEpochStr!);
+                (<ReducedParams>params).createdAfterEpochStr = makeEpochStrFrom(params.createdAfter);
+                params.createdAfter = parseTemporalFromEpochStr((<ReducedParams>params).createdAfterEpochStr!);
             }
         }
         if (params.createdBefore !== undefined) {
             if (typeof params.createdBefore === 'string') {
                 params.createdBefore = parseTemporalFromEpochStr(params.createdBefore);
-                (<SanitizedParams>params).createdBeforeEpochStr = makeEpochStrFrom(params.createdBefore);
+                (<ReducedParams>params).createdBeforeEpochStr = makeEpochStrFrom(params.createdBefore);
             } else {
-                (<SanitizedParams>params).createdBeforeEpochStr = makeEpochStrFrom(params.createdBefore);
-                params.createdBefore = parseTemporalFromEpochStr((<SanitizedParams>params).createdBeforeEpochStr!);
+                (<ReducedParams>params).createdBeforeEpochStr = makeEpochStrFrom(params.createdBefore);
+                params.createdBefore = parseTemporalFromEpochStr((<ReducedParams>params).createdBeforeEpochStr!);
             }
         }
         if (params.updatedAfter !== undefined) {
             if (typeof params.updatedAfter === 'string') {
                 params.updatedAfter = parseTemporalFromEpochStr(params.updatedAfter);
-                (<SanitizedParams>params).updatedAfterEpochStr = makeEpochStrFrom(params.updatedAfter);
+                (<ReducedParams>params).updatedAfterEpochStr = makeEpochStrFrom(params.updatedAfter);
             } else {
-                (<SanitizedParams>params).updatedAfterEpochStr = makeEpochStrFrom(params.updatedAfter);
-                params.updatedAfter = parseTemporalFromEpochStr((<SanitizedParams>params).updatedAfterEpochStr!);
+                (<ReducedParams>params).updatedAfterEpochStr = makeEpochStrFrom(params.updatedAfter);
+                params.updatedAfter = parseTemporalFromEpochStr((<ReducedParams>params).updatedAfterEpochStr!);
             }
         }
         if (params.updatedBefore !== undefined) {
             if (typeof params.updatedBefore === 'string') {
                 params.updatedBefore = parseTemporalFromEpochStr(params.updatedBefore);
-                (<SanitizedParams>params).updatedBeforeEpochStr = makeEpochStrFrom(params.updatedBefore);
+                (<ReducedParams>params).updatedBeforeEpochStr = makeEpochStrFrom(params.updatedBefore);
             } else {
-                (<SanitizedParams>params).updatedBeforeEpochStr = makeEpochStrFrom(params.updatedBefore);
-                params.updatedBefore = parseTemporalFromEpochStr((<SanitizedParams>params).updatedBeforeEpochStr!);
+                (<ReducedParams>params).updatedBeforeEpochStr = makeEpochStrFrom(params.updatedBefore);
+                params.updatedBefore = parseTemporalFromEpochStr((<ReducedParams>params).updatedBeforeEpochStr!);
             }
         }
 
         //ensure arrays
         if (params.uid !== undefined && typeof params.uid == 'string') params.uid = [params.uid]
         if (params.did !== undefined && typeof params.did == 'string') params.did = [params.did]
-        if (params.pid !== undefined && typeof params.pid == 'string') params.pid = [params.pid]
+        // if (params.pid !== undefined && typeof params.pid == 'string') params.pid = [params.pid]
         if (params.eid !== undefined && typeof params.eid == 'string') params.eid = [params.eid]
         if (params.tid !== undefined && typeof params.tid == 'string') params.tid = [params.tid]
 
         if (params.defLbl !== undefined && typeof params.defLbl == 'string') params.defLbl = [params.defLbl]
-        if (params.pointLbl !== undefined && typeof params.pointLbl == 'string') params.pointLbl = [params.pointLbl]
+        // if (params.pointLbl !== undefined && typeof params.pointLbl == 'string') params.pointLbl = [params.pointLbl]
         if (params.tagLbl !== undefined && typeof params.tagLbl == 'string') params.tagLbl = [params.tagLbl]
+        if (params.scope !== undefined && typeof params.scope == 'string') params.scope = [params.scope]
 
         if (params.limit !== undefined && typeof params.limit !== "number") {
             console.error('Your params were: ', params)
             throw new Error('You tried to supply a limit param with a non-number.')
         }
 
-        return params as SanitizedParams
+        return params as ReducedParams
     }
 
     /**
-     * Finds the most-recently updated Element from a {@link CompleteishDataset}
+     * Finds the most-recently updated Element from a {@link CompleteDataset}
      * @returns EpochStr of the most recently-updated thing in the set
      */
-    static getDatasetLastUpdate(dataset: CompleteishDataset): string {
+    static getDatasetLastUpdate(dataset: CompleteDataset): string {
         let recents: ElementData[] = [];
         if (dataset.defs !== undefined && dataset.defs.length > 0) recents.push(Element.getMostRecent(dataset.defs)!)
         if (dataset.entries !== undefined && dataset.entries.length > 0) recents.push(Element.getMostRecent(dataset.entries)!)
@@ -1028,9 +1134,9 @@ export class PDW {
     }
 
     /**
-     * Slap a {@link DatasetOverview} to a {@link CompleteishDataset}
+     * Slap a {@link DatasetOverview} to a {@link CompleteDataset}
      */
-    static addOverviewToCompleteDataset(data: CompleteishDataset, storeName?: string): CompleteishDataset {
+    static addOverviewToCompleteDataset(data: CompleteDataset, storeName?: string): CompleteDataset {
         if (data.overview !== undefined) {
             console.warn('Tried to add an overview to a dataset that already had one:', data);
             return data
@@ -1082,21 +1188,21 @@ export class PDW {
                 val: undefined
             }
             if (pd.rollup === Rollup.COUNT) ptRlp.val = vals.length;
-            if (pd.rollup === Rollup.AVERAGE){
+            if (pd.rollup === Rollup.AVERAGE) {
                 const type = pd.type;
-                if(type === PointType.NUMBER) ptRlp.val = doAverage(vals);
-                if(type === PointType.DURATION) ptRlp.val = doAverageDuration(vals);
-                if(type === PointType.TIME) ptRlp.val = doAverageTime(vals);
-                if(type !== PointType.NUMBER && type !== PointType.DURATION && type !== PointType.TIME){
+                if (type === PointType.NUMBER) ptRlp.val = doAverage(vals);
+                if (type === PointType.DURATION) ptRlp.val = doAverageDuration(vals);
+                if (type === PointType.TIME) ptRlp.val = doAverageTime(vals);
+                if (type !== PointType.NUMBER && type !== PointType.DURATION && type !== PointType.TIME) {
                     console.warn('Tried averaging a point with unsupported type ' + type);
                     ptRlp.val = -1; //hint at an error in the UI
                 }
             }
-            if (pd.rollup === Rollup.SUM){
+            if (pd.rollup === Rollup.SUM) {
                 const type = pd.type;
-                if(type === PointType.NUMBER) ptRlp.val = doSum(vals);
-                if(type === PointType.DURATION) ptRlp.val = doSumDuration(vals);
-            } 
+                if (type === PointType.NUMBER) ptRlp.val = doSum(vals);
+                if (type === PointType.DURATION) ptRlp.val = doSumDuration(vals);
+            }
             if (pd.rollup === Rollup.COUNTOFEACH) ptRlp.val = doCountOfEach(vals);
 
             //@ts-expect-error
@@ -1110,24 +1216,24 @@ export class PDW {
         }
 
         function doAverageDuration(vals: string[]): string {
-            if(typeof vals[0] !== 'string') throw new Error('Period average saw a non-string')
+            if (typeof vals[0] !== 'string') throw new Error('Period average saw a non-string')
             // let temp = Temporal.Duration.from(vals[0]).total('seconds');
             const sum = vals.reduce((pv, val) => pv + Temporal.Duration.from(val).total('seconds'), 0);
             const ave = sum / vals.length;
-            return Temporal.Duration.from({seconds: ave}).toLocaleString();
+            return Temporal.Duration.from({ seconds: ave }).toLocaleString();
         }
-        
-        function doAverageTime(vals: string[]){// Temporal.PlainTime {
+
+        function doAverageTime(vals: string[]) {// Temporal.PlainTime {
             //want average to be about 4pm, so any time *before* 4pm I add 1-day's worth of seconds to
             let runningTotalInSeconds = 0;
-            vals.forEach(val=>{
+            vals.forEach(val => {
                 const time = Temporal.PlainTime.from(val)
                 let delta = Temporal.PlainTime.from('00:00:00').until(time)
                 const hrs = delta.hours;
                 const mins = delta.minutes;
                 const secs = delta.seconds;
                 //add 24hrs if its before 4am
-                if(hrs<4) runningTotalInSeconds = runningTotalInSeconds + 86400; //add 24 hrs if its before 4am
+                if (hrs < 4) runningTotalInSeconds = runningTotalInSeconds + 86400; //add 24 hrs if its before 4am
                 runningTotalInSeconds = runningTotalInSeconds + hrs * 3600;
                 runningTotalInSeconds = runningTotalInSeconds + mins * 60;
                 runningTotalInSeconds = runningTotalInSeconds + secs;
@@ -1135,7 +1241,7 @@ export class PDW {
             })
             // let sum = doSum(vals)
             const averageSeconds = Math.round(runningTotalInSeconds / vals.length);
-            const timeAverage = Temporal.PlainTime.from('00:00:00').add({seconds: averageSeconds})
+            const timeAverage = Temporal.PlainTime.from('00:00:00').add({ seconds: averageSeconds })
             return timeAverage.toString();
         }
 
@@ -1144,10 +1250,10 @@ export class PDW {
         }
 
         function doSumDuration(vals: string[]) {
-            if(typeof vals[0] !== 'string') throw new Error('Period average saw a non-string')
+            if (typeof vals[0] !== 'string') throw new Error('Period average saw a non-string')
             // let temp = Temporal.Duration.from(vals[0]).total('seconds');
             const sum = vals.reduce((pv, val) => pv + Temporal.Duration.from(val).total('seconds'), 0);
-            return Temporal.Duration.from({seconds: sum}).toLocaleString();
+            return Temporal.Duration.from({ seconds: sum }).toLocaleString();
         }
 
         function doCountOfEach(vals: string[]) {
@@ -1156,7 +1262,7 @@ export class PDW {
             strings.forEach(str => {
                 stringCounts = str + ": " + vals.filter(s => s == str).length + ", " + stringCounts;
             })
-            return stringCounts.substring(0,stringCounts.length-2);
+            return stringCounts.substring(0, stringCounts.length - 2);
         }
     }
 }
@@ -1193,16 +1299,16 @@ export abstract class Element {
     /**
      * An {@link EpochStr} describing when the Element was created.
      * If an Element is updated, the _created property will be carried forward.
-     */ 
+     */
     get created(): string {
         return this.data._created as string;
-    } 
+    }
     /**
      * An {@link EpochStr} describing when the Element was most recently updated.
      * If an Element is updated, the _updated property will be set to the moment that Element
      * instance was created. The _updated property will also be set to the time the Element
      * class instance was marked as Deleted (or Undeleted).
-     */ 
+     */
     get updated(): string {
         return this.data._updated as string;
     }
@@ -1246,29 +1352,34 @@ export abstract class Element {
         }
         const oldId = this.data._uid;
         const changeTime = makeEpochStr();
-        let toWriteToStores: ElementLike[] = [];
+
+        let created: ElementLike[] = [];
+        let deleted: DeletionMsg[] = [];
+
         //deletions and un-deletions need to be handled differently, since they don't spawn 
         //new elements to be created. Right now I'm handling it this way.
         if (this.__deletionChange !== undefined) { //indicates 'delete' was changed.
             this.data._updated = changeTime;
-            toWriteToStores.push(this.data);
+            // toWriteToStores.push(this.data);
+            deleted.push({
+                uid: this.data._uid,
+                deleted: this.data._deleted,
+                updated: changeTime
+            });
             this.__deletionChange = undefined;
         } else {
+            //create a static copy to not update the old stuff
+            let staticEntryData = this.toData();
             //generate a deletion message for stores
-            toWriteToStores.push(
-                {
-                    _uid: oldId,
-                    _deleted: true,
-                    _updated: changeTime,
-                    _tid: this.data._tid,
-                    _eid: this.data._eid,
-                    _did: this.data._did,
-                }
-            )
+            deleted.push({
+                uid: oldId,
+                deleted: true,
+                updated: changeTime
+            });
             const newId = makeUID();
-            this.data._updated = changeTime;
-            this.data._uid = newId;
-            toWriteToStores.push(this.data);
+            staticEntryData._updated = changeTime;
+            staticEntryData._uid = newId;
+            created.push(staticEntryData);
         }
 
         //return the 'modified' flag to false to indicate it's not been deleted
@@ -1276,15 +1387,15 @@ export abstract class Element {
 
         const elementType = this.getType();
         if (elementType === 'DefData') {
-            PDW.getInstance().setDefs(toWriteToStores)
+            PDW.getInstance().setDefs(created, [], deleted)
             return this
         }
         if (elementType === 'EntryData') {
-            PDW.getInstance().setEntries(toWriteToStores)
+            PDW.getInstance().setEntries(created, [], deleted)
             return this
         }
         if (elementType === 'TagData') {
-            PDW.getInstance().setTags(toWriteToStores)
+            PDW.getInstance().setTags(created, [], deleted)
             return this
         }
         throw new Error('What kind of element is this anyway? ' + elementType)
@@ -1346,12 +1457,12 @@ export abstract class Element {
         return this.getType() === Element.getTypeOfElement((<ElementData>comparison));
     }
 
-    passesFilters(params: SanitizedParams) {
+    passesFilters(params: ReducedParams) {
         if (params.uid !== undefined && !params.uid.some(uid => uid === this.data._uid)) return false;
         if (params.did !== undefined && this.data._did !== undefined && !params.did.some(did => did === this.data._did)) return false;
         if (params.eid !== undefined && this.data._eid !== undefined && !params.eid.some(eid => eid === this.data._eid)) return false;
         if (params.tid !== undefined && this.data._tid != undefined && !params.tid.some(tid => tid === this.data._tid)) return false;
-        if (params.pid !== undefined && this.data._pid !== undefined && !params.pid.some(pid => pid === this.data._pid)) return false;
+        // if (params.pid !== undefined && this.data._pid !== undefined && !params.pid.some(pid => pid === this.data._pid)) return false;
 
         const type = this.getType()!;
 
@@ -1458,25 +1569,25 @@ export abstract class Element {
         let existing: any;
         if (type === 'DefData') {
             pdwRef.dataStores.forEach(store => {
-                let storeResult = maybeGetOnlyResult(store.getDefs({ did: [dataIn._did], includeDeleted: 'no' }));
+                let storeResult = maybeGetOnlyResult(store.reducedQuery({ did: [dataIn._did], includeDeleted: 'no' }).defs);
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as DefData
             })
         }
         if (type === 'EntryData') {
             pdwRef.dataStores.forEach(store => {
                 //search by _eid
-                let storeResult = maybeGetOnlyResult(store.getEntries({ eid: [dataIn._eid], includeDeleted: 'no' }));
+                let storeResult = maybeGetOnlyResult(store.reducedQuery({ eid: [dataIn._eid], includeDeleted: 'no' }).entries);
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as unknown as EntryData
                 //search by _uid
-                storeResult = maybeGetOnlyResult(store.getEntries({ uid: [dataIn._uid], includeDeleted: 'no' }));
+                storeResult = maybeGetOnlyResult(store.reducedQuery({ uid: [dataIn._uid], includeDeleted: 'no' }).entries);
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as unknown as EntryData
             })
         }
         if (type === 'TagData') {
             pdwRef.dataStores.forEach(store => {
                 let storeResult
-                if (dataIn._pid === undefined) storeResult = maybeGetOnlyResult(store.getTags({ did: [dataIn._did], tid: [dataIn._tid], includeDeleted: 'no' }));
-                if (dataIn._pid !== undefined) storeResult = maybeGetOnlyResult(store.getTags({ did: [dataIn._did], tid: [dataIn._tid], pid: [dataIn._pid], includeDeleted: 'no' }));
+                if (dataIn._pid === undefined) storeResult = maybeGetOnlyResult(store.reducedQuery({ did: [dataIn._did], tid: [dataIn._tid], includeDeleted: 'no' }).tags);
+                // if (dataIn._pid !== undefined) storeResult = maybeGetOnlyResult(store.getTags({ did: [dataIn._did], tid: [dataIn._tid], pid: [dataIn._pid], includeDeleted: 'no' }));
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as TagData
             })
         }
@@ -1618,6 +1729,7 @@ export class Def extends Element {
         } else {
             let pdwRef = PDW.getInstance();
             let foundTags = pdwRef.getTags({ tid: tidLblOrTag as string });
+            if (foundTags.length !== 1) throw new Error('No such tag found');
             if (foundTags.length !== 1) {
                 foundTags = pdwRef.getTags({ tagLbl: tidLblOrTag as string });
                 if (foundTags.length !== 1) throw new Error('No such tag found');
@@ -2215,17 +2327,17 @@ export class Tag extends Element {
         if (typeof data._lbl !== 'string') return false
         return true;
     }
-    
-    includesDef(defOrDid: Def | SmallID){
-      if(typeof defOrDid !== "string" && defOrDid.hasOwnProperty("__modified")) defOrDid = defOrDid.did;
-      return this.data._dids.some(did=>did===defOrDid);
+
+    includesDef(defOrDid: Def | SmallID) {
+        if (typeof defOrDid !== "string" && defOrDid.hasOwnProperty("__modified")) defOrDid = defOrDid.did;
+        return this.data._dids.some(did => did === defOrDid);
     }
 
     addDef(defOrDid: Def | string) {
         let did = '';
-        if(typeof defOrDid !== 'string' && defOrDid.hasOwnProperty('__modified')){
+        if (typeof defOrDid !== 'string' && defOrDid.hasOwnProperty('__modified')) {
             did = (<Def>defOrDid).data._did;
-        } else{
+        } else {
             did = (<string>defOrDid);
         }
         if (this.data._dids.indexOf(did) === -1) this.data._dids.push(did);
@@ -2235,9 +2347,9 @@ export class Tag extends Element {
 
     removeDef(defOrDid: Def | string) {
         let did = '';
-        if(typeof defOrDid !== 'string' && defOrDid.hasOwnProperty('__modified')){
+        if (typeof defOrDid !== 'string' && defOrDid.hasOwnProperty('__modified')) {
             did = (<Def>defOrDid).data._did;
-        } else{
+        } else {
             did = (<string>defOrDid);
         }
         this.data._dids = this.data._dids.filter(d => d !== did);
@@ -2588,7 +2700,6 @@ export class Period {
 export class Query {
     private verbosity: 'terse' | 'normal' | 'verbose'
     // private rollup: boolean
-    private scope: Scope | undefined
     private params: StandardParams
     private sortOrder: undefined | 'asc' | 'dsc'
     private sortBy: undefined | string
@@ -2801,7 +2912,7 @@ export class Query {
                     paramsIn: this.params,
                     asParsed: { todo: '#TODO' }
                 },
-                messages: 'Empty queries not allowed. If seeking all, include {allOnPurpose: true}',
+                msgs: ['Empty queries not allowed. If seeking all, include {allOnPurpose: true}'],
                 entries: []
             }
         }
@@ -2897,10 +3008,61 @@ export class DefaultDataStore implements DataStore {
         this.entries = [];
         this.tags = [];
     }
-    
-    commit(trans: Transaction){
-      //#TODO
-      
+
+    commit(trans: Transaction): CommitResponse {
+        let returnObj: CommitResponse = {
+            success: false
+        }
+        try {
+            //creating new Elements
+            trans.create.defs.forEach(newDef => {
+                this.defs.push(newDef);
+            })
+            trans.create.entries.forEach(newEntry => {
+                this.entries.push(newEntry);
+            })
+            trans.create.tags.forEach(newTag => {
+                this.tags.push(newTag);
+            })
+            returnObj.msgs?.push(`Added:
+            ${trans.create.defs.length} Defs, 
+            ${trans.create.entries.length} Entries, and 
+            ${trans.create.tags.length} Tags.`)
+
+            //updating existing
+            this.setElementsInRepo(trans.update.defs.map(d => d.data) as DefData[], this.defs) as DefData[]
+            this.setElementsInRepo(trans.update.entries.map(d => d.data) as EntryData[], this.entries) as EntryData[]
+            this.setElementsInRepo(trans.update.tags.map(d => d.data) as TagData[], this.tags) as TagData[]
+
+            //deletions
+            trans.delete.defs.forEach(def => {
+                let matched = this.defs.find(defInRepo => defInRepo.uid === def.uid);
+                if(matched !== undefined) {
+                    matched.updated = def.updated;
+                    matched.deleted = def.deleted;
+                }
+            })
+            trans.delete.entries.forEach(entry => {
+                let matched = this.entries.find(entryInRepo => entryInRepo.uid === entry.uid);
+                if(matched !== undefined) {
+                    matched.updated = entry.updated;
+                    matched.deleted = entry.deleted;
+                }
+            })
+            trans.delete.tags.forEach(tag => {
+                let matched = this.tags.find(tagInRepo => tagInRepo.uid === tag.uid);
+                if(matched !== undefined) {
+                    matched.updated = tag.updated;
+                    matched.deleted = tag.deleted;
+                }
+            })
+
+            returnObj.success = true;
+        } catch (e) {
+            console.error(e);
+            returnObj.msgs = ['An error occurred when querying the DefaultDataStore']
+        }
+        return returnObj;
     }
 
     /**
@@ -2913,19 +3075,28 @@ export class DefaultDataStore implements DataStore {
         this.tags = [];
     }
 
-    query(params: SanitizedParams): QueryResponse {
-        throw new Error("Method not implemented.");
+    reducedQuery(params: ReducedParams): ReducedQueryResponse {
+        let returnObj: ReducedQueryResponse = {
+            success: false,
+            entries: [],
+            defs: [],
+            tags: []
+        }
+        try {
+            returnObj.entries = this.getEntries(params);
+            returnObj.defs = this.getDefs(params);
+            returnObj.tags = this.getTags(params);
+            returnObj.success = true;
+        } catch (e) {
+            console.error(e);
+            returnObj.msgs = ['An error occurred when querying the DefaultDataStore']
+        }
+        //force any future updates to *not* change the elements in stores until they're saved explicitly
+        returnObj = JSON.parse(JSON.stringify(returnObj));
+        return returnObj
     }
 
-    getAll(params: SanitizedParams): CompleteishDataset {
-        return {
-            defs: this.getDefs(params),
-            entries: this.getEntries(params),
-            tags: this.getTags(params),
-        };
-    }
-
-    getDefs(params: SanitizedParams): DefData[] {
+    private getDefs(params: ReducedParams): DefData[] {
         const allMatches = this.defs.filter(def => def.passesFilters(params));
         let noDupes = new Set(allMatches);
         return Array.from(noDupes).map(def => def.toData() as DefData)
@@ -2937,13 +3108,13 @@ export class DefaultDataStore implements DataStore {
      * @param includeDeleted
      * @returns an array of all entries matching the criteria
      */
-    getEntries(params: SanitizedParams): EntryData[] {
+    private getEntries(params: ReducedParams): EntryData[] {
         const allMatches = this.entries.filter(entry => entry.passesFilters(params));
         let noDupes = new Set(allMatches);
         return Array.from(noDupes).map(entry => entry.toData() as EntryData);
     }
 
-    getTags(params: SanitizedParams): TagData[] {
+    private getTags(params: ReducedParams): TagData[] {
         const allMatches = this.tags.filter(tag => tag.passesFilters(params));
         let noDupes = new Set(allMatches);
         return Array.from(noDupes).map(tag => tag.toData() as TagData);
@@ -2956,6 +3127,7 @@ export class DefaultDataStore implements DataStore {
      * @param elementRepo the existing set of Elements in the DataStore (this.defs, this.entries, etc)
      */
     setElementsInRepo(elementsIn: ElementData[], elementRepo: Element[]) {
+        if (elementsIn.length === 0) return;
         let newElements: ElementData[] = [];
         elementsIn.forEach(el => {
             //if we're *only* deleting or undeleting, this should find match.
@@ -3005,7 +3177,7 @@ export class DefaultDataStore implements DataStore {
         throw new Error("Method not implemented.");
     }
 
-    setAll(completeData: CompleteishDataset): CompleteishDataset {
+    setAll(completeData: CompleteDataset): CompleteDataset {
         throw new Error("Method not implemented.");
     }
 
