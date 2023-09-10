@@ -684,8 +684,9 @@ export class PDW {
 
     getAll(rawParams: StandardParams): CompleteDataset {
         const params = PDW.sanitizeParams(rawParams)
-        let data = this.dataStores[0].reducedQuery(params);
+        let data = this.dataStores[0].reducedQuery(params) as any;
         delete data.msgs
+        delete data.success
         return PDW.addOverviewToCompleteDataset(data);
     }
 
@@ -875,10 +876,11 @@ export class PDW {
 
     newDef(defInfo: DefLike): Def {
         let newDef = new Def(defInfo, false);
+        const storeCopy = newDef.makeStaticCopy() as Def;
         this.dataStores.forEach(connection => {
             connection.commit({
                 create: {
-                    defs: [newDef],
+                    defs: [storeCopy],
                     entries: [],
                     tags: []
                 },
@@ -894,17 +896,18 @@ export class PDW {
                 },
             })
         })
-        this.manifest.push(newDef)        
-        return newDef.makeStaticCopy() as Def
+        this.manifest.push(storeCopy);
+        return newDef;
     }
 
     newEntry(entryInfo: EntryLike): Entry {
         let newEntry = new Entry(entryInfo, false);
+        const storeCopy = newEntry.makeStaticCopy() as Entry;
         this.dataStores.forEach(connection => {
             connection.commit({
                 create: {
                     defs: [],
-                    entries: [newEntry],
+                    entries: [storeCopy],
                     tags: []
                 },
                 update: {
@@ -924,12 +927,13 @@ export class PDW {
 
     newTag(tagInfo: TagLike): Tag {
         let newTag = new Tag(tagInfo, false);
+        const storeCopy = newTag.makeStaticCopy() as Tag;
         this.dataStores.forEach(connection => {
             connection.commit({
                 create: {
                     defs: [],
                     entries: [],
-                    tags: [newTag]
+                    tags: [storeCopy]
                 },
                 update: {
                     defs: [],
@@ -1352,7 +1356,7 @@ export abstract class Element {
         }
         const oldId = this.data._uid;
         const changeTime = makeEpochStr();
-
+        
         let created: ElementLike[] = [];
         let deleted: DeletionMsg[] = [];
 
@@ -1360,7 +1364,6 @@ export abstract class Element {
         //new elements to be created. Right now I'm handling it this way.
         if (this.__deletionChange !== undefined) { //indicates 'delete' was changed.
             this.data._updated = changeTime;
-            // toWriteToStores.push(this.data);
             deleted.push({
                 uid: this.data._uid,
                 deleted: this.data._deleted,
@@ -1368,18 +1371,15 @@ export abstract class Element {
             });
             this.__deletionChange = undefined;
         } else {
-            //create a static copy to not update the old stuff
-            let staticEntryData = this.toData();
             //generate a deletion message for stores
             deleted.push({
                 uid: oldId,
                 deleted: true,
                 updated: changeTime
             });
-            const newId = makeUID();
-            staticEntryData._updated = changeTime;
-            staticEntryData._uid = newId;
-            created.push(staticEntryData);
+            this.data._uid = makeUID();
+            this.data._updated = changeTime;
+            created.push(this.toData());
         }
 
         //return the 'modified' flag to false to indicate it's not been deleted
@@ -1387,7 +1387,7 @@ export abstract class Element {
 
         const elementType = this.getType();
         if (elementType === 'DefData') {
-            PDW.getInstance().setDefs(created, [], deleted)
+            PDW.getInstance().setDefs(created, [], deleted);
             return this
         }
         if (elementType === 'EntryData') {
@@ -1729,7 +1729,7 @@ export class Def extends Element {
         } else {
             let pdwRef = PDW.getInstance();
             let foundTags = pdwRef.getTags({ tid: tidLblOrTag as string });
-            if (foundTags.length !== 1) throw new Error('No such tag found');
+            if (foundTags.length > 1) throw new Error('Too many tags found');
             if (foundTags.length !== 1) {
                 foundTags = pdwRef.getTags({ tagLbl: tidLblOrTag as string });
                 if (foundTags.length !== 1) throw new Error('No such tag found');

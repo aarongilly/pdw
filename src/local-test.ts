@@ -7,114 +7,25 @@ import { FireDataStore } from './dataStores/firestoreDataStore.js';
 
 
 const pdwRef = pdw.PDW.getInstance();
-let origUid = pdw.makeUID();
 
     let def = pdwRef.newDef({
-        _uid: origUid,
-        _did: 'aaaa',
-        _lbl: 'Def 1',
-        _desc: 'Def Desc',
+        _did: 'yoyo',
         _pts: [
             {
-                _pid: 'a111',
-                _lbl: 'Def 1 point 1',
-                _desc: 'Point Desc'
-            },
-            {
-                _pid: 'a222',
-                _lbl: 'Def 1 point 2',
-                _desc: 'Numero Dos'
+                _pid: 'aaaa'
             }
         ]
+    })
+    let entry = def.newEntry({
+        _note: 'for test'
     });
-
-    /**
-     * Not modified to begin with.
-     */
-    def.isSaved()
-
-    /**
-     * Element.delete
-    */
-    //modify Def
-    def.deleted
-    def.deleted = true;
-    def.deleted
-    def.isSaved()
-    //its counterpart in the DataStore isn't changed yet
-    let defFromStores = pdwRef.getDefs({ did: 'aaaa' });
-    defFromStores.length
-    let defFromStore = defFromStores[0];
-    defFromStore.deleted
-    pdwRef.getDefs({ includeDeleted: 'no' }).length
-    pdwRef.getDefs({ includeDeleted: 'only' }).length
-    //save it to the datastore
-    def.save();
-    def.isSaved()
-    //DataStore now has the deletion, but didnt' spawn any additional elements
-    pdwRef.getDefs({ includeDeleted: 'no' }).length
-    pdwRef.getDefs({ includeDeleted: 'only' }).length
-    //undelete the def in memory
-    def.deleted = false;
-    def.isSaved()
-    //data store didn't change
-    pdwRef.getDefs({ includeDeleted: 'no' }).length
-    pdwRef.getDefs({ includeDeleted: 'only' }).length
-    //write undelete back to datastore
-    def.save();
-    def.isSaved()
-    //DataStore now has the deletion, but didnt' spawn any additional elements
-    pdwRef.getDefs({ includeDeleted: 'no' }).length
-    pdwRef.getDefs({ includeDeleted: 'only' }).length
-
-    /**
-     * Do other types of modifications.
-     */
-    def.lbl = "Def 1 with new Label";
-    def.isSaved()
-    //no change yet
-    pdwRef.getDefs({ includeDeleted: 'no' })[0].lbl
-    pdwRef.getDefs({ includeDeleted: 'only' })
-    //write change to the data store
-    def.save();
-    let notDeletedFromStore = pdwRef.getDefs({ includeDeleted: 'no' })
-    let deletedFromStore = pdwRef.getDefs({ includeDeleted: 'only' })
-    notDeletedFromStore.length
-    notDeletedFromStore[0].lbl
-    deletedFromStore.length
-    deletedFromStore[0].lbl
-
-    def.created = pdw.makeEpochStr();
-    def.lbl = 'Def ONE';
-    def.emoji = '🤿';
-    def.desc = 'Modify *then* verify';
-    def.hide = true;
-    def.save()////this is erroring on pdw.test.ts at line 719, maybeGetOnlyResult is returning 2 results... but no issue *here*
-    /////I think it's something to do with the def.deleted=false being; line followed by def.save();
-
-    console.log(def); 
-
-// createSummaryDataSet();
-
-// let all = new pdw.Query().inPeriod(new pdw.Period('2023-08-21').zoomOut()).run().entries;
-
-// let summary = new pdw.Summary(all, pdw.Scope.DAY);
-
-// console.log(summary);
-
-
-
-
-// pdwRef.dataStores = [];
-
-// pdwRef.registerConnection(new FireDataStore(pdwRef));
-
-// pdwRef.newDef({
-//     _did: 'Test Def'
-// })
-
-
-
+    let tag = pdwRef.newTag({
+        _lbl: 'my tag'
+    });
+    def.addTag(tag); //updates the Tag
+    def.save(); //updates the Def
+    let all = pdwRef.getAll({ includeDeleted: 'yes' });
+    console.log(all);
 // temp();
 // createTestDataSet();
 // console.log(pdwRef.getDefs({}).length);

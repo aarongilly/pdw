@@ -11,7 +11,7 @@ function resetTestDataset() {
     (<pdw.DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 }
 
-test.skip('Def Creation and Getting', () => {
+test('Def Creation and Getting', () => {
     /**
      * Most Basic Def Creation
     */
@@ -340,7 +340,7 @@ test.skip('Def Creation and Getting', () => {
     expect(Object.keys(pointWithOptions.opts).length).toBe(2);
 })
 
-test.skip('Entry Creation and Getting', () => {
+test('Entry Creation and Getting', () => {
     resetTestDataset();
 
     const testDef = pdwRef.newDef({
@@ -590,7 +590,7 @@ test.skip('Entry Creation and Getting', () => {
     expect(both.getPoint('d111')?.val).toEqual(['ddd1', 'ddd2']);
 })
 
-test.skip('Tag Basics', () => {
+test('Tag Basics', () => {
     resetTestDataset();
 
     pdwRef.newDef({
@@ -628,7 +628,6 @@ test.skip('Tag Basics', () => {
     //... I guess there's not a lot else to them outside of updates
 });
 
-//for some reason you gotta run this one like 6 times before it will pass, no idea.
 test('Update Logic', async () => {
     resetTestDataset();
 
@@ -691,7 +690,7 @@ test('Update Logic', async () => {
     //DataStore now has the deletion, but didnt' spawn any additional elements
     expect(pdwRef.getDefs({ includeDeleted: 'no' }).length).toBe(1);
     expect(pdwRef.getDefs({ includeDeleted: 'only' }).length).toBe(0);
-
+    
     /**
      * Do other types of modifications.
      */
@@ -972,7 +971,7 @@ test('Update Logic', async () => {
 
 })
 
-test.skip('Get All', () => {
+test('Get All', () => {
     resetTestDataset();
     let def = pdwRef.newDef({
         _did: 'yoyo',
@@ -986,13 +985,15 @@ test.skip('Get All', () => {
         _note: 'for test'
     });
     let tag = pdwRef.newTag({
-        _lbl: 'my tag'
+        _lbl: 'my tag',
+        _dids: ['yoyo']
     });
-    def.addTag(tag); //updates the Tag
     def.save(); //updates the Def
     let all = pdwRef.getAll({ includeDeleted: 'yes' });
-    expect(Object.keys(all)).toEqual(['defs', 'entries', 'tags', 'overview']);
-    expect(all.defs![0]);
+    expect(Object.keys(all)).toEqual(['entries', 'defs', 'tags', 'overview']);
+    expect(all.entries.length).toBe(1);
+    expect(all.tags.length).toBe(1);
+    expect(all.defs.length).toBe(1);
 })
 
 test('Query Basics', () => {
@@ -1327,7 +1328,7 @@ test('Query Basics', () => {
 
 })
 
-test.skip('Data Merge', () => {
+test('Data Merge', () => {
     (<pdw.DefaultDataStore>pdwRef.dataStores[0]).clearAllStoreArrays();
 
     // let inMemoryDataStoreTwo = new DefaultDataStore(pdwRef);
@@ -1525,8 +1526,7 @@ test.skip('Data Merge', () => {
 
 })
 
-//#TODO - finish this
-test.skip('Summarizer', () => {
+test('Summarizer', () => {
     resetTestDataset()
 
     createSummaryDataSet();
