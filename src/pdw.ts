@@ -134,13 +134,13 @@ export enum Rollup {
  * It's *very much* a work in progress.
  */
 export interface DataStore {
-    commit(trans: Transaction): CommitResponse;
+    commit(trans: Transaction): Promise<CommitResponse>;
 
-    reducedQuery(params: ReducedParams): ReducedQueryResponse;
+    reducedQuery(params: ReducedParams): Promise<ReducedQueryResponse>;
 
-    getOverview(): DataStoreOverview;
+    getOverview(): Promise<DataStoreOverview>;
 
-    connect?(...params: any): boolean;
+    connect(...params: any): Promise<boolean>;
 
     /**
      * The name of the connector, essentially. Examples: "Excel", "Firestore"
@@ -462,11 +462,6 @@ export interface PointDefLike {
      * An array of _tid
      */
     _opts?: OptMap;
-
-    /**
-     * Metaproperty reference to the Def
-     */
-    __def?: Def
     // [x: string]: any;
 }
 
@@ -654,7 +649,7 @@ export interface DataStoreOverview {
 
 export class PDW {
     dataStores: DataStore[];
-    private manifest: Def[];
+    // private manifest: Def[];
     private static instance: PDW;
     private constructor(store?: DataStore) {
         if (store !== undefined) {
@@ -663,7 +658,7 @@ export class PDW {
             this.dataStores = [new DefaultDataStore(this)]
         }
         PDW.instance = this; //for singleton
-        this.manifest = [];
+        // this.manifest = [];
     }
 
     /**
@@ -677,44 +672,54 @@ export class PDW {
         return PDW.instance;
     }
 
-    registerConnection(storeInstance: DataStore) {
-        //#THINK - is this how to do it? Right now you're coming in from the connector
-        this.dataStores.push(storeInstance);
+    /**
+     * Removes any existing DataStore(s) and uses the provided one
+     * @param storeInstance the DataStore to use
+     */
+    setDataStore(storeInstance: DataStore) {
+        this.dataStores = [storeInstance];
     }
 
-    getAll(rawParams: StandardParams): CompleteDataset {
+    //#TODO - multiple datastore registration
+
+    /**
+     * 
+     * @param rawParams an object of any {@link StandardParams} to include
+     * @returns a {@link CompleteDataset} containing a {@link Def}s, {@link Entry}s, and {@link Tag}s
+     */
+    async getAll(rawParams: StandardParams): Promise<CompleteDataset> {
         const params = PDW.sanitizeParams(rawParams)
-        let data = this.dataStores[0].reducedQuery(params) as any;
+        let data = await this.dataStores[0].reducedQuery(params) as any;
         delete data.msgs
         delete data.success
         return PDW.addOverviewToCompleteDataset(data);
     }
 
-    getDefs(rawParams?: StandardParams): Def[] {
+    async getDefs(rawParams?: StandardParams): Promise<Def[]> {
         if (rawParams === undefined) rawParams = {};
         const params = PDW.sanitizeParams(rawParams);
         params.type = 'Def';
 
         //this if block will cause the function to return Defs from
         //the manifest of defs, if the query should
-        if (shouldLookInManifest()) {
-            let defsFromManifest = this.manifest.filter(def => {
-                return params.did?.some(pd => pd === def.did);
-            });
-            if (defsFromManifest !== undefined && defsFromManifest.length > 0) {
-                let filterCount = 0;
-                if (params.did !== undefined) filterCount = filterCount + params.did.length
-                if (params.defLbl !== undefined) filterCount = filterCount + params.defLbl.length
-                //only return defs from Manifest if ALL Defs requested are there
-                if (defsFromManifest.length === filterCount) return defsFromManifest;
-            }
-        }
+        // if (shouldLookInManifest()) {
+        //     let defsFromManifest = this.manifest.filter(def => {
+        //         return params.did?.some(pd => pd === def.did);
+        //     });
+        //     if (defsFromManifest !== undefined && defsFromManifest.length > 0) {
+        //         let filterCount = 0;
+        //         if (params.did !== undefined) filterCount = filterCount + params.did.length
+        //         if (params.defLbl !== undefined) filterCount = filterCount + params.defLbl.length
+        //         //only return defs from Manifest if ALL Defs requested are there
+        //         if (defsFromManifest.length === filterCount) return defsFromManifest;
+        //     }
+        // }
 
         //if there's only 1 DataStore, bypass the combining stuff to save time
         if (this.dataStores.length == 1) {
-            let defDatas = this.dataStores[0].reducedQuery(params);
+            let defDatas = await this.dataStores[0].reducedQuery(params);
             let defs = defDatas.defs.map(dl => new Def(dl));
-            this.pushDefsToManifest(defs);
+            // this.pushDefsToManifest(defs);
             return defs;
         }
 
@@ -722,8 +727,8 @@ export class PDW {
         let combinedDefs: Def[] = [];
         //compile defs from all attached DataStores
         //#UNTESTED - test this!
-        this.dataStores.forEach(dataStore => {
-            let thisStoreDefDatas = dataStore.reducedQuery(params);
+        this.dataStores.forEach(async dataStore => {
+            let thisStoreDefDatas = await dataStore.reducedQuery(params);
             let thisStoreDefs = thisStoreDefDatas.defs.map(tsdl => new Def(tsdl));
             thisStoreDefs.forEach(def => {
                 let existingCopy = combinedDefs.find(cd => cd.sameIdAs(def.data));
@@ -742,56 +747,56 @@ export class PDW {
                 }
             })
         })
-        this.pushDefsToManifest(combinedDefs);
+        // this.pushDefsToManifest(combinedDefs);
         return combinedDefs;
 
-        function shouldLookInManifest() { //don't need ot pass in the variable, it's in scope already
-            if (params.includeDeleted !== 'no') return false;
-            if (params.did === undefined && params.defLbl == undefined) return false;
-            return true;
-        }
+        // function shouldLookInManifest() { //don't need ot pass in the variable, it's in scope already
+        //     if (params.includeDeleted !== 'no') return false;
+        //     if (params.did === undefined && params.defLbl == undefined) return false;
+        //     return true;
+        // }
     }
 
-    private pushDefsToManifest(defs: Def[]) {
-        if (!Array.isArray(defs)) return;
-        if (defs.length === 0) return;
-        defs.forEach((def: any) => {
-            //find def with the same _did, if you find it, replace it
-            //if you don't, add it
-            const existsAt = this.manifest.findIndex(mD => mD.data._did === def.data._did);
-            if (existsAt === -1) this.manifest.push(def);
-            if (existsAt !== -1) this.manifest[existsAt] = def;
-        })
-    }
+    // private pushDefsToManifest(defs: Def[]) {
+    //     if (!Array.isArray(defs)) return;
+    //     if (defs.length === 0) return;
+    //     defs.forEach((def: any) => {
+    //         //find def with the same _did, if you find it, replace it
+    //         //if you don't, add it
+    //         const existsAt = this.manifest.findIndex(mD => mD.data._did === def.data._did);
+    //         if (existsAt === -1) this.manifest.push(def);
+    //         if (existsAt !== -1) this.manifest[existsAt] = def;
+    //     })
+    // }
 
-    getEntries(rawParams?: StandardParams): Entry[] {
+    async getEntries(rawParams?: StandardParams): Promise<Entry[]> {
         if (rawParams === undefined) rawParams = {};
         const params = PDW.sanitizeParams(rawParams);
         params.type = 'Entry';
 
         if (this.dataStores.length == 1) {
-            let entries = this.dataStores[0].reducedQuery(params);
-            return entries.entries.map(entry => new Entry(entry));
+            let entriesQuery = await this.dataStores[0].reducedQuery(params);
+            return PDW.inflateEntriesFromData(entriesQuery.entries);
         }
 
         throw new Error('Multiple datastores not yet implemented');
     }
 
-    getTags(rawParams?: StandardParams): Tag[] {
+    async getTags(rawParams?: StandardParams): Promise<Tag[]> {
         if (rawParams === undefined) rawParams = {};
         const params = PDW.sanitizeParams(rawParams)
         params.type = 'Tag';
 
         //if there's only DataStore, bypass the combining stuff to save time
         if (this.dataStores.length == 1) {
-            let tagDatas = this.dataStores[0].reducedQuery(params)
+            let tagDatas = await this.dataStores[0].reducedQuery(params)
             return tagDatas.tags.map(tdl => new Tag(tdl));
         }
 
         throw new Error('Multiple datastores not yet implemented');
     }
 
-    setDefs(createDefs: DefLike[] = [], updateDefs: DefLike[] = [], deletionDefs: DeletionMsg[] = []): Def[] {
+    async setDefs(createDefs: DefLike[] = [], updateDefs: DefLike[] = [], deletionDefs: DeletionMsg[] = []): Promise<Def[]> {
         let trans: Transaction = {
             create: {
                 defs: createDefs.map(def => new Def(def)),
@@ -813,20 +818,21 @@ export class PDW {
             connection.commit(trans)
         });
         const defs = [...trans.create.defs, ...trans.update.defs];
-        this.pushDefsToManifest(defs);
-        return defs.map(e=>e.makeStaticCopy()) as Def[]
+        // this.pushDefsToManifest(defs);
+        return defs.map(e => e.makeStaticCopy()) as Def[]
     }
 
-    setEntries(createEntries: EntryLike[] = [], updateEntries: EntryLike[] = [], deletionEntries: DeletionMsg[] = []): Entry[] {
+    async setEntries(createEntries: EntryData[] = [], updateEntries: EntryData[] = [], deletionEntries: DeletionMsg[] = []): Promise<Entry[]> {
+
         let trans: Transaction = {
             create: {
                 defs: [],
-                entries: createEntries.map(entry => new Entry(entry)),
+                entries: await PDW.inflateEntriesFromData(createEntries),
                 tags: []
             },
             update: {
                 defs: [],
-                entries: updateEntries.map(entry => new Entry(entry)),
+                entries: await PDW.inflateEntriesFromData(updateEntries),
                 tags: []
             },
             delete: {
@@ -839,11 +845,11 @@ export class PDW {
             connection.commit(trans)
         });
         const entries = [...trans.create.entries, ...trans.update.entries];
-        
-        return entries.map(e=>e.makeStaticCopy()) as Entry[]
+
+        return entries.map(e => e.makeStaticCopy()) as Entry[]
     }
 
-    setTags(createTags: TagLike[] = [], updateTags: TagLike[] = [], deletionEntries: DeletionMsg[] = []): Tag[] {
+    async setTags(createTags: TagLike[] = [], updateTags: TagLike[] = [], deletionEntries: DeletionMsg[] = []): Promise<Tag[]> {
         let trans: Transaction = {
             create: {
                 defs: [],
@@ -865,17 +871,17 @@ export class PDW {
             connection.commit(trans)
         });
         const tags = [...trans.create.tags, ...trans.update.tags];
-        return tags.map(e=>e.makeStaticCopy()) as Tag[]
+        return tags.map(e => e.makeStaticCopy()) as Tag[]
     }
 
-    setAll(completeDataset: CompleteDataset) {
+    async setAll(completeDataset: CompleteDataset) {
         if (completeDataset.defs !== undefined) this.setDefs(completeDataset.defs);
         if (completeDataset.entries !== undefined) this.setEntries(completeDataset.entries);
         if (completeDataset.tags !== undefined) this.setTags(completeDataset.tags);
     }
 
-    newDef(defInfo: DefLike): Def {
-        let newDef = new Def(defInfo, false);
+    async newDef(defInfo: DefLike): Promise<Def> {
+        let newDef = new Def(defInfo);
         const storeCopy = newDef.makeStaticCopy() as Def;
         this.dataStores.forEach(connection => {
             connection.commit({
@@ -896,12 +902,12 @@ export class PDW {
                 },
             })
         })
-        this.manifest.push(storeCopy);
+        // this.manifest.push(storeCopy);
         return newDef;
     }
 
-    newEntry(entryInfo: EntryLike): Entry {
-        let newEntry = new Entry(entryInfo, false);
+    async newEntry(entryInfo: EntryLike, def: Def): Promise<Entry> {
+        let newEntry = new Entry(entryInfo, def);
         const storeCopy = newEntry.makeStaticCopy() as Entry;
         this.dataStores.forEach(connection => {
             connection.commit({
@@ -925,8 +931,8 @@ export class PDW {
         return newEntry;
     }
 
-    newTag(tagInfo: TagLike): Tag {
-        let newTag = new Tag(tagInfo, false);
+    async newTag(tagInfo: TagLike): Promise<Tag> {
+        let newTag = new Tag(tagInfo);
         const storeCopy = newTag.makeStaticCopy() as Tag;
         this.dataStores.forEach(connection => {
             connection.commit({
@@ -1164,12 +1170,18 @@ export class PDW {
         return data
     }
 
+    static async inflateEntriesFromData(entryData: EntryData[]): Promise<Entry[]> {
+        let dids = entryData.map(e => e._did);
+        let defs = await PDW.getInstance().getDefs({ did: dids });
+        return entryData.map(e => new Entry(e, defs.find(def => def.did === e._did)!));
+    }
+
     /**
      * Takes in an array of {@link Entry} instances and applies the default rollup to 
      * each of the EntryPoints contained in the Entries. Produces an {@link EntryRollup}
      */
     static rollupEntries(entries: Entry[]): EntryRollup { //#TODO - add RollupOverride param
-        const def = entries[0].getDef();
+        const def = entries[0].def;
         const pointDefs = def.pts;
         let returnObj = {
             did: def.did,
@@ -1349,14 +1361,14 @@ export abstract class Element {
      * its current property values and a new _uid to the connected {@link DataStore}(s)
      * @returns this
      */
-    save() {
+    async save() {
         if (this.__modified === false) {
             console.warn('Tried saving an unchanged Element, ignoring request');
             return;
         }
         const oldId = this.data._uid;
         const changeTime = makeEpochStr();
-        
+
         let created: ElementLike[] = [];
         let deleted: DeletionMsg[] = [];
 
@@ -1370,6 +1382,7 @@ export abstract class Element {
                 updated: changeTime
             });
             this.__deletionChange = undefined;
+            
         } else {
             //generate a deletion message for stores
             deleted.push({
@@ -1387,15 +1400,15 @@ export abstract class Element {
 
         const elementType = this.getType();
         if (elementType === 'DefData') {
-            PDW.getInstance().setDefs(created, [], deleted);
+            await PDW.getInstance().setDefs(created, [], deleted);
             return this
         }
         if (elementType === 'EntryData') {
-            PDW.getInstance().setEntries(created, [], deleted)
+            await PDW.getInstance().setEntries(created as EntryData[], [], deleted)
             return this
         }
         if (elementType === 'TagData') {
-            PDW.getInstance().setTags(created, [], deleted)
+            await PDW.getInstance().setTags(created, [], deleted)
             return this
         }
         throw new Error('What kind of element is this anyway? ' + elementType)
@@ -1494,9 +1507,10 @@ export abstract class Element {
     makeStaticCopy(): Tag | Def | Entry {
         const type = Element.getTypeOfElement(this.data);
         const data = this.toData();
-        if (type === 'DefData') return new Def(data, false);
-        if (type === 'EntryData') return new Entry(data, false);
-        if (type === 'TagData') return new Tag(data, false);
+        if (type === 'DefData') return new Def(data);
+        //@ts-expect-error - Entry instances will have an existing def
+        if (type === 'EntryData') return new Entry(data, this.def);
+        if (type === 'TagData') return new Tag(data);
         throw new Error('What type was this? ' + type);
     }
 
@@ -1559,7 +1573,7 @@ export abstract class Element {
      * @param ofType optional, allows you to override what the dataIn would suggest it should be
      * @returns the raw DefData, PointDefData, EntryData, EntryPointData, TagData, or TagDefData - or undefined if none found
      */
-    static findExistingData(dataIn: any, ofType?: 'Def' | 'Entry' | 'Tag'): any {
+    static async findExistingData(dataIn: any, ofType?: 'Def' | 'Entry' | 'Tag'): Promise<any> {
         //replace any passed in Element instances with their Data replacement
         if (dataIn.hasOwnProperty('__modified') && dataIn.hasOwnProperty('data')) dataIn = dataIn.data;
         const type = ofType === undefined ? Element.getTypeOfElement(dataIn) : ofType + 'Data';
@@ -1568,25 +1582,28 @@ export abstract class Element {
         let pdwRef = PDW.getInstance();
         let existing: any;
         if (type === 'DefData') {
-            pdwRef.dataStores.forEach(store => {
-                let storeResult = maybeGetOnlyResult(store.reducedQuery({ did: [dataIn._did], includeDeleted: 'no' }).defs);
+            pdwRef.dataStores.forEach(async store => {
+                let storeResult: any = await store.reducedQuery({ did: [dataIn._did], includeDeleted: 'no' });
+                storeResult = maybeGetOnlyResult(storeResult.defs)
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as DefData
             })
         }
         if (type === 'EntryData') {
-            pdwRef.dataStores.forEach(store => {
+            pdwRef.dataStores.forEach(async store => {
                 //search by _eid
-                let storeResult = maybeGetOnlyResult(store.reducedQuery({ eid: [dataIn._eid], includeDeleted: 'no' }).entries);
+                let storeResult: any = await store.reducedQuery({ eid: [dataIn._eid], includeDeleted: 'no' });
+                storeResult = maybeGetOnlyResult(storeResult.entries);
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as unknown as EntryData
                 //search by _uid
-                storeResult = maybeGetOnlyResult(store.reducedQuery({ uid: [dataIn._uid], includeDeleted: 'no' }).entries);
+                storeResult = await store.reducedQuery({ uid: [dataIn._uid], includeDeleted: 'no' });
+                storeResult = maybeGetOnlyResult(storeResult.entries);
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as unknown as EntryData
             })
         }
         if (type === 'TagData') {
-            pdwRef.dataStores.forEach(store => {
-                let storeResult
-                if (dataIn._pid === undefined) storeResult = maybeGetOnlyResult(store.reducedQuery({ did: [dataIn._did], tid: [dataIn._tid], includeDeleted: 'no' }).tags);
+            pdwRef.dataStores.forEach(async store => {
+                let storeResult: any = await store.reducedQuery({ did: [dataIn._did], tid: [dataIn._tid], includeDeleted: 'no' });
+                storeResult = maybeGetOnlyResult(storeResult.tags)
                 // if (dataIn._pid !== undefined) storeResult = maybeGetOnlyResult(store.getTags({ did: [dataIn._did], tid: [dataIn._tid], pid: [dataIn._pid], includeDeleted: 'no' }));
                 if (storeResult !== undefined && existing === undefined) existing = storeResult as TagData
             })
@@ -1616,20 +1633,8 @@ export class Def extends Element {
     declare data: DefData;
     private readonly _pts: PointDef[];
 
-    constructor(defData: DefLike, lookForExisting = true) {
+    constructor(defData: DefLike) {
         if (defData._scope !== undefined && !Def.isValidScope(defData._scope)) throw new Error('Invalid scope supplied when creating Def: ' + defData._scope);
-        if (lookForExisting) {
-            let existing = Element.findExistingData(defData, 'Def');
-            if (existing !== undefined) {
-                if (defData._created === undefined) defData._created = existing._created;
-                if (defData._desc === undefined) defData._desc = existing._desc;
-                if (defData._emoji === undefined) defData._emoji = existing._emoji;
-                if (defData._did === undefined) defData._did = existing._did;
-                if (defData._lbl === undefined) defData._lbl = existing._lbl;
-                if (defData._hide === undefined) defData._hide = existing._hide;
-                if (defData._scope === undefined) defData._scope = existing._scope;
-            }
-        }
         super(defData);
         this.data = {
             ...this.data,
@@ -1722,16 +1727,16 @@ export class Def extends Element {
      * @param tid of EXISTING Tag
      * @returns the new Tag
      */
-    addTag(tidLblOrTag: Tag | string, isRemove = false): Tag {
+    async addTag(tidLblOrTag: Tag | string, isRemove = false): Promise<Tag> {
         let tag: Tag | undefined;
         if (tidLblOrTag.hasOwnProperty('data') && Tag.isTagData((<Tag>tidLblOrTag).data)) {
             tag = tidLblOrTag as Tag;
         } else {
             let pdwRef = PDW.getInstance();
-            let foundTags = pdwRef.getTags({ tid: tidLblOrTag as string });
+            let foundTags = await pdwRef.getTags({ tid: tidLblOrTag as string });
             if (foundTags.length > 1) throw new Error('Too many tags found');
             if (foundTags.length !== 1) {
-                foundTags = pdwRef.getTags({ tagLbl: tidLblOrTag as string });
+                foundTags = await pdwRef.getTags({ tagLbl: tidLblOrTag as string });
                 if (foundTags.length !== 1) throw new Error('No such tag found');
             }
             tag = foundTags[0];
@@ -1746,7 +1751,7 @@ export class Def extends Element {
         return tag
     }
 
-    removeTag(tidLblOrTag: Tag | string): Tag {
+    async removeTag(tidLblOrTag: Tag | string): Promise<Tag> {
         return this.addTag(tidLblOrTag, true);
     }
 
@@ -1774,13 +1779,9 @@ export class Def extends Element {
         this.hidePoint(pointIdentifier, false)
     }
 
-    newEntry(entryData: EntryLike): Entry {
-        //not tesitng the 'any' right here
+    async newEntry(entryData: EntryLike): Promise<Entry> {
         entryData._did = this.did;
-        //add setEntries shortcuts
-        entryData.__isNew = true;
-        entryData.__def = this;
-        return PDW.getInstance().setEntries([entryData])[0];
+        return PDW.getInstance().newEntry(entryData, this);
     }
 
     /**
@@ -2100,42 +2101,23 @@ export class PointDef {
 
 export class Entry extends Element {
     declare data: EntryData
-    private _def?: Def | undefined;
+    private _def: Def;
     private _period: Period;
-    constructor(entryData: EntryLike, lookForExisting = true, def?: Def) {
-        if (def === undefined && entryData.__def !== undefined) def = entryData.__def;
-        if (lookForExisting && entryData.__isNew !== undefined) lookForExisting = !entryData.__isNew;
-        if (entryData._uid === undefined && entryData._eid === undefined && entryData._did === undefined && def === undefined)
-            throw new Error('Not enough info to determine Entry type')
-        if (lookForExisting) {
-            let existing = Element.findExistingData(entryData, 'Entry');
-            if (existing !== undefined) {
-                if (entryData._created === undefined) entryData._created = existing._created;
-                if (entryData._did === undefined) entryData._did = existing._did;
-                if (entryData._period === undefined) entryData._period = existing._period;
-                if (entryData._note === undefined) entryData._note = existing._note;
-                if (entryData._source === undefined) entryData._source = existing._source;
-            }
-        }
+    constructor(entryData: EntryLike, def: Def) {
         super(entryData);
+        //this design decision was hard. Entries **have** to know their Defs
+        this._def = def;
 
-        if (entryData._def !== undefined) this._def = entryData._def;
-        if (this.def === undefined && entryData._did !== undefined) this._def = maybeGetOnlyResult(PDW.getInstance().getDefs({ did: [entryData._did!], includeDeleted: 'no' })) as Def;
-        if (this.def === undefined) {
-            throw new
-                Error('No def found for ' + entryData._did);
-        }
-
+        //forcing scope adherance
         if (entryData._period !== undefined) {
-            //force period scope compatibility
-            this._period = new Period(entryData._period, this.def.scope);
+            this._period = new Period(entryData._period, def.scope);
         } else {
-            this._period = Period.nowAsPeriod(this.def.scope);
+            this._period = Period.nowAsPeriod(def.scope);
         }
 
         this.data = {
             ...this.data,
-            _did: this.def.did,
+            _did: def.did,
             _period: this.period.toString(),
             _eid: entryData._eid ?? makeUID(),
             _note: entryData._note ?? '',
@@ -2152,9 +2134,6 @@ export class Entry extends Element {
         if (!Entry.isEntryData(this.data)) throw new Error('The Entry was mal-formed');
     }
 
-    public get def(): Def | undefined {
-        return this._def;
-    }
     get did() {
         return this.data._did;
     }
@@ -2170,6 +2149,9 @@ export class Entry extends Element {
     get source() {
         return this.data._source;
     }
+    public get def(){
+        return this._def;
+    }
 
     set note(newNote: string) {
         this.data._note = newNote;
@@ -2182,7 +2164,7 @@ export class Entry extends Element {
     public set period(value: Period | string) {
         if (typeof value === 'string') value = new Period(value);
         //ensure scope agreement
-        value = value.zoomTo(this.getDef().scope)
+        value = value.zoomTo(this.def.scope)
         this.data._period = value.toString();
         this._period = value;
         this.__modified = true;
@@ -2213,9 +2195,8 @@ export class Entry extends Element {
 
     getPoints(): { 'pid': string, 'lbl': string, 'val': any, 'pointDef': PointDef }[] {
         let pids = Object.keys(this.data).filter(key => key.substring(0, 1) !== '_');
-        let def = this.getDef();
         return pids.map(pid => {
-            const assPD = def.pts.find(point => point.pid === pid);
+            const assPD = this.def.pts.find(point => point.pid === pid);
             return {
                 pointDef: assPD!,
                 pid: pid,
@@ -2250,11 +2231,6 @@ export class Entry extends Element {
         return this.setPointVals([{ [pid]: val }]);
     }
 
-    getDef(): Def {
-        if (this.def) return this.def;
-        return PDW.getInstance().getDefs({ did: this.did })[0]
-    }
-
     /**
     * Predicate to check if an object has all {@link EntryData} properties
     * AND they are the right type. Does not check for EntryPoints or their types.
@@ -2277,13 +2253,7 @@ export class Entry extends Element {
 
 export class Tag extends Element {
     declare data: TagData
-    constructor(tagDefData: TagLike, lookForExisting = true) {
-        if (lookForExisting) {
-            let existing = Element.findExistingData(tagDefData, 'Tag');
-            if (existing !== undefined) {
-                if (tagDefData._created === undefined) tagDefData._created = existing._created;
-            }
-        }
+    constructor(tagDefData: TagLike) {
         super(tagDefData);
         this.data = {
             ...this.data,
@@ -2357,15 +2327,11 @@ export class Tag extends Element {
         return this
     }
 
-    getDefs(includeDeleted = false): Def[] {
+    async getDefs(includeDeleted = false): Promise<Def[]> {
         const pdwRef = PDW.getInstance();
         const includeDeletedText = includeDeleted ? 'yes' : 'no';
         let defs: Def[] = [];
-        this.data._dids.forEach(did => {
-            let def = pdwRef.getDefs({ did: did, includeDeleted: includeDeletedText });
-            if (def !== undefined) defs.push(def[0]);
-        })
-        return defs
+        return pdwRef.getDefs({ did: this.data._dids, includeDeleted: includeDeletedText });
     }
 }
 
@@ -2799,10 +2765,10 @@ export class Query {
      * @param tid tag ID of tags to be used
      * @returns 
      */
-    tids(tid: string[] | string) {
+    async tids(tid: string[] | string): Promise<Query> {
         if (!Array.isArray(tid)) tid = [tid];
         //convert tid into dids
-        const tags = PDW.getInstance().getTags({ tid: tid });
+        const tags = await PDW.getInstance().getTags({ tid: tid });
         const dids: string[] = [];
         tags.forEach(tag => tag.dids.forEach(did => {
             if (!dids.some(d => d === did)) dids.push(did);
@@ -2832,10 +2798,10 @@ export class Query {
      * @param tid tag ID of tags to be used
      * @returns 
      */
-    tagsLbld(tid: string[] | string) {
+    async tagsLbld(tid: string[] | string): Promise<Query> {
         if (!Array.isArray(tid)) tid = [tid];
         //convert tid into dids
-        const tags = PDW.getInstance().getTags({ tagLbl: tid });
+        const tags = await PDW.getInstance().getTags({ tagLbl: tid });
         const dids: string[] = [];
         tags.forEach(tag => tag.dids.forEach(did => {
             if (!dids.some(d => d === did)) dids.push(did);
@@ -2844,21 +2810,21 @@ export class Query {
         return this
     }
 
-    scopes(scopes: Scope[] | Scope): Query {
+    async scopes(scopes: Scope[] | Scope): Promise<Query> {
         if (!Array.isArray(scopes)) scopes = [scopes];
-        let defs = PDW.getInstance().getDefs({});
+        let defs = await PDW.getInstance().getDefs({});
         defs = defs.filter(def => (<Scope[]>scopes).some(scope => scope === def.scope));
         this.params.did = defs.map(def => def.did);
         return this
     }
 
-    scopeMin(scope: Scope): Query {
+    async scopeMin(scope: Scope): Promise<Query> {
         let scopes = Object.values(Scope);
         let index = scopes.indexOf(scope);
         return this.scopes(scopes.slice(index));
     }
 
-    scopeMax(scope: Scope): Query {
+    async scopeMax(scope: Scope): Promise<Query> {
         let scopes = Object.values(Scope);
         let index = scopes.indexOf(scope);
         return this.scopes(scopes.slice(0, index + 1));
@@ -2900,7 +2866,7 @@ export class Query {
         this.sortBy = propName;
     }
 
-    run(): QueryResponse {
+    async run(): Promise<QueryResponse> {
         //empty queries are not allowed
         if (this.params === undefined ||
             (!this.params.allOnPurpose && Object.keys(this.params).length <= 1)
@@ -2916,7 +2882,7 @@ export class Query {
                 entries: []
             }
         }
-        let entries = PDW.getInstance().getEntries(this.params);
+        let entries = await PDW.getInstance().getEntries(this.params);
         if (this.sortBy !== undefined) entries = this.applySort(entries);
         let resp: QueryResponse = {
             success: true,
@@ -3009,11 +2975,11 @@ export class DefaultDataStore implements DataStore {
         this.tags = [];
     }
 
-    commit(trans: Transaction): CommitResponse {
+    async commit(trans: Transaction): Promise<CommitResponse> {
         let returnObj: CommitResponse = {
             success: false
         }
-        try {
+        // try {
             //creating new Elements
             trans.create.defs.forEach(newDef => {
                 this.defs.push(newDef);
@@ -3030,38 +2996,40 @@ export class DefaultDataStore implements DataStore {
             ${trans.create.tags.length} Tags.`)
 
             //updating existing
-            this.setElementsInRepo(trans.update.defs.map(d => d.data) as DefData[], this.defs) as DefData[]
-            this.setElementsInRepo(trans.update.entries.map(d => d.data) as EntryData[], this.entries) as EntryData[]
-            this.setElementsInRepo(trans.update.tags.map(d => d.data) as TagData[], this.tags) as TagData[]
+            //is there a race condition here possibly?
+            //NO IDEA WHAT'S GOING ON HERE - if I "await", this is causing tests to fail, it skips the "deletions" section
+            this.setElementsInRepo(trans.update.defs.map(d => d.data) as DefData[], this.defs)
+            this.setElementsInRepo(trans.update.entries.map(d => d.data) as EntryData[], this.entries)
+            this.setElementsInRepo(trans.update.tags.map(d => d.data) as TagData[], this.tags)
 
             //deletions
             trans.delete.defs.forEach(def => {
                 let matched = this.defs.find(defInRepo => defInRepo.uid === def.uid);
-                if(matched !== undefined) {
+                if (matched !== undefined) {
                     matched.updated = def.updated;
                     matched.deleted = def.deleted;
                 }
             })
             trans.delete.entries.forEach(entry => {
                 let matched = this.entries.find(entryInRepo => entryInRepo.uid === entry.uid);
-                if(matched !== undefined) {
+                if (matched !== undefined) {
                     matched.updated = entry.updated;
                     matched.deleted = entry.deleted;
                 }
             })
             trans.delete.tags.forEach(tag => {
                 let matched = this.tags.find(tagInRepo => tagInRepo.uid === tag.uid);
-                if(matched !== undefined) {
+                if (matched !== undefined) {
                     matched.updated = tag.updated;
                     matched.deleted = tag.deleted;
                 }
             })
 
             returnObj.success = true;
-        } catch (e) {
-            console.error(e);
-            returnObj.msgs = ['An error occurred when querying the DefaultDataStore']
-        }
+        // } catch (e) {
+        //     console.log(e);
+        //     returnObj.msgs = ['An error occurred when querying the DefaultDataStore']
+        // }
         return returnObj;
     }
 
@@ -3075,7 +3043,7 @@ export class DefaultDataStore implements DataStore {
         this.tags = [];
     }
 
-    reducedQuery(params: ReducedParams): ReducedQueryResponse {
+    async reducedQuery(params: ReducedParams): Promise<ReducedQueryResponse> {
         let returnObj: ReducedQueryResponse = {
             success: false,
             entries: [],
@@ -3126,7 +3094,7 @@ export class DefaultDataStore implements DataStore {
      * @param elementsIn list of Elements (Defs, Entries, etc) to set
      * @param elementRepo the existing set of Elements in the DataStore (this.defs, this.entries, etc)
      */
-    setElementsInRepo(elementsIn: ElementData[], elementRepo: Element[]) {
+    async setElementsInRepo(elementsIn: ElementData[], elementRepo: Element[]): Promise<void> {
         if (elementsIn.length === 0) return;
         let newElements: ElementData[] = [];
         elementsIn.forEach(el => {
@@ -3157,23 +3125,23 @@ export class DefaultDataStore implements DataStore {
         const type = getElementType(elementsIn[0])
         if (type === 'DefData') elementRepo.push(...newElements.map(d => new Def(d)));
         if (type === 'TagData') elementRepo.push(...newElements.map(t => new Tag(t)));
-        if (type === 'EntryData') elementRepo.push(...newElements.map(e => new Entry(e)));
-        return elementsIn;
+        if (type === 'EntryData') elementRepo.push(...await PDW.inflateEntriesFromData(newElements as EntryData[]));
+        // return elementsIn;
     }
 
-    setDefs(defsIn: Def[]): DefData[] {
-        return this.setElementsInRepo(defsIn.map(d => d.data) as DefData[], this.defs) as DefData[];
+    async setDefs(defsIn: Def[]): Promise<DefData[]> {
+        return this.setElementsInRepo(defsIn.map(d => d.data) as DefData[], this.defs) as unknown as DefData[];
     }
 
-    setEntries(entriesIn: Entry[]): EntryData[] {
-        return this.setElementsInRepo(entriesIn.map(e => e.data), this.entries) as EntryData[];
+    async setEntries(entriesIn: Entry[]): Promise<EntryData[]> {
+        return this.setElementsInRepo(entriesIn.map(e => e.data), this.entries) as unknown as EntryData[];
     }
 
-    setTags(tagData: Tag[]): TagData[] {
-        return this.setElementsInRepo(tagData.map(t => t.data), this.tags) as TagData[];
+    async setTags(tagData: Tag[]): Promise<TagData[]> {
+        return this.setElementsInRepo(tagData.map(t => t.data), this.tags) as unknown as TagData[];
     }
 
-    getOverview(): DataStoreOverview {
+    async getOverview(): Promise<DataStoreOverview> {
         throw new Error("Method not implemented.");
     }
 
@@ -3181,8 +3149,11 @@ export class DefaultDataStore implements DataStore {
         throw new Error("Method not implemented.");
     }
 
-    connect(..._params: any): boolean {
-        throw new Error("Method not implemented.");
+    async connect(pdwRef: PDW): Promise<boolean> {
+        this.pdw = pdwRef;
+        console.log("Connected to the DefaultDataStore");
+        return true
+
     }
 
 }

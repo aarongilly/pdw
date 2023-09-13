@@ -26,6 +26,8 @@ The `pdw` library exists because I got tired of starting from scratch every time
 
 ## Concepts
 
+#TODO - all this needs rewritten somewhat now that I'm treating all Elements as wrappers for ElementData objects.
+
 The library is built around a few core data structures: `Def`, `PointDef`, `Entry`, `EntryPoint`, `Tag` and `Period`
 
 - A record of a thing that happened is called an `Entry`
@@ -41,7 +43,6 @@ The library is built around a few core data structures: `Def`, `PointDef`, `Entr
 - A list of Entries can have their `EntryPoint` values summarized using `Rollup`s
 
 > 👉 `Def`s contain `PointDef`s and describe `Entry`s, which take place in Periods
-> 
 
 An `Entry` is a record of a thing that occurred during a given period of time (`Period`). A Definition (or `Def`) describes a type of `Entry` that can exist. Every `Entry` has exactly **one** definfion. A `Def` contains zero or more `PointDef`s. A `PointDef` describes a key/value pair (called an `EntryPoint`) that can exist on its associated `Entry`. `EntryPoint`s may be of any type. Each entry is associated with exactly **one** `Period`, which range in their granularity from seconds to years. Running a `Query` will return `Entry` instances match the query's parameters. To aid in `Query`ing, there exist `Tag`s, whose only function is to help group related `Def`s together.
 

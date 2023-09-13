@@ -3,30 +3,10 @@ import { Query, Scope } from './pdw.js'
 // import { exportToFile, importFromFile } from './dataStores/fileAsyncDataStores.js';
 import { Temporal, toTemporalInstant } from 'temporal-polyfill';
 import { importFirestore, importMongo, importOldV9, importOldest, importPreviousCSV } from './onetimeImports.js'
-import { FireDataStore } from './dataStores/firestoreDataStore.js';
-
+// import * as test from '../../pdw-firestore-plugin/'
 
 const pdwRef = pdw.PDW.getInstance();
 
-    let def = pdwRef.newDef({
-        _did: 'yoyo',
-        _pts: [
-            {
-                _pid: 'aaaa'
-            }
-        ]
-    })
-    let entry = def.newEntry({
-        _note: 'for test'
-    });
-    let tag = pdwRef.newTag({
-        _lbl: 'my tag'
-    });
-    def.addTag(tag); //updates the Tag
-    def.save(); //updates the Def
-    let all = pdwRef.getAll({ includeDeleted: 'yes' });
-    console.log(all);
-// temp();
 // createTestDataSet();
 // console.log(pdwRef.getDefs({}).length);
 // importFromFile('data-files/wholly_excel.xlsx');
@@ -52,8 +32,8 @@ const pdwRef = pdw.PDW.getInstance();
 // defs = pdwRef.getDefs();
 // console.log(defs);
 
-function createTestDataSet() {
-    const nightly = pdwRef.newDef({
+async function createTestDataSet() {
+    const nightly = await pdwRef.newDef({
         _created: '2023-07-10T20:02:30-05:00',
         _did: 'aaaa',
         _lbl: 'Nightly Review',
@@ -101,7 +81,7 @@ function createTestDataSet() {
             }
         ]
     });
-    const quotes = pdwRef.newDef({
+    const quotes = await pdwRef.newDef({
         _did: 'bbbb',
         _lbl: 'Quotes',
         _desc: 'Funny or good sayings',
@@ -120,7 +100,7 @@ function createTestDataSet() {
             _type: pdw.PointType.TEXT
         },
     })
-    const movies = pdwRef.newDef({
+    const movies = await pdwRef.newDef({
         _did: 'cccc',
         _lbl: 'Movie',
         _emoji: "🎬",
@@ -135,7 +115,7 @@ function createTestDataSet() {
             _type: pdw.PointType.BOOL
         }
     })
-    const book = pdwRef.newDef({
+    const book = await pdwRef.newDef({
         _did: 'dddd',
         _lbl: 'Book',
         _emoji: "📖",
@@ -148,7 +128,7 @@ function createTestDataSet() {
     /**
      * A tag
      */
-    const mediaTag = pdwRef.newTag({
+    pdwRef.newTag({
         _lbl: 'media',
         _dids: ['dddd', 'cccc'],
         _tid: 'tag1'
@@ -156,7 +136,7 @@ function createTestDataSet() {
     /**
      * Several entries
      */
-    let quote = quotes.newEntry({
+    let quote = await quotes.newEntry({
         _eid: 'lkfkuxon-f9ys',
         _period: '2023-07-21T14:02:13',
         _created: '2023-07-22T20:02:13Z',
@@ -240,8 +220,8 @@ function createTestDataSet() {
 }
 
 
-function createSummaryDataSet(){
-    const nap = pdwRef.newDef({
+async function createSummaryDataSet(){
+    const nap = await pdwRef.newDef({
         _lbl: "Nap",
         _scope: pdw.Scope.SECOND,
         _pts: [
