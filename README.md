@@ -1,3 +1,5 @@
+//#TODO - update all this
+
 `pdw` is a library for creating quantified self applications. It's intended to be platform-agnostic with regard to the underlying database and the presentation layer. It handles the core logic, and provides interfaces out to whatever databases and whatever UI components you want to build.
 
 ```mermaid
@@ -99,7 +101,7 @@ The `Def` describes the `Entry` because they share the same `_did` value. The `_
 - Don’t delete. Don’t update*. Create new & mark old as deleted.
     - *updates allowed to: `_deleted`, `_updated`
 - Surrogate IDs for everything!
-    - `_did`, `_uid`, `_eid`, `_tid`, `_pid`
+    - `_did`, `_uid`, `_eid`, `_pid`
     - ID property values may never be changed once they are established
 - Case doesn't matter. Everything gets trimmed.
 - Timezones suck and are not included in Periods
@@ -107,7 +109,7 @@ The `Def` describes the `Entry` because they share the same `_did` value. The `_
 
 ## Full Data Structure
 
-The full data structure includes a few more properties that add features and make it possible to combine data from different datasets without duplication. Each of the `Entry`, `Def`, and `Tag` interfaces extend abstract base interface called `Element`. 
+The full data structure includes a few more properties that add features and make it possible to combine data from different datasets without duplication. The `Entry` and `Def`, interfaces extend abstract base interface called `Element`. 
 
 ```mermaid
 erDiagram
@@ -123,7 +125,6 @@ erDiagram
         string _lbl
         SmallID[] _dids
     }
-    TAG }o--o{ DEF : groups
 
     ENTRY {
         SmallID _did

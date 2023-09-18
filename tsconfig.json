@@ -19,7 +19,11 @@
     // "noUnusedParameters": true, //uncomment this for prod
     "noImplicitReturns": true,
     "skipLibCheck": true,
-    "outDir": "out"
+    "outDir": "out",
+    // "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
   },
   "include": [
     "src",

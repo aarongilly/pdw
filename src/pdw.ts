@@ -151,7 +151,7 @@ export interface DataStore {
      * A reference to the Personal Data Warehouse instance to 
      * which the storage connector is connected.
      */
-    pdw: PDW;
+    pdw?: PDW;
 }
 
 /**
@@ -160,7 +160,7 @@ export interface DataStore {
  * place where the data was imported from until it's exported back to that place.
  */
 export interface AsyncDataStore {
-    importFrom(params: any): CompleteDataset,
+    importFrom(params: any): Promise<CompleteDataset>,
     exportTo(allData: CompleteDataset, params: any): any
 }
 
@@ -223,7 +223,6 @@ export interface StandardParams {
     /**
      * A list of {@link SmallID}.
      * For Entry and Def elements, will return those with Element.did in the list.
-     * For Tag, will return tags whose _dids[] contain the SmallID
      */
     did?: SmallID[] | SmallID,
     //pid?: SmallID[] | SmallID, //#THINK - should this be supported on StandardParams?
@@ -233,17 +232,10 @@ export interface StandardParams {
      */
     eid?: UID[] | UID,
     /**
-     * A list of {@link SmallID}
-     * Will return any Tag instance(s) whose Tag.tid is in the list.
-     * Will NOT returns Def or Entry instances
-     */
-    tid?: SmallID[] | SmallID,
-    /**
      * A list of strings for the associated with Def.lbl
      * Internally, this is translated into a list of _did strings, and behaves like
      * {@link StandardParams.did}
      * For Entry and Def elements, will return those with Element.did in the list.
-     * For Tag, will return tags whose _dids[] contain the SmallID
      */
     defLbl?: string[] | string,
     //pointLbl?: string[] | string, do you want to support this
@@ -251,7 +243,7 @@ export interface StandardParams {
      * A list of strings.
      * Will return any Tag(s) whose Tag.lbl is in the list.
      */
-    tagLbl?: string[] | string,
+    tag?: string[] | string,
     /**
      * Reduces the resulting {@link Def} and {@link} Entry results to those whose
      * scope is in the provided list.
@@ -262,7 +254,7 @@ export interface StandardParams {
      * not super helpful, but this is something I'd like to support.
      */
     limit?: number,//#TODO
-    type?: "Entry" | "Def" | "Tag" | "All" //#TODO
+    type?: "Entry" | "Def" | "All"
     /**
      * If an empty query is sent without this field, the query is rejected.
      * This is prevent the error trap of accidentally asking for *everything*,
@@ -301,15 +293,13 @@ export interface ReducedParams {
 
     uid?: UID[],
     did?: SmallID[],
-    //pid?: SmallID[],
     eid?: UID[],
-    tid?: SmallID[],
     defLbl?: string[],
     pointLbl?: string[],
-    tagLbl?: string[],
+    tag?: string[],
 
     limit?: number, //#TODO
-    type?: "Entry" | "Def" | "Tag" | "All" //#TODO
+    type?: "Entry" | "Def" | "All"
     /**
      * Reduces the resulting {@link Def} and {@link} Entry results to those whose
      * scope is in the provided list.
@@ -321,13 +311,11 @@ export interface ReducedParams {
 export interface ElementDataMap {
     defs: DefData[];
     entries: EntryData[];
-    tags: TagData[];
 }
 
 export interface ElementMap {
     defs: Def[];
     entries: Entry[];
-    tags: Tag[];
 }
 
 
@@ -350,7 +338,6 @@ export interface DeletionMsg {
 export interface DeletionMsgMap {
     defs: DeletionMsg[];
     entries: DeletionMsg[];
-    tags: DeletionMsg[];
 }
 
 /**
@@ -421,7 +408,7 @@ export interface DefLike extends ElementLike {
     /**
      * For things you want to collect, but not necessarily see
      */
-    _hide?: boolean;
+    _tags?: string[];
     /**
      * The points on the definition
      */
@@ -458,8 +445,7 @@ export interface PointDefLike {
      */
     _hide?: boolean;
     /**
-     * Select & Multiselect options. Associated with a {@link Tag} '_tid.
-     * An array of _tid
+     * Select & Multiselect options. Associated with a option ID (an {@link SmallID})
      */
     _opts?: OptMap;
     // [x: string]: any;
@@ -495,22 +481,6 @@ export interface EntryLike extends ElementLike {
     [_pid: string]: any
 }
 
-export interface TagLike extends ElementLike {
-    /**
-     * Data the Definition ID, the ID of the Tag
-     */
-    _tid?: SmallID;
-    /**
-     * Text
-     */
-    _lbl?: string;
-    /**
-     * Tags for grouping similar definitions easier in filters,
-     * An array of _did
-     */
-    _dids?: SmallID[];
-}
-
 export interface ElementData {
     _uid: UID;
     _deleted: boolean;
@@ -524,7 +494,7 @@ export interface DefData extends ElementData {
     _lbl: string;
     _desc: string;
     _emoji: string;
-    _hide: boolean;
+    _tags: string[];
     _scope: Scope;
     _pts: PointDefData[];
 }
@@ -547,12 +517,6 @@ export interface EntryData extends ElementData {
     _did: SmallID,
     _source: string,
     [_pid: string]: any
-}
-
-export interface TagData extends ElementData {
-    _tid: SmallID;
-    _lbl: string;
-    _dids: SmallID[];
 }
 
 export interface PointRollupData {
@@ -615,7 +579,6 @@ export interface ReducedQueryResponse {
     success: boolean;
     entries: EntryData[];
     defs: DefData[];
-    tags: TagData[];
     msgs?: string[];
 }
 
@@ -639,7 +602,6 @@ export interface DataStoreOverview {
     storeName?: string;
     defs: CurrentAndDeletedCounts;
     entries: CurrentAndDeletedCounts;
-    tags: CurrentAndDeletedCounts;
     lastUpdated: EpochStr;
 }
 
@@ -648,17 +610,17 @@ export interface DataStoreOverview {
 //#region ### CLASSES ###
 
 export class PDW {
-    dataStores: DataStore[];
-    // private manifest: Def[];
+    dataStore: DataStore;
+    private _manifest: Def[];    
     private static instance: PDW;
     private constructor(store?: DataStore) {
         if (store !== undefined) {
-            this.dataStores = [store];
+            this.dataStore = store;
         } else {
-            this.dataStores = [new DefaultDataStore(this)]
+            this.dataStore = new DefaultDataStore(this);
         }
         PDW.instance = this; //for singleton
-        // this.manifest = [];
+        this._manifest = [];
     }
 
     /**
@@ -672,24 +634,31 @@ export class PDW {
         return PDW.instance;
     }
 
+    public static getManifest(): Def[]{
+        return this.getInstance()._manifest;
+    }
+
+    public get manifest(): Def[] {
+        return this._manifest;
+    }
+
     /**
      * Removes any existing DataStore(s) and uses the provided one
      * @param storeInstance the DataStore to use
      */
-    setDataStore(storeInstance: DataStore) {
-        this.dataStores = [storeInstance];
+    async setDataStore(storeInstance: DataStore) {
+        this.dataStore = storeInstance;
+        this._manifest = (await storeInstance.reducedQuery({type: "Def", includeDeleted: "no"})).defs.map(defData => new Def(defData));
     }
-
-    //#TODO - multiple datastore registration
 
     /**
      * 
      * @param rawParams an object of any {@link StandardParams} to include
-     * @returns a {@link CompleteDataset} containing a {@link Def}s, {@link Entry}s, and {@link Tag}s
+     * @returns a {@link CompleteDataset} containing a {@link Def}s, {@link Entry}s
      */
     async getAll(rawParams: StandardParams): Promise<CompleteDataset> {
         const params = PDW.sanitizeParams(rawParams)
-        let data = await this.dataStores[0].reducedQuery(params) as any;
+        let data = await this.dataStore.reducedQuery(params) as any;
         delete data.msgs
         delete data.success
         return PDW.addOverviewToCompleteDataset(data);
@@ -700,125 +669,91 @@ export class PDW {
         const params = PDW.sanitizeParams(rawParams);
         params.type = 'Def';
 
-        //this if block will cause the function to return Defs from
-        //the manifest of defs, if the query should
-        // if (shouldLookInManifest()) {
-        //     let defsFromManifest = this.manifest.filter(def => {
-        //         return params.did?.some(pd => pd === def.did);
-        //     });
-        //     if (defsFromManifest !== undefined && defsFromManifest.length > 0) {
-        //         let filterCount = 0;
-        //         if (params.did !== undefined) filterCount = filterCount + params.did.length
-        //         if (params.defLbl !== undefined) filterCount = filterCount + params.defLbl.length
-        //         //only return defs from Manifest if ALL Defs requested are there
-        //         if (defsFromManifest.length === filterCount) return defsFromManifest;
-        //     }
-        // }
+        let defDatas = await this.dataStore.reducedQuery(params);
+        let defs = defDatas.defs.map(dl => new Def(dl));
+        return defs;
 
-        //if there's only 1 DataStore, bypass the combining stuff to save time
-        if (this.dataStores.length == 1) {
-            let defDatas = await this.dataStores[0].reducedQuery(params);
-            let defs = defDatas.defs.map(dl => new Def(dl));
-            // this.pushDefsToManifest(defs);
-            return defs;
-        }
-
-        //multiple DataStores need to be all pulled, then deconflicted
-        let combinedDefs: Def[] = [];
-        //compile defs from all attached DataStores
-        //#UNTESTED - test this!
-        this.dataStores.forEach(async dataStore => {
-            let thisStoreDefDatas = await dataStore.reducedQuery(params);
-            let thisStoreDefs = thisStoreDefDatas.defs.map(tsdl => new Def(tsdl));
-            thisStoreDefs.forEach(def => {
-                let existingCopy = combinedDefs.find(cd => cd.sameIdAs(def.data));
-                if (existingCopy !== undefined) {
-                    //duplicate found, determine which is newer & keep only it
-                    if (existingCopy.shouldBeReplacedWith(def.data)) {
-                        //find & remove exising
-                        const ind = combinedDefs.findIndex(el => el.data._uid === existingCopy!.data._uid)
-                        combinedDefs.splice(ind);
-                        //add replacement
-                        combinedDefs.push(def);
-                    }
-                    //else{ignore it. don't do anything}
-                } else {
-                    combinedDefs.push(def);
-                }
-            })
-        })
-        // this.pushDefsToManifest(combinedDefs);
-        return combinedDefs;
-
-        // function shouldLookInManifest() { //don't need ot pass in the variable, it's in scope already
-        //     if (params.includeDeleted !== 'no') return false;
-        //     if (params.did === undefined && params.defLbl == undefined) return false;
-        //     return true;
-        // }
+        // //#TODO - extract this logic to a dedicated "PDW.sync(datastores:DataStore[])" method
+        // let combinedDefs: Def[] = [];
+        // //compile defs from all attached DataStores
+        // this.dataStore.forEach(async dataStore => {
+        //     let thisStoreDefDatas = await dataStore.reducedQuery(params);
+        //     let thisStoreDefs = thisStoreDefDatas.defs.map(tsdl => new Def(tsdl));
+        //     thisStoreDefs.forEach(def => {
+        //         let existingCopy = combinedDefs.find(cd => cd.sameIdAs(def.data));
+        //         if (existingCopy !== undefined) {
+        //             //duplicate found, determine which is newer & keep only it
+        //             if (existingCopy.shouldBeReplacedWith(def.data)) {
+        //                 //find & remove exising
+        //                 const ind = combinedDefs.findIndex(el => el.data._uid === existingCopy!.data._uid)
+        //                 combinedDefs.splice(ind);
+        //                 //add replacement
+        //                 combinedDefs.push(def);
+        //             }
+        //             //else{ignore it. don't do anything}
+        //         } else {
+        //             combinedDefs.push(def);
+        //         }
+        //     })
+        // })
+        // return combinedDefs;
     }
 
-    // private pushDefsToManifest(defs: Def[]) {
-    //     if (!Array.isArray(defs)) return;
-    //     if (defs.length === 0) return;
-    //     defs.forEach((def: any) => {
-    //         //find def with the same _did, if you find it, replace it
-    //         //if you don't, add it
-    //         const existsAt = this.manifest.findIndex(mD => mD.data._did === def.data._did);
-    //         if (existsAt === -1) this.manifest.push(def);
-    //         if (existsAt !== -1) this.manifest[existsAt] = def;
-    //     })
-    // }
+    getFromManifest(did: string): Def {
+        const matchedDef = this.manifest.find(d=>d.data._did === did);
+        if(matchedDef === undefined) throw new Error("No Def found in Manifest with id: " + did);
+        return matchedDef!
+    }
+
+    private pushDefsToManifest(defs: Def[]) {
+        if (!Array.isArray(defs)) return;
+        if (defs.length === 0) return;
+        defs.forEach((def: any) => {
+            //find def with the same _did, if you find it, replace it
+            //if you don't, add it
+            const existsAt = this.manifest.findIndex(mD => mD.data._did === def.data._did);
+            if (existsAt === -1) this.manifest.push(def);
+            if (existsAt !== -1) this.manifest[existsAt] = def;
+        })
+    }
+
+    private async handleManifestDeletionChange(deles: DeletionMsg[]){
+        if(!Array.isArray(deles)) deles = [deles];
+        const deletions = deles.filter(d=>d.deleted);
+        const undeletions = deles.filter(d=>!d.deleted);
+        this._manifest = this.manifest.filter(md=>!deletions.some(d=>d.uid === md.data._uid));
+        if(undeletions.length>0){
+            this.manifest.push(...(await PDW.getInstance().getDefs({uid: undeletions.map(ud=>ud.uid)})));
+        }
+    }
 
     async getEntries(rawParams?: StandardParams): Promise<Entry[]> {
         if (rawParams === undefined) rawParams = {};
         const params = PDW.sanitizeParams(rawParams);
         params.type = 'Entry';
-
-        if (this.dataStores.length == 1) {
-            let entriesQuery = await this.dataStores[0].reducedQuery(params);
-            return PDW.inflateEntriesFromData(entriesQuery.entries);
-        }
-
-        throw new Error('Multiple datastores not yet implemented');
-    }
-
-    async getTags(rawParams?: StandardParams): Promise<Tag[]> {
-        if (rawParams === undefined) rawParams = {};
-        const params = PDW.sanitizeParams(rawParams)
-        params.type = 'Tag';
-
-        //if there's only DataStore, bypass the combining stuff to save time
-        if (this.dataStores.length == 1) {
-            let tagDatas = await this.dataStores[0].reducedQuery(params)
-            return tagDatas.tags.map(tdl => new Tag(tdl));
-        }
-
-        throw new Error('Multiple datastores not yet implemented');
+        let entriesQuery = await this.dataStore.reducedQuery(params);
+        return PDW.inflateEntriesFromData(entriesQuery.entries);
     }
 
     async setDefs(createDefs: DefLike[] = [], updateDefs: DefLike[] = [], deletionDefs: DeletionMsg[] = []): Promise<Def[]> {
         let trans: Transaction = {
             create: {
                 defs: createDefs.map(def => new Def(def)),
-                entries: [],
-                tags: []
+                entries: []
             },
             update: {
                 defs: updateDefs.map(def => new Def(def)),
-                entries: [],
-                tags: []
+                entries: []
             },
             delete: {
                 defs: deletionDefs,
-                entries: [],
-                tags: []
+                entries: []
             }
         }
-        this.dataStores.forEach(connection => {
-            connection.commit(trans)
-        });
+        this.dataStore.commit(trans)
         const defs = [...trans.create.defs, ...trans.update.defs];
-        // this.pushDefsToManifest(defs);
+        this.handleManifestDeletionChange(trans.delete.defs);
+        this.pushDefsToManifest(defs);
         return defs.map(e => e.makeStaticCopy()) as Def[]
     }
 
@@ -827,133 +762,68 @@ export class PDW {
         let trans: Transaction = {
             create: {
                 defs: [],
-                entries: await PDW.inflateEntriesFromData(createEntries),
-                tags: []
+                entries: await PDW.inflateEntriesFromData(createEntries)
             },
             update: {
                 defs: [],
-                entries: await PDW.inflateEntriesFromData(updateEntries),
-                tags: []
+                entries: await PDW.inflateEntriesFromData(updateEntries)
             },
             delete: {
                 defs: [],
-                entries: deletionEntries,
-                tags: []
+                entries: deletionEntries
             }
         }
-        this.dataStores.forEach(connection => {
-            connection.commit(trans)
-        });
+        this.dataStore.commit(trans);
+
         const entries = [...trans.create.entries, ...trans.update.entries];
 
         return entries.map(e => e.makeStaticCopy()) as Entry[]
     }
 
-    async setTags(createTags: TagLike[] = [], updateTags: TagLike[] = [], deletionEntries: DeletionMsg[] = []): Promise<Tag[]> {
-        let trans: Transaction = {
-            create: {
-                defs: [],
-                tags: createTags.map(tag => new Tag(tag)),
-                entries: []
-            },
-            update: {
-                defs: [],
-                tags: updateTags.map(tag => new Tag(tag)),
-                entries: []
-            },
-            delete: {
-                defs: [],
-                tags: deletionEntries,
-                entries: []
-            }
-        }
-        this.dataStores.forEach(connection => {
-            connection.commit(trans)
-        });
-        const tags = [...trans.create.tags, ...trans.update.tags];
-        return tags.map(e => e.makeStaticCopy()) as Tag[]
-    }
-
     async setAll(completeDataset: CompleteDataset) {
         if (completeDataset.defs !== undefined) this.setDefs(completeDataset.defs);
         if (completeDataset.entries !== undefined) this.setEntries(completeDataset.entries);
-        if (completeDataset.tags !== undefined) this.setTags(completeDataset.tags);
     }
 
     async newDef(defInfo: DefLike): Promise<Def> {
         let newDef = new Def(defInfo);
         const storeCopy = newDef.makeStaticCopy() as Def;
-        this.dataStores.forEach(connection => {
-            connection.commit({
-                create: {
-                    defs: [storeCopy],
-                    entries: [],
-                    tags: []
-                },
-                update: {
-                    defs: [],
-                    entries: [],
-                    tags: []
-                },
-                delete: {
-                    defs: [],
-                    entries: [],
-                    tags: []
-                },
-            })
+        this.dataStore.commit({
+            create: {
+                defs: [storeCopy],
+                entries: []
+            },
+            update: {
+                defs: [],
+                entries: []
+            },
+            delete: {
+                defs: [],
+                entries: []
+            },
         })
-        // this.manifest.push(storeCopy);
+        this.manifest.push(storeCopy);
         return newDef;
     }
 
     async newEntry(entryInfo: EntryLike, def: Def): Promise<Entry> {
         let newEntry = new Entry(entryInfo, def);
         const storeCopy = newEntry.makeStaticCopy() as Entry;
-        this.dataStores.forEach(connection => {
-            connection.commit({
-                create: {
-                    defs: [],
-                    entries: [storeCopy],
-                    tags: []
-                },
-                update: {
-                    defs: [],
-                    entries: [],
-                    tags: []
-                },
-                delete: {
-                    defs: [],
-                    entries: [],
-                    tags: []
-                },
-            })
+        this.dataStore.commit({
+            create: {
+                defs: [],
+                entries: [storeCopy]
+            },
+            update: {
+                defs: [],
+                entries: []
+            },
+            delete: {
+                defs: [],
+                entries: []
+            },
         })
         return newEntry;
-    }
-
-    async newTag(tagInfo: TagLike): Promise<Tag> {
-        let newTag = new Tag(tagInfo);
-        const storeCopy = newTag.makeStaticCopy() as Tag;
-        this.dataStores.forEach(connection => {
-            connection.commit({
-                create: {
-                    defs: [],
-                    entries: [],
-                    tags: [storeCopy]
-                },
-                update: {
-                    defs: [],
-                    entries: [],
-                    tags: []
-                },
-                delete: {
-                    defs: [],
-                    entries: [],
-                    tags: []
-                },
-            })
-        })
-        return newTag;
     }
 
     /**
@@ -961,7 +831,7 @@ export class PDW {
      * @param elements Def[], Entry[], or Tag[]
      * @returns DefData[], EntryData[], or TagData[]
      */
-    static flatten(elements: Element[]): ElementData[] | DefData[] | EntryData[] | TagData[] {
+    static flatten(elements: Element[]): ElementData[] | DefData[] | EntryData[] {
         return elements.map(e => e.toData());
     }
 
@@ -972,8 +842,7 @@ export class PDW {
     static mergeComplete(a: CompleteDataset, b: CompleteDataset): CompleteDataset {
         let returnObj: CompleteDataset = {
             defs: [],
-            entries: [],
-            tags: []
+            entries: []
         };
 
         if (a.defs.length > 0 && b.defs.length > 0) {
@@ -988,13 +857,6 @@ export class PDW {
             if (a.entries.length > 0) returnObj.entries = a.entries
             if (b.entries.length > 0) returnObj.entries = b.entries
         }
-        if (a.tags.length > 0 && b.tags.length > 0) {
-            returnObj.tags = PDW.merge(a.tags, b.tags) as TagData[];
-        } else {
-            if (a.tags.length > 0) returnObj.tags = a.tags
-            if (b.tags.length > 0) returnObj.tags = b.tags
-        }
-
         return returnObj;
     }
 
@@ -1054,7 +916,7 @@ export class PDW {
         //ensure default
         if (params.includeDeleted === undefined) params.includeDeleted = 'no';
 
-        //make periods from period srings
+        //make periods from period strings
         if (params.from !== undefined) {
             if (typeof params.from === 'string') {
                 params.from = new Period(params.from);
@@ -1115,11 +977,10 @@ export class PDW {
         if (params.did !== undefined && typeof params.did == 'string') params.did = [params.did]
         // if (params.pid !== undefined && typeof params.pid == 'string') params.pid = [params.pid]
         if (params.eid !== undefined && typeof params.eid == 'string') params.eid = [params.eid]
-        if (params.tid !== undefined && typeof params.tid == 'string') params.tid = [params.tid]
 
         if (params.defLbl !== undefined && typeof params.defLbl == 'string') params.defLbl = [params.defLbl]
         // if (params.pointLbl !== undefined && typeof params.pointLbl == 'string') params.pointLbl = [params.pointLbl]
-        if (params.tagLbl !== undefined && typeof params.tagLbl == 'string') params.tagLbl = [params.tagLbl]
+        if (params.tag !== undefined && typeof params.tag == 'string') params.tag = [params.tag]
         if (params.scope !== undefined && typeof params.scope == 'string') params.scope = [params.scope]
 
         if (params.limit !== undefined && typeof params.limit !== "number") {
@@ -1138,7 +999,6 @@ export class PDW {
         let recents: ElementData[] = [];
         if (dataset.defs !== undefined && dataset.defs.length > 0) recents.push(Element.getMostRecent(dataset.defs)!)
         if (dataset.entries !== undefined && dataset.entries.length > 0) recents.push(Element.getMostRecent(dataset.entries)!)
-        if (dataset.tags !== undefined && dataset.tags.length > 0) recents.push(Element.getMostRecent(dataset.tags)!)
         if (recents.length === 0) return '00000001'
         return Element.getMostRecent(recents)!._updated!
     }
@@ -1159,10 +1019,6 @@ export class PDW {
             entries: {
                 current: data.entries?.filter(element => element._deleted === false).length,
                 deleted: data.entries?.filter(element => element._deleted).length
-            },
-            tags: {
-                current: data.tags?.filter(element => element._deleted === false).length,
-                deleted: data.tags?.filter(element => element._deleted).length
             },
             lastUpdated: PDW.getDatasetLastUpdate(data)
         }
@@ -1352,7 +1208,7 @@ export abstract class Element {
     /**
      * Create a **static** copy of the Element's ElementData.
      */
-    toData(): ElementData | DefData | EntryData | TagData {
+    toData(): ElementData | DefData | EntryData  {
         return JSON.parse(JSON.stringify(this.data));
     }
 
@@ -1382,7 +1238,7 @@ export abstract class Element {
                 updated: changeTime
             });
             this.__deletionChange = undefined;
-            
+
         } else {
             //generate a deletion message for stores
             deleted.push({
@@ -1405,10 +1261,6 @@ export abstract class Element {
         }
         if (elementType === 'EntryData') {
             await PDW.getInstance().setEntries(created as EntryData[], [], deleted)
-            return this
-        }
-        if (elementType === 'TagData') {
-            await PDW.getInstance().setTags(created, [], deleted)
             return this
         }
         throw new Error('What kind of element is this anyway? ' + elementType)
@@ -1451,7 +1303,7 @@ export abstract class Element {
      * Get the type of an Element.
      * @returns string representing the type of element
      */
-    getType(): 'DefData' | 'EntryData' | 'TagData' | null {
+    getType(): 'DefData' | 'EntryData' | null {
         return Element.getTypeOfElement(this.data)!
     }
 
@@ -1474,13 +1326,15 @@ export abstract class Element {
         if (params.uid !== undefined && !params.uid.some(uid => uid === this.data._uid)) return false;
         if (params.did !== undefined && this.data._did !== undefined && !params.did.some(did => did === this.data._did)) return false;
         if (params.eid !== undefined && this.data._eid !== undefined && !params.eid.some(eid => eid === this.data._eid)) return false;
-        if (params.tid !== undefined && this.data._tid != undefined && !params.tid.some(tid => tid === this.data._tid)) return false;
         // if (params.pid !== undefined && this.data._pid !== undefined && !params.pid.some(pid => pid === this.data._pid)) return false;
 
         const type = this.getType()!;
 
         if (params.defLbl !== undefined && type === 'DefData' && !params.defLbl.some(lbl => lbl === this.data._lbl)) return false;
-        if (params.tagLbl !== undefined && type.substring(0, 3) === 'Tag' && !params.tagLbl.some(lbl => lbl === this.data._lbl)) return false;
+        if (params.tag !== undefined && type === 'DefData') {
+            let isMatch = params.tag.some(lbl => this.data._tags.some((tag: string)=>tag.toUpperCase() === lbl.toUpperCase()))
+            if(!isMatch) return false;
+        }
 
         if (params.createdBeforeEpochStr !== undefined && params.createdBeforeEpochStr < this.data._created) return false;
         if (params.createdAfterEpochStr !== undefined && params.createdAfterEpochStr > this.data._created) return false;
@@ -1504,13 +1358,12 @@ export abstract class Element {
      * NOTE: Not the Element's *data*, that would be the {@link toData} method.
      * @returns an instance of {@link Tag}, {@link Def}, or {@link Entry} that is a de-referenced copy of this
      */
-    makeStaticCopy(): Tag | Def | Entry {
+    makeStaticCopy(): Def | Entry {
         const type = Element.getTypeOfElement(this.data);
         const data = this.toData();
         if (type === 'DefData') return new Def(data);
         //@ts-expect-error - Entry instances will have an existing def
         if (type === 'EntryData') return new Entry(data, this.def);
-        if (type === 'TagData') return new Tag(data);
         throw new Error('What type was this? ' + type);
     }
 
@@ -1555,12 +1408,10 @@ export abstract class Element {
 
         if (type === 'DefData') return a._did === b._did;
         if (type === 'EntryData') return a._eid === b._eid;
-        if (type === 'TagData') return a._tid === b._tid;
         throw new Error('type not matched!')
     }
 
     private static getTypeOfElement(data: ElementData) {
-        if (data.hasOwnProperty("_tid")) return "TagData"
         if (data.hasOwnProperty("_eid")) return "EntryData"
         if (data.hasOwnProperty("_did")) return "DefData"
         return null
@@ -1571,44 +1422,24 @@ export abstract class Element {
      * has the same Xid(s). Does not look at UIDs or Labels.
      * @param dataIn an object that may be part of an existing Element
      * @param ofType optional, allows you to override what the dataIn would suggest it should be
-     * @returns the raw DefData, PointDefData, EntryData, EntryPointData, TagData, or TagDefData - or undefined if none found
      */
-    static async findExistingData(dataIn: any, ofType?: 'Def' | 'Entry' | 'Tag'): Promise<any> {
+    static async findExistingData(dataIn: any, ofType?: 'Def' | 'Entry' ): Promise<any> {
         //replace any passed in Element instances with their Data replacement
         if (dataIn.hasOwnProperty('__modified') && dataIn.hasOwnProperty('data')) dataIn = dataIn.data;
         const type = ofType === undefined ? Element.getTypeOfElement(dataIn) : ofType + 'Data';
         if (type === null) return undefined;
 
         let pdwRef = PDW.getInstance();
-        let existing: any;
         if (type === 'DefData') {
-            pdwRef.dataStores.forEach(async store => {
-                let storeResult: any = await store.reducedQuery({ did: [dataIn._did], includeDeleted: 'no' });
-                storeResult = maybeGetOnlyResult(storeResult.defs)
-                if (storeResult !== undefined && existing === undefined) existing = storeResult as DefData
-            })
+            let storeResult = await pdwRef.dataStore.reducedQuery({ did: [dataIn._did], includeDeleted: 'no' });
+            if (storeResult.defs.length === 1) return storeResult.defs[0];
+            return undefined;
         }
         if (type === 'EntryData') {
-            pdwRef.dataStores.forEach(async store => {
-                //search by _eid
-                let storeResult: any = await store.reducedQuery({ eid: [dataIn._eid], includeDeleted: 'no' });
-                storeResult = maybeGetOnlyResult(storeResult.entries);
-                if (storeResult !== undefined && existing === undefined) existing = storeResult as unknown as EntryData
-                //search by _uid
-                storeResult = await store.reducedQuery({ uid: [dataIn._uid], includeDeleted: 'no' });
-                storeResult = maybeGetOnlyResult(storeResult.entries);
-                if (storeResult !== undefined && existing === undefined) existing = storeResult as unknown as EntryData
-            })
+            let storeResult = await pdwRef.dataStore.reducedQuery({ eid: [dataIn._eid], includeDeleted: 'no' });
+            if (storeResult.entries.length === 1) return storeResult.entries[0];
+            return undefined;
         }
-        if (type === 'TagData') {
-            pdwRef.dataStores.forEach(async store => {
-                let storeResult: any = await store.reducedQuery({ did: [dataIn._did], tid: [dataIn._tid], includeDeleted: 'no' });
-                storeResult = maybeGetOnlyResult(storeResult.tags)
-                // if (dataIn._pid !== undefined) storeResult = maybeGetOnlyResult(store.getTags({ did: [dataIn._did], tid: [dataIn._tid], pid: [dataIn._pid], includeDeleted: 'no' }));
-                if (storeResult !== undefined && existing === undefined) existing = storeResult as TagData
-            })
-        }
-        return existing;
     }
 
     public static getMostRecent(elementArr: ElementData[]): ElementData | undefined {
@@ -1643,7 +1474,7 @@ export class Def extends Element {
             _desc: defData._desc ?? 'Set a description',
             _emoji: defData._emoji ?? '🆕',
             _scope: defData._scope ?? Scope.SECOND,
-            _hide: defData._hide ?? false,
+            _tags: defData._tags ?? [],
             _pts: []
         }
 
@@ -1677,8 +1508,8 @@ export class Def extends Element {
     get scope() {
         return this.data._scope;
     }
-    get hide() {
-        return this.data._hide;
+    get tags(){
+        return this.data._tags;
     }
     public get pts(): PointDef[] {
         return this._pts;
@@ -1690,10 +1521,6 @@ export class Def extends Element {
     }
     set desc(newDesc: string) {
         this.data._desc = newDesc;
-        this.__modified = true;
-    }
-    set hide(newHide: boolean) {
-        this.data._hide = newHide;
         this.__modified = true;
     }
     set emoji(newEmoji: string) {
@@ -1721,42 +1548,38 @@ export class Def extends Element {
     }
 
     /**
-     * Associates an Existing Tag with this Def
-     * SAVES the Tag with the modification.
-     * 
-     * @param tid of EXISTING Tag
-     * @returns the new Tag
+     * Will return true of the Def has that tag, or the def has a tag in the passed-in array
      */
-    async addTag(tidLblOrTag: Tag | string, isRemove = false): Promise<Tag> {
-        let tag: Tag | undefined;
-        if (tidLblOrTag.hasOwnProperty('data') && Tag.isTagData((<Tag>tidLblOrTag).data)) {
-            tag = tidLblOrTag as Tag;
-        } else {
-            let pdwRef = PDW.getInstance();
-            let foundTags = await pdwRef.getTags({ tid: tidLblOrTag as string });
-            if (foundTags.length > 1) throw new Error('Too many tags found');
-            if (foundTags.length !== 1) {
-                foundTags = await pdwRef.getTags({ tagLbl: tidLblOrTag as string });
-                if (foundTags.length !== 1) throw new Error('No such tag found');
-            }
-            tag = foundTags[0];
-        }
-        if (tag === undefined) throw new Error('Tag was undefined')
-        if (isRemove) {
-            tag.removeDef(this.did);
-        } else {
-            tag.addDef(this.did);
-        }
-        tag.save();
-        return tag
+    hasTag(tag: string[] | string): boolean{
+        if(Array.isArray(tag)) return tag.some(item => this.data._tags.includes(item))
+        return this.data._tags.some(t=>t.toUpperCase() === (<string> tag).toUpperCase());
     }
 
-    async removeTag(tidLblOrTag: Tag | string): Promise<Tag> {
-        return this.addTag(tidLblOrTag, true);
+    addTag(tag: string): Def {
+        if(this.data._tags.some(t=>t===tag)){
+            console.warn('tried to add already-existing tag to def, ingoring request')
+        }else{
+            this.data._tags.push(tag);
+        }
+        return this
+    }
+
+    clearTags(): Def{
+        this.data._tags = [];
+        return this;
+    }
+
+    removeTag(tag: string): Def {
+        if(this.data._tags.some(t=>t===tag)){
+            this.data._tags = this.data._tags.filter(t=>t!==tag);
+        }else{
+            console.warn('tried to remove a non-existant tag from a def, ingoring request')
+        }
+        return this
     }
 
     /**
-     * Marks the pointDef as _hide = false
+     * Marks the pointDef as _hide = ture
      */
     hidePoint(pointIdentifier: string | PointDef, isUnhide = true) {
         let assPoint: undefined | PointDef
@@ -1802,6 +1625,7 @@ export class Def extends Element {
         if (typeof data._deleted !== 'boolean') return false
         if (typeof data._updated !== 'string') return false
         if (!Array.isArray(data._pts)) return false
+        if (!Array.isArray(data._tags)) return false
         return true;
     }
 
@@ -2103,21 +1927,24 @@ export class Entry extends Element {
     declare data: EntryData
     private _def: Def;
     private _period: Period;
-    constructor(entryData: EntryLike, def: Def) {
+    constructor(entryData: EntryLike, def?: Def) {
         super(entryData);
-        //this design decision was hard. Entries **have** to know their Defs
-        this._def = def;
+        if(def !== undefined){
+            this._def = def;
+        }else{
+            this._def = PDW.getInstance().getFromManifest(entryData._did!)
+        }
 
         //forcing scope adherance
         if (entryData._period !== undefined) {
-            this._period = new Period(entryData._period, def.scope);
+            this._period = new Period(entryData._period, this.def.scope);
         } else {
-            this._period = Period.nowAsPeriod(def.scope);
+            this._period = Period.nowAsPeriod(this.def.scope);
         }
 
         this.data = {
             ...this.data,
-            _did: def.did,
+            _did: this.def.did,
             _period: this.period.toString(),
             _eid: entryData._eid ?? makeUID(),
             _note: entryData._note ?? '',
@@ -2149,7 +1976,7 @@ export class Entry extends Element {
     get source() {
         return this.data._source;
     }
-    public get def(){
+    public get def() {
         return this._def;
     }
 
@@ -2248,90 +2075,6 @@ export class Entry extends Element {
         if (typeof data._updated !== 'string') return false
         if (typeof data._source !== 'string') return false
         return true;
-    }
-}
-
-export class Tag extends Element {
-    declare data: TagData
-    constructor(tagDefData: TagLike) {
-        super(tagDefData);
-        this.data = {
-            ...this.data,
-            _tid: tagDefData._tid ?? makeSmallID(),
-            _lbl: tagDefData._lbl ?? 'Unlabeled Tag with _tid',
-            _dids: tagDefData._dids ?? []
-        }
-
-        if (!Tag.isTagData(this.data)) {
-            throw new Error('TagDef created is not TagDefData');
-        }
-    }
-    get tid() {
-        return this.data._tid;
-    }
-    get lbl() {
-        return this.data._lbl;
-    }
-    get dids() {
-        return this.data._dids;
-    }
-    set tid(newTid: string) {
-        this.data._tid = newTid;
-        this.__modified = true;
-    }
-    set lbl(newLbl: string) {
-        this.data.lbl = newLbl;
-        this.__modified = true;
-    }
-    set dids(newDids: string[]) {
-        this.data._dids = newDids;
-        this.__modified = true;
-    }
-
-    static isTagData(data: any): boolean {
-        if (typeof data._uid !== 'string') return false
-        if (typeof data._created !== 'string') return false
-        if (typeof data._updated !== 'string') return false
-        if (typeof data._deleted !== 'boolean') return false
-        if (typeof data._tid !== 'string') return false
-        if (typeof data._lbl !== 'string') return false
-        return true;
-    }
-
-    includesDef(defOrDid: Def | SmallID) {
-        if (typeof defOrDid !== "string" && defOrDid.hasOwnProperty("__modified")) defOrDid = defOrDid.did;
-        return this.data._dids.some(did => did === defOrDid);
-    }
-
-    addDef(defOrDid: Def | string) {
-        let did = '';
-        if (typeof defOrDid !== 'string' && defOrDid.hasOwnProperty('__modified')) {
-            did = (<Def>defOrDid).data._did;
-        } else {
-            did = (<string>defOrDid);
-        }
-        if (this.data._dids.indexOf(did) === -1) this.data._dids.push(did);
-        this.__modified = true;
-        return this
-    }
-
-    removeDef(defOrDid: Def | string) {
-        let did = '';
-        if (typeof defOrDid !== 'string' && defOrDid.hasOwnProperty('__modified')) {
-            did = (<Def>defOrDid).data._did;
-        } else {
-            did = (<string>defOrDid);
-        }
-        this.data._dids = this.data._dids.filter(d => d !== did);
-        this.__modified = true;
-        return this
-    }
-
-    async getDefs(includeDeleted = false): Promise<Def[]> {
-        const pdwRef = PDW.getInstance();
-        const includeDeletedText = includeDeleted ? 'yes' : 'no';
-        let defs: Def[] = [];
-        return pdwRef.getDefs({ did: this.data._dids, includeDeleted: includeDeletedText });
     }
 }
 
@@ -2567,10 +2310,10 @@ export class Period {
 
     // I can't believe I was able to reduce these to a 1 liner
     getNext(): Period {
-        let start = this.getStart();
-        let end = this.getEnd();
-        let plusOne = end.addDuration('PT1S');
-        let zoomed = plusOne.zoomTo(this.scope);
+        // let start = this.getStart();
+        // let end = this.getEnd();
+        // let plusOne = end.addDuration('PT1S');
+        // let zoomed = plusOne.zoomTo(this.scope);
         return this.getEnd().addDuration('PT1S').zoomTo(this.scope);
 
     }
@@ -2595,8 +2338,8 @@ export class Period {
             start = end;
             end = temp;
         }
-        const startOfStart = start.getStart().periodStr;
-        const endOfEnd = end.getEnd().periodStr;
+        // const startOfStart = start.getStart().periodStr;
+        // const endOfEnd = end.getEnd().periodStr;
         let first, last, list: any[];
         first = start.zoomTo(scope);
         last = end.getNext().zoomTo(Scope.SECOND).addDuration('-PT1S').zoomTo(scope);
@@ -2765,66 +2508,29 @@ export class Query {
      * @param tid tag ID of tags to be used
      * @returns 
      */
-    async tids(tid: string[] | string): Promise<Query> {
-        if (!Array.isArray(tid)) tid = [tid];
-        //convert tid into dids
-        const tags = await PDW.getInstance().getTags({ tid: tid });
-        const dids: string[] = [];
-        tags.forEach(tag => tag.dids.forEach(did => {
-            if (!dids.some(d => d === did)) dids.push(did);
-        }))
-        this.params.did = dids;
-        return this
-    }
-
-    /**
-     * Cannot be used in conjuction with dids. This sets `params.did` internally.
-     * @param tid tag ID of tags to be used
-     * @returns 
-     */
-    tags(tags: Tag[] | Tag) {
+    tags(tags: string[] | string) {
         if (!Array.isArray(tags)) tags = [tags];
-        //convert tid into dids
-        const dids: string[] = [];
-        tags.forEach(tag => tag.dids.forEach(did => {
-            if (!dids.some(d => d === did)) dids.push(did);
-        }))
-        this.params.did = dids;
+        //convert tags into dids
+        const manifest = PDW.getManifest();
+        const dids = manifest.filter(def=> def.hasTag(tags))
+        this.params.did = dids.map(d=>d.data._did);
         return this
     }
 
-    /**
-     * Cannot be used in conjuction with dids. This sets `params.did` internally.
-     * @param tid tag ID of tags to be used
-     * @returns 
-     */
-    async tagsLbld(tid: string[] | string): Promise<Query> {
-        if (!Array.isArray(tid)) tid = [tid];
-        //convert tid into dids
-        const tags = await PDW.getInstance().getTags({ tagLbl: tid });
-        const dids: string[] = [];
-        tags.forEach(tag => tag.dids.forEach(did => {
-            if (!dids.some(d => d === did)) dids.push(did);
-        }))
-        this.params.did = dids;
-        return this
-    }
-
-    async scopes(scopes: Scope[] | Scope): Promise<Query> {
+    scopes(scopes: Scope[] | Scope): Query {
         if (!Array.isArray(scopes)) scopes = [scopes];
-        let defs = await PDW.getInstance().getDefs({});
-        defs = defs.filter(def => (<Scope[]>scopes).some(scope => scope === def.scope));
+        let defs = PDW.getInstance().manifest.filter(def => (<Scope[]>scopes).some(scope => scope === def.scope));
         this.params.did = defs.map(def => def.did);
         return this
     }
 
-    async scopeMin(scope: Scope): Promise<Query> {
+    scopeMin(scope: Scope): Query {
         let scopes = Object.values(Scope);
         let index = scopes.indexOf(scope);
         return this.scopes(scopes.slice(index));
     }
 
-    async scopeMax(scope: Scope): Promise<Query> {
+    scopeMax(scope: Scope): Query {
         let scopes = Object.values(Scope);
         let index = scopes.indexOf(scope);
         return this.scopes(scopes.slice(0, index + 1));
@@ -2953,7 +2659,7 @@ export class Summary {
         // this.entries = entries;
         // this._def = entries[0].getDef();
         // this.period = period;
-        let pivot: any[] = [];
+        // let pivot: any[] = [];
     }
     public get periods(): PeriodSummary[] {
         return this._periods;
@@ -2965,14 +2671,12 @@ export class DefaultDataStore implements DataStore {
     pdw: PDW;
     defs: Def[];
     entries: Entry[];
-    tags: Tag[];
 
     constructor(pdwRef: PDW) {
         this.serviceName = 'In memory dataset';
         this.pdw = pdwRef;
         this.defs = [];
         this.entries = [];
-        this.tags = [];
     }
 
     async commit(trans: Transaction): Promise<CommitResponse> {
@@ -2980,52 +2684,40 @@ export class DefaultDataStore implements DataStore {
             success: false
         }
         // try {
-            //creating new Elements
-            trans.create.defs.forEach(newDef => {
-                this.defs.push(newDef);
-            })
-            trans.create.entries.forEach(newEntry => {
-                this.entries.push(newEntry);
-            })
-            trans.create.tags.forEach(newTag => {
-                this.tags.push(newTag);
-            })
-            returnObj.msgs?.push(`Added:
+        //creating new Elements
+        trans.create.defs.forEach(newDef => {
+            this.defs.push(newDef);
+        })
+        trans.create.entries.forEach(newEntry => {
+            this.entries.push(newEntry);
+        })
+        returnObj.msgs?.push(`Added:
             ${trans.create.defs.length} Defs, 
-            ${trans.create.entries.length} Entries, and 
-            ${trans.create.tags.length} Tags.`)
+            ${trans.create.entries.length} Entries`)
 
-            //updating existing
-            //is there a race condition here possibly?
-            //NO IDEA WHAT'S GOING ON HERE - if I "await", this is causing tests to fail, it skips the "deletions" section
-            this.setElementsInRepo(trans.update.defs.map(d => d.data) as DefData[], this.defs)
-            this.setElementsInRepo(trans.update.entries.map(d => d.data) as EntryData[], this.entries)
-            this.setElementsInRepo(trans.update.tags.map(d => d.data) as TagData[], this.tags)
+        //updating existing
+        //is there a race condition here possibly?
+        //NO IDEA WHAT'S GOING ON HERE - if I "await", this is causing tests to fail, it skips the "deletions" section
+        this.setElementsInRepo(trans.update.defs.map(d => d.data) as DefData[], this.defs);
+        this.setElementsInRepo(trans.update.entries.map(d => d.data) as EntryData[], this.entries);
 
-            //deletions
-            trans.delete.defs.forEach(def => {
-                let matched = this.defs.find(defInRepo => defInRepo.uid === def.uid);
-                if (matched !== undefined) {
-                    matched.updated = def.updated;
-                    matched.deleted = def.deleted;
-                }
-            })
-            trans.delete.entries.forEach(entry => {
-                let matched = this.entries.find(entryInRepo => entryInRepo.uid === entry.uid);
-                if (matched !== undefined) {
-                    matched.updated = entry.updated;
-                    matched.deleted = entry.deleted;
-                }
-            })
-            trans.delete.tags.forEach(tag => {
-                let matched = this.tags.find(tagInRepo => tagInRepo.uid === tag.uid);
-                if (matched !== undefined) {
-                    matched.updated = tag.updated;
-                    matched.deleted = tag.deleted;
-                }
-            })
+        //deletions
+        trans.delete.defs.forEach(def => {
+            let matched = this.defs.find(defInRepo => defInRepo.uid === def.uid);
+            if (matched !== undefined) {
+                matched.updated = def.updated;
+                matched.deleted = def.deleted;
+            }
+        })
+        trans.delete.entries.forEach(entry => {
+            let matched = this.entries.find(entryInRepo => entryInRepo.uid === entry.uid);
+            if (matched !== undefined) {
+                matched.updated = entry.updated;
+                matched.deleted = entry.deleted;
+            }
+        })
 
-            returnObj.success = true;
+        returnObj.success = true;
         // } catch (e) {
         //     console.log(e);
         //     returnObj.msgs = ['An error occurred when querying the DefaultDataStore']
@@ -3040,20 +2732,17 @@ export class DefaultDataStore implements DataStore {
     clearAllStoreArrays() {
         this.defs = [];
         this.entries = [];
-        this.tags = [];
     }
 
     async reducedQuery(params: ReducedParams): Promise<ReducedQueryResponse> {
         let returnObj: ReducedQueryResponse = {
             success: false,
             entries: [],
-            defs: [],
-            tags: []
+            defs: []
         }
         try {
             returnObj.entries = this.getEntries(params);
             returnObj.defs = this.getDefs(params);
-            returnObj.tags = this.getTags(params);
             returnObj.success = true;
         } catch (e) {
             console.error(e);
@@ -3080,12 +2769,6 @@ export class DefaultDataStore implements DataStore {
         const allMatches = this.entries.filter(entry => entry.passesFilters(params));
         let noDupes = new Set(allMatches);
         return Array.from(noDupes).map(entry => entry.toData() as EntryData);
-    }
-
-    private getTags(params: ReducedParams): TagData[] {
-        const allMatches = this.tags.filter(tag => tag.passesFilters(params));
-        let noDupes = new Set(allMatches);
-        return Array.from(noDupes).map(tag => tag.toData() as TagData);
     }
 
     /**
@@ -3124,7 +2807,6 @@ export class DefaultDataStore implements DataStore {
         });
         const type = getElementType(elementsIn[0])
         if (type === 'DefData') elementRepo.push(...newElements.map(d => new Def(d)));
-        if (type === 'TagData') elementRepo.push(...newElements.map(t => new Tag(t)));
         if (type === 'EntryData') elementRepo.push(...await PDW.inflateEntriesFromData(newElements as EntryData[]));
         // return elementsIn;
     }
@@ -3137,17 +2819,13 @@ export class DefaultDataStore implements DataStore {
         return this.setElementsInRepo(entriesIn.map(e => e.data), this.entries) as unknown as EntryData[];
     }
 
-    async setTags(tagData: Tag[]): Promise<TagData[]> {
-        return this.setElementsInRepo(tagData.map(t => t.data), this.tags) as unknown as TagData[];
-    }
-
     async getOverview(): Promise<DataStoreOverview> {
         throw new Error("Method not implemented.");
     }
 
-    setAll(completeData: CompleteDataset): CompleteDataset {
-        throw new Error("Method not implemented.");
-    }
+    // setAll(completeData: CompleteDataset): CompleteDataset {
+    //     throw new Error("Method not implemented.");
+    // }
 
     async connect(pdwRef: PDW): Promise<boolean> {
         this.pdw = pdwRef;
@@ -3224,15 +2902,6 @@ export function getElementType(element: ElementData): 'DefData' | 'EntryData' | 
     if (element.hasOwnProperty("_tid") && element.hasOwnProperty("_dids")) return "TagData"
     if (element.hasOwnProperty("_eid")) return "EntryData"
     return "DefData"
-}
-
-function maybeGetOnlyResult(arrayOfOneElement: any[]): any {
-    if (arrayOfOneElement.length === 0) return undefined
-    if (arrayOfOneElement.length > 1) {
-        console.error('Found too many errors:', arrayOfOneElement)
-        throw new Error('Found too many results')
-    }
-    return arrayOfOneElement[0]
 }
 
 //#endregion
