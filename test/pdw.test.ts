@@ -7,7 +7,7 @@ const pdwRef = pdw.PDW.getInstance();
 
 function resetTestDataset() {
     //@ts-expect-error - hacking to set the private manifest prop, it has no setter on purpose
-    pdwRef._manifest= [];
+    pdwRef._manifest = [];
     (<pdw.DefaultDataStore>pdwRef.dataStore).clearAllStoreArrays();
 }
 
@@ -113,7 +113,7 @@ test('Def Creation and Getting', async () => {
     /**
      * Specified getter
      */
-    defs = await pdwRef.getDefs({ did: ['gggg'] });
+    defs = (await pdwRef.getDefs()).filter(def=>def.did==='gggg');
     expect(defs[0].lbl).toBe('Second Def');
 
     /**
@@ -137,10 +137,10 @@ test('Def Creation and Getting', async () => {
     /**
      * Emoji not emoji error
      */
-    expect(async () => 
-    await pdwRef.newDef({
-        _emoji: 'not an emoji' //emoji isn't 1 character long
-    })).rejects.toThrowError()  //interesting syntax
+    expect(async () =>
+        await pdwRef.newDef({
+            _emoji: 'not an emoji' //emoji isn't 1 character long
+        })).rejects.toThrowError()  //interesting syntax
 
     /**
      * Invalid Scope Error
@@ -397,7 +397,7 @@ test('Entry Creation and Getting', async () => {
     */
     let testEntry = await pdwRef.newEntry({
         'yyyy': 'Text value', //by _pid
-        'Point B': true //by _lbl
+        'PoiNT b': true //by _lbl - case doesn't matter
     }, testDef)
     entries = await pdwRef.getEntries();
     expect(entries.length).toBe(2);
@@ -406,6 +406,20 @@ test('Entry Creation and Getting', async () => {
     //checking values - the typical, easy way
     expect(entry.data['yyyy']).toBe('Text value');
     expect(entry.data['zzzz']).toBe(true);
+
+    // testEntry = await pdwRef.newEntry({
+    //     _pts: {
+    //         'yyyy': "text",
+    //         "zzzz": false
+    //     }
+    // }, testDef)
+    // entries = await pdwRef.getEntries();
+    // expect(entries.length).toBe(3);
+    // entry = entries[1];
+    // expect(testEntry.did).toBe('aaaa');
+    // //checking values - the typical, easy way
+    // expect(testEntry.data['yyyy']).toBe('text');
+    // expect(testEntry.data['zzzz']).toBe(false);
 
     /**
      * Entry.getPoints
@@ -646,21 +660,21 @@ test('Update Logic', async () => {
     let defFromManifest = pdwRef.getFromManifest('aaaa');
     expect(defFromManifest.deleted).toBe(false);
     //its counterpart in the DataStore isn't changed yet
-    let defFromStores = await pdwRef.getDefs({ did: 'aaaa' });
+    let defFromStores = await pdwRef.getDefs();
     expect(defFromStores.length).toBe(1);
     let defFromStore = defFromStores[0];
     expect(defFromStore.deleted).toBe(false);
-    expect((await pdwRef.getDefs({ includeDeleted: 'no' })).length).toBe(1);
-    expect((await pdwRef.getDefs({ includeDeleted: 'only' })).length).toBe(0);
+    expect((await pdwRef.getDefs()).length).toBe(1);
+    expect((await pdwRef.getDefs(true)).length).toBe(1);
 
     //save it to the datastore
     await def.save();
     expect(def.isSaved()).toBe(true);
     //DataStore now has the deletion, but didnt' spawn any additional elements
-    expect((await pdwRef.getDefs({ includeDeleted: 'no' })).length).toBe(0);
-    expect((await pdwRef.getDefs({ includeDeleted: 'only' })).length).toBe(1);
+    expect((await pdwRef.getDefs()).length).toBe(0);
+    expect((await pdwRef.getDefs(true)).length).toBe(1);
     //manifest no longer has the def
-    expect(()=>{
+    expect(() => {
         pdwRef.getFromManifest('aaaa'); //no longer exists, this throws error
     }).toThrowError();
 
@@ -668,10 +682,10 @@ test('Update Logic', async () => {
     def.deleted = false;
     expect(def.isSaved()).toBe(false);
     //data store didn't change
-    expect((await pdwRef.getDefs({ includeDeleted: 'no' })).length).toBe(0);
-    expect((await pdwRef.getDefs({ includeDeleted: 'only' })).length).toBe(1);
+    expect((await pdwRef.getDefs()).length).toBe(0);
+    expect((await pdwRef.getDefs(true)).length).toBe(1);
     //manifest still has no matching def
-    expect(()=>{
+    expect(() => {
         pdwRef.getFromManifest('aaaa'); //no longer exists, this throws error
     }).toThrowError();
 
@@ -679,12 +693,12 @@ test('Update Logic', async () => {
     await def.save();
     expect(def.isSaved()).toBe(true);
     //DataStore now has the deletion, but didnt' spawn any additional elements
-    expect((await pdwRef.getDefs({ includeDeleted: 'no' })).length).toBe(1);
-    expect((await pdwRef.getDefs({ includeDeleted: 'only' })).length).toBe(0);
+    expect((await pdwRef.getDefs()).length).toBe(1);
+    expect((await pdwRef.getDefs(true)).length).toBe(1);
     //its counterpart from the manifest isn't changed yet
     defFromManifest = pdwRef.getFromManifest('aaaa');
     expect(defFromManifest.deleted).toBe(false);
-    
+
     /**
      * Do other types of modifications.
      */
@@ -692,15 +706,15 @@ test('Update Logic', async () => {
     expect(def.isSaved()).toBe(false);
     //no change yet
     // expect(pdwRef.getDefs({ includeDeleted: 'no' })[0].lbl).toBe('Def 1');
-    expect((await pdwRef.getDefs({ includeDeleted: 'only' })).length).toBe(0);
+    expect((await pdwRef.getDefs()).length).toBe(1);
     //check on the def in the manifest as well
     defFromManifest = pdwRef.getFromManifest(def.did);
     expect(defFromManifest.lbl).toBe('Def 1');
 
     //write change to the data store
     await def.save();
-    let notDeletedFromStore = await pdwRef.getDefs({ includeDeleted: 'no' })
-    let deletedFromStore = await pdwRef.getDefs({ includeDeleted: 'only' })
+    let notDeletedFromStore = await pdwRef.getDefs()
+    let deletedFromStore = (await pdwRef.getDefs(true)).filter(def=>def.deleted)
     expect(notDeletedFromStore.length).toBe(1);
     expect(notDeletedFromStore[0].lbl).toBe('Def 1 with new Label');
     expect(deletedFromStore.length).toBe(1);
@@ -715,9 +729,9 @@ test('Update Logic', async () => {
     def.desc = 'Modify *then* verify';
     await def.save()
 
-    deletedFromStore = await pdwRef.getDefs({ includeDeleted: 'only' })
-    expect(deletedFromStore.length).toBe(2);
-    notDeletedFromStore = await pdwRef.getDefs({ includeDeleted: 'no' });
+    deletedFromStore = await pdwRef.getDefs(true)
+    expect(deletedFromStore.length).toBe(3);
+    notDeletedFromStore = await pdwRef.getDefs();
     expect(notDeletedFromStore[0].lbl).toBe('Def ONE');
     expect(notDeletedFromStore[0].emoji).toBe('🤿');
     expect(notDeletedFromStore[0].desc).toBe('Modify *then* verify');
@@ -740,9 +754,9 @@ test('Update Logic', async () => {
     /**
      * saving without any changes no props doesn't change datastore
      */
-    expect((await pdwRef.getDefs({ includeDeleted: 'yes' })).length).toBe(3);
+    expect((await pdwRef.getDefs(true)).length).toBe(3);
     await def.save();
-    expect((await pdwRef.getDefs({ includeDeleted: 'yes' })).length).toBe(3);
+    expect((await pdwRef.getDefs(true)).length).toBe(3);
 
     /**
      * Data validation for Emoji
@@ -781,11 +795,11 @@ test('Update Logic', async () => {
     point.desc = "Added dynamically";
     expect(point.desc).toBe('Added dynamically');
     //added point hasn't effected the store yet
-    notDeletedFromStore = await pdwRef.getDefs({ includeDeleted: 'no' });
+    notDeletedFromStore = await pdwRef.getDefs();
     expect(notDeletedFromStore.length).toBe(1);
     expect(notDeletedFromStore[0].pts.length).toBe(2);
     point.save();
-    notDeletedFromStore = await pdwRef.getDefs({ includeDeleted: 'no' });
+    notDeletedFromStore = await pdwRef.getDefs();
     expect(notDeletedFromStore.length).toBe(1);
     expect(notDeletedFromStore[0].pts.length).toBe(3);
     expect(notDeletedFromStore[0].getPoint('a333').desc).toBe('Added dynamically');
@@ -928,7 +942,7 @@ test('Get All', async () => {
     });
     await def.save(); //updates the Def
     let all = await pdwRef.getAll({ includeDeleted: 'yes' });
-    expect(Object.keys(all)).toEqual(['entries', 'defs', 'overview']);
+    expect(Object.keys(all)).toEqual(['defs', 'entries', 'overview']);
     expect(all.entries.length).toBe(1);
     expect(all.defs.length).toBe(1);
 })
@@ -981,7 +995,7 @@ test('Query Basics', async () => {
     expect(origResult.count).toBe(3);
     q.forDids('aaaa'); //converted to array internally
     expect((await q.run())).toEqual(origResult);
-    let def = (await pdwRef.getDefs({ did: 'aaaa' }))[0];
+    let def = (await pdwRef.getDefs()).filter(def=>def.did==='aaaa')[0];
     q.forDefs([def]);
     expect((await q.run())).toEqual(origResult);
     q.forDefs(def); //converted to array internally
@@ -1068,9 +1082,9 @@ test('Query Basics', async () => {
      * Scopes
      */
     q = new pdw.Query();
-    q.scopes(pdw.Scope.DAY);
+    q.scope(pdw.Scope.DAY);
     expect((await q.run()).count).toBe(3);
-    q.scopes([pdw.Scope.DAY, pdw.Scope.SECOND]);
+    q.scope([pdw.Scope.DAY, pdw.Scope.SECOND]);
     expect((await q.run()).count).toBe(9);
 
     q.scopeMax(pdw.Scope.YEAR); //statement doesn't filter anything, but won't break anything
@@ -1286,7 +1300,7 @@ test('DataStore Tester', async () => {
     resetTestDataset();
 
     let ds = new pdw.DefaultDataStore(pdwRef);
-    
+
 })
 
 async function createTestDataSet() {

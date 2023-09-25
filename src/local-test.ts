@@ -7,12 +7,38 @@ import * as pdw from './pdw.js'
 
 const pdwRef = pdw.PDW.getInstance();
 
+const def = await pdwRef.newDef({
+    _did: 'aaaa',
+    _lbl: 'Default Scope test',
+    'yyyy': {
+        _lbl: 'Point A',
+        _desc: 'Test point desc'
+    },
+    'zzzz': {
+        _lbl: 'Point B',
+        _type: pdw.PointType.BOOL
+    }
+});
+
+const entry = await def.newEntry({
+    _pts: {
+        'yyyy': 'Butthole',
+        'zzzz': false
+    }
+})
+
+console.log(entry);
+console.log(pdwRef.dataStore);
+await def.save();
+console.log(pdwRef.dataStore);
+
+
 await createTestDataSet();
 
-let q = new pdw.Query();
-q.tags('tag1');
-const origResult = await q.run();
-console.log(origResult);
+// let q = new pdw.Query();
+// q.tags('tag1');
+// const origResult = await q.run();
+// console.log(origResult);
 
 
 

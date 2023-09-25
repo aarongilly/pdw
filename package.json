@@ -1,6 +1,6 @@
 {
   "name": "pdw",
-  "version": "0.0.13",
+  "version": "0.0.16",
   "type": "module",
   "main": "/pdw.js",
   "types": "/pdw.d.ts",

@@ -136,7 +136,9 @@ export enum Rollup {
 export interface DataStore {
     commit(trans: Transaction): Promise<CommitResponse>;
 
-    reducedQuery(params: ReducedParams): Promise<ReducedQueryResponse>;
+    getEntries(params: ReducedParams): Promise<ReducedQueryResponse>;
+
+    getDefs(includeDeletedForArchiving?: boolean): Promise<DefData[]>;
 
     getOverview(): Promise<DataStoreOverview>;
 
@@ -197,6 +199,10 @@ export interface StandardParams {
      */
     to?: Period | PeriodStr,
     /**
+     * Entry period. Sets the Query.from and Query.to values internally.
+     */
+    inPeriod?: Period
+    /**
      * The lower-bound of Element.created, represented as an {@link EpochStr}
      * or Temporal.ZonedDateTime. 
      */
@@ -254,7 +260,6 @@ export interface StandardParams {
      * not super helpful, but this is something I'd like to support.
      */
     limit?: number,//#TODO
-    type?: "Entry" | "Def" | "All"
     /**
      * If an empty query is sent without this field, the query is rejected.
      * This is prevent the error trap of accidentally asking for *everything*,
@@ -299,7 +304,6 @@ export interface ReducedParams {
     tag?: string[],
 
     limit?: number, //#TODO
-    type?: "Entry" | "Def" | "All"
     /**
      * Reduces the resulting {@link Def} and {@link} Entry results to those whose
      * scope is in the provided list.
@@ -318,7 +322,14 @@ export interface ElementMap {
     entries: Entry[];
 }
 
-
+/**
+ * 
+    overview?: DataStoreOverview
+    storeName?: string;
+    defs: CurrentAndDeletedCounts;
+    entries: CurrentAndDeletedCounts;
+    lastUpdated: EpochStr;
+ */
 export interface CompleteDataset extends ElementDataMap {
     overview?: DataStoreOverview;
 }
@@ -578,7 +589,6 @@ export interface QueryResponse {
 export interface ReducedQueryResponse {
     success: boolean;
     entries: EntryData[];
-    defs: DefData[];
     msgs?: string[];
 }
 
@@ -648,7 +658,7 @@ export class PDW {
      */
     async setDataStore(storeInstance: DataStore) {
         this.dataStore = storeInstance;
-        this._manifest = (await storeInstance.reducedQuery({type: "Def", includeDeleted: "no"})).defs.map(defData => new Def(defData));
+        this._manifest = (await storeInstance.getDefs()).map(defData => new Def(defData));
     }
 
     /**
@@ -657,20 +667,29 @@ export class PDW {
      * @returns a {@link CompleteDataset} containing a {@link Def}s, {@link Entry}s
      */
     async getAll(rawParams: StandardParams): Promise<CompleteDataset> {
-        const params = PDW.sanitizeParams(rawParams)
-        let data = await this.dataStore.reducedQuery(params) as any;
-        delete data.msgs
-        delete data.success
-        return PDW.addOverviewToCompleteDataset(data);
+        const params = PDW.sanitizeParams(rawParams);
+        const entries = await this.dataStore.getEntries(params);
+        const includeDeletedDefs = params.hasOwnProperty('includeDeleted') && params.includeDeleted != 'no';
+        const defs = (await this.dataStore.getDefs(includeDeletedDefs)) as DefData[];
+
+        const dataset: CompleteDataset = {
+            defs: defs,
+            entries: entries.entries
+        }
+        
+        return PDW.addOverviewToCompleteDataset(dataset);
     }
 
-    async getDefs(rawParams?: StandardParams): Promise<Def[]> {
-        if (rawParams === undefined) rawParams = {};
-        const params = PDW.sanitizeParams(rawParams);
-        params.type = 'Def';
-
-        let defDatas = await this.dataStore.reducedQuery(params);
-        let defs = defDatas.defs.map(dl => new Def(dl));
+    /**
+     * Grabs the Defs from the attached DataStore. 
+     * By default, does not include the deleted defs.
+     * If you want to include *all* defs, pass in `true`
+     * @param includedDeleted false by default
+     * @returns Defs inflated from the DataStore
+     */
+    async getDefs(includedDeleted = false): Promise<Def[]> {
+        const defDatas = await this.dataStore.getDefs(includedDeleted);
+        let defs = defDatas.map(dl => new Def(dl));
         return defs;
 
         // //#TODO - extract this logic to a dedicated "PDW.sync(datastores:DataStore[])" method
@@ -723,15 +742,14 @@ export class PDW {
         const undeletions = deles.filter(d=>!d.deleted);
         this._manifest = this.manifest.filter(md=>!deletions.some(d=>d.uid === md.data._uid));
         if(undeletions.length>0){
-            this.manifest.push(...(await PDW.getInstance().getDefs({uid: undeletions.map(ud=>ud.uid)})));
+            this.manifest.push(...(await PDW.getInstance().getDefs(false)));
         }
     }
 
     async getEntries(rawParams?: StandardParams): Promise<Entry[]> {
         if (rawParams === undefined) rawParams = {};
         const params = PDW.sanitizeParams(rawParams);
-        params.type = 'Entry';
-        let entriesQuery = await this.dataStore.reducedQuery(params);
+        let entriesQuery = await this.dataStore.getEntries(params);
         return PDW.inflateEntriesFromData(entriesQuery.entries);
     }
 
@@ -916,6 +934,12 @@ export class PDW {
         //ensure default
         if (params.includeDeleted === undefined) params.includeDeleted = 'no';
 
+        if (params.hasOwnProperty("inPeriod")){
+            let period = (<StandardParams>params).inPeriod as Period
+            params.from = new Period(period);
+            params.to = new Period(period);
+        }
+
         //make periods from period strings
         if (params.from !== undefined) {
             if (typeof params.from === 'string') {
@@ -1026,9 +1050,8 @@ export class PDW {
         return data
     }
 
-    static async inflateEntriesFromData(entryData: EntryData[]): Promise<Entry[]> {
-        let dids = entryData.map(e => e._did);
-        let defs = await PDW.getInstance().getDefs({ did: dids });
+    static inflateEntriesFromData(entryData: EntryData[]): Entry[] {
+        let defs = PDW.getInstance().manifest;
         return entryData.map(e => new Entry(e, defs.find(def => def.did === e._did)!));
     }
 
@@ -1417,30 +1440,30 @@ export abstract class Element {
         return null
     }
 
-    /**
-     * Analyzes an object and tries to find one UNDELETED Element that
-     * has the same Xid(s). Does not look at UIDs or Labels.
-     * @param dataIn an object that may be part of an existing Element
-     * @param ofType optional, allows you to override what the dataIn would suggest it should be
-     */
-    static async findExistingData(dataIn: any, ofType?: 'Def' | 'Entry' ): Promise<any> {
-        //replace any passed in Element instances with their Data replacement
-        if (dataIn.hasOwnProperty('__modified') && dataIn.hasOwnProperty('data')) dataIn = dataIn.data;
-        const type = ofType === undefined ? Element.getTypeOfElement(dataIn) : ofType + 'Data';
-        if (type === null) return undefined;
+    // /**
+    //  * Analyzes an object and tries to find one UNDELETED Element that
+    //  * has the same Xid(s). Does not look at UIDs or Labels.
+    //  * @param dataIn an object that may be part of an existing Element
+    //  * @param ofType optional, allows you to override what the dataIn would suggest it should be
+    //  */
+    // static async findExistingData(dataIn: any, ofType?: 'Def' | 'Entry' ): Promise<any> {
+    //     //replace any passed in Element instances with their Data replacement
+    //     if (dataIn.hasOwnProperty('__modified') && dataIn.hasOwnProperty('data')) dataIn = dataIn.data;
+    //     const type = ofType === undefined ? Element.getTypeOfElement(dataIn) : ofType + 'Data';
+    //     if (type === null) return undefined;
 
-        let pdwRef = PDW.getInstance();
-        if (type === 'DefData') {
-            let storeResult = await pdwRef.dataStore.reducedQuery({ did: [dataIn._did], includeDeleted: 'no' });
-            if (storeResult.defs.length === 1) return storeResult.defs[0];
-            return undefined;
-        }
-        if (type === 'EntryData') {
-            let storeResult = await pdwRef.dataStore.reducedQuery({ eid: [dataIn._eid], includeDeleted: 'no' });
-            if (storeResult.entries.length === 1) return storeResult.entries[0];
-            return undefined;
-        }
-    }
+    //     let pdwRef = PDW.getInstance();
+    //     if (type === 'DefData') {
+    //         let storeResult = await pdwRef.dataStore.reducedQuery({ did: [dataIn._did], includeDeleted: 'no' });
+    //         if (storeResult.defs.length === 1) return storeResult.defs[0];
+    //         return undefined;
+    //     }
+    //     if (type === 'EntryData') {
+    //         let storeResult = await pdwRef.dataStore.reducedQuery({ eid: [dataIn._eid], includeDeleted: 'no' });
+    //         if (storeResult.entries.length === 1) return storeResult.entries[0];
+    //         return undefined;
+    //     }
+    // }
 
     public static getMostRecent(elementArr: ElementData[]): ElementData | undefined {
         if (elementArr.length == 0) {
@@ -1534,7 +1557,7 @@ export class Def extends Element {
 
     getPoint(pidOrLbl: string): PointDef {
         let point = this.pts.find(point => point.pid === pidOrLbl);
-        if (point === undefined) point = this.pts.find(point => point.lbl === pidOrLbl);
+        if (point === undefined) point = this.pts.find(point => point.lbl.toUpperCase() === pidOrLbl.toUpperCase());
         if (point !== undefined) return point
         throw new Error('No point found with pid or lbl when getting "' + pidOrLbl + '" for the Def labeled "' + this.lbl + '"');
     }
@@ -2133,6 +2156,14 @@ export class Period {
         return this.periodStr;
     }
 
+    toTemporalPlainDate(){
+        return Temporal.PlainDate.from(this.periodStr);
+    }
+
+    toTemporalPlainDateTime(){
+        return Temporal.PlainDateTime.from(this.periodStr);
+    }
+
     getEnd(): Period {
         if (this.scope === Scope.SECOND) return new Period(this.periodStr);
         if (this.scope === Scope.MINUTE) return new Period(this.periodStr + ':59');
@@ -2159,7 +2190,7 @@ export class Period {
             const q = Number.parseInt(this.periodStr.slice(-1));
             const month = q * 3
             const d = Temporal.PlainDate.from(year + '-' + month.toString().padStart(2, '0') + '-01').daysInMonth;
-            return new Period(year + '-' + month.toString().padStart(2, '0') + '-' + d + 'T23:59:59')
+            return new Period(year + '-' + month.toString().padStart(2, '0') + '-' + d + 'T23:59:59');
         }
         return new Period(this.periodStr + "-12-31T23:59:59")
     }
@@ -2407,19 +2438,39 @@ export class Period {
 
 //#TODO - clean up some query methods, maybe combine things like "dids" "defs" "defsLbld"
 export class Query {
-    private verbosity: 'terse' | 'normal' | 'verbose'
+    // private verbosity: 'terse' | 'normal' | 'verbose'
     // private rollup: boolean
     private params: StandardParams
     private sortOrder: undefined | 'asc' | 'dsc'
     private sortBy: undefined | string
-    constructor() {
-        this.verbosity = 'normal';
+    constructor(paramsIn?: StandardParams) {
+        // this.verbosity = 'normal';
         // this.rollup = false;
         this.params = { includeDeleted: 'no' }; //default
+        if(paramsIn!==undefined) this.parseParamsObject(paramsIn)
     }
 
-    parseQueryString(queryString: string, isUrlFormatted = false) {
-        throw new Error('just an idea at this poitn')
+    parseParamsObject(paramsIn: StandardParams){
+        if(paramsIn?.includeDeleted !== undefined){
+            if(paramsIn.includeDeleted === 'no')this.includeDeleted(false);
+            if(paramsIn.includeDeleted === 'yes')this.includeDeleted(true);
+            if(paramsIn.includeDeleted === 'only')this.onlyIncludeDeleted();            
+        }
+        if(paramsIn?.allOnPurpose !== undefined) this.allOnPurpose(paramsIn.allOnPurpose);
+        if(paramsIn?.createdAfter !== undefined) this.createdAfter(paramsIn.createdAfter);
+        if(paramsIn?.createdBefore !== undefined) this.createdBefore(paramsIn.createdBefore);
+        if(paramsIn?.updatedAfter !== undefined) this.updatedAfter(paramsIn.updatedAfter);
+        if(paramsIn?.updatedBefore !== undefined) this.updatedBefore(paramsIn.updatedBefore);
+        if(paramsIn?.defLbl !== undefined) this.forDefsLbld(paramsIn.defLbl);
+        if(paramsIn?.did !== undefined) this.forDids(paramsIn.did);
+        if(paramsIn?.uid !== undefined) this.uids(paramsIn.uid);
+        if(paramsIn?.eid !== undefined) this.eids(paramsIn.eid);
+        if(paramsIn?.tag !== undefined) this.tags(paramsIn.tag);
+        if(paramsIn?.from !== undefined) this.from(paramsIn.from);
+        if(paramsIn?.to !== undefined) this.to(paramsIn.to);
+        if(paramsIn?.inPeriod !== undefined) this.inPeriod(paramsIn.inPeriod);
+        if(paramsIn?.scope !== undefined) this.scope(paramsIn.scope);
+        return this
     }
 
     includeDeleted(b = true) {
@@ -2427,7 +2478,7 @@ export class Query {
             this.params.includeDeleted = 'yes';
         } else {
             this.params.includeDeleted = 'no';
-        }
+        }        
         return this
     }
 
@@ -2517,7 +2568,7 @@ export class Query {
         return this
     }
 
-    scopes(scopes: Scope[] | Scope): Query {
+    scope(scopes: Scope[] | Scope): Query {
         if (!Array.isArray(scopes)) scopes = [scopes];
         let defs = PDW.getInstance().manifest.filter(def => (<Scope[]>scopes).some(scope => scope === def.scope));
         this.params.did = defs.map(def => def.did);
@@ -2527,13 +2578,13 @@ export class Query {
     scopeMin(scope: Scope): Query {
         let scopes = Object.values(Scope);
         let index = scopes.indexOf(scope);
-        return this.scopes(scopes.slice(index));
+        return this.scope(scopes.slice(index));
     }
 
     scopeMax(scope: Scope): Query {
         let scopes = Object.values(Scope);
         let index = scopes.indexOf(scope);
-        return this.scopes(scopes.slice(0, index + 1));
+        return this.scope(scopes.slice(0, index + 1));
     }
 
     allOnPurpose(allIn = true): Query {
@@ -2555,10 +2606,6 @@ export class Query {
         this.params.from = period;
         this.params.to = period;
         return this
-    }
-    scope(scope: Scope) {
-        this.params.scope = scope;
-        return this;
     }
 
     /**
@@ -2582,7 +2629,7 @@ export class Query {
                 count: 0,
                 params: {
                     paramsIn: this.params,
-                    asParsed: { todo: '#TODO' }
+                    asParsed: PDW.sanitizeParams(this.params)
                 },
                 msgs: ['Empty queries not allowed. If seeking all, include {allOnPurpose: true}'],
                 entries: []
@@ -2594,8 +2641,8 @@ export class Query {
             success: true,
             count: entries.length,
             params: {
-                paramsIn: {},
-                asParsed: {}
+                paramsIn: this.params,
+                asParsed: {todo: 'Also to do'}
             },
             entries: entries
         }
@@ -2734,15 +2781,14 @@ export class DefaultDataStore implements DataStore {
         this.entries = [];
     }
 
-    async reducedQuery(params: ReducedParams): Promise<ReducedQueryResponse> {
+    async getEntries(params: ReducedParams): Promise<ReducedQueryResponse> {
         let returnObj: ReducedQueryResponse = {
             success: false,
             entries: [],
-            defs: []
+            msgs: []
         }
         try {
-            returnObj.entries = this.getEntries(params);
-            returnObj.defs = this.getDefs(params);
+            returnObj.entries = this.getEntriesFromRepo(params);
             returnObj.success = true;
         } catch (e) {
             console.error(e);
@@ -2753,7 +2799,9 @@ export class DefaultDataStore implements DataStore {
         return returnObj
     }
 
-    private getDefs(params: ReducedParams): DefData[] {
+    async getDefs(includedDeleted = false): Promise<DefData[]> {
+        let params: ReducedParams = {includeDeleted: 'no'};
+        if(includedDeleted) params.includeDeleted = 'yes';
         const allMatches = this.defs.filter(def => def.passesFilters(params));
         let noDupes = new Set(allMatches);
         return Array.from(noDupes).map(def => def.toData() as DefData)
@@ -2765,7 +2813,7 @@ export class DefaultDataStore implements DataStore {
      * @param includeDeleted
      * @returns an array of all entries matching the criteria
      */
-    private getEntries(params: ReducedParams): EntryData[] {
+    private getEntriesFromRepo(params: ReducedParams): EntryData[] {
         const allMatches = this.entries.filter(entry => entry.passesFilters(params));
         let noDupes = new Set(allMatches);
         return Array.from(noDupes).map(entry => entry.toData() as EntryData);
