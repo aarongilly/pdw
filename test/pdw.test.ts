@@ -1280,7 +1280,7 @@ test('Summarizer', async () => {
 
     await createSummaryDataSet();
 
-    let q = new pdw.Query();
+    let q = pdwRef.query();
 
     let all = (await new pdw.Query().inPeriod(new pdw.Period('2023-08-21').zoomOut()).run()).entries;
 
@@ -1294,6 +1294,9 @@ test('Summarizer', async () => {
     expect(summary.periods[0].entryRollups[0].pts['b111'].val).toBe('PT9360S')
     expect(summary.periods[0].entryRollups[0].pts['b222'].val).toBe('true: 1, false: 1')
     expect(summary.periods[0].entryRollups[0].pts['b333'].val).toBe('22:05:28')
+
+    
+
 })
 
 test('DataStore Tester', async () => {

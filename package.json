@@ -1,14 +1,14 @@
 {
   "name": "pdw",
-  "version": "0.0.16",
+  "version": "0.0.18",
   "type": "module",
   "main": "/pdw.js",
   "types": "/pdw.d.ts",
   "license": "MIT",
   "files": [
-    "/out/pdw.js",
-    "/out/pdw.d.ts",
-    "/out/pdw.js.map"
+    "pdw.js",
+    "pdw.d.ts",
+    "pdw.js.map"
   ],
   "scripts": {
     "dev": "vite",

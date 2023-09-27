@@ -7,33 +7,15 @@ import * as pdw from './pdw.js'
 
 const pdwRef = pdw.PDW.getInstance();
 
-const def = await pdwRef.newDef({
-    _did: 'aaaa',
-    _lbl: 'Default Scope test',
-    'yyyy': {
-        _lbl: 'Point A',
-        _desc: 'Test point desc'
-    },
-    'zzzz': {
-        _lbl: 'Point B',
-        _type: pdw.PointType.BOOL
-    }
-});
+await createSummaryDataSet();
 
-const entry = await def.newEntry({
-    _pts: {
-        'yyyy': 'Butthole',
-        'zzzz': false
-    }
-})
+let result = await pdwRef.query({includeDeleted: 'yes', allOnPurpose: true, inPeriod: '2023-08-23'}).run();
 
-console.log(entry);
-console.log(pdwRef.dataStore);
-await def.save();
-console.log(pdwRef.dataStore);
+let summary = new pdw.Summary(result.entries,pdw.Scope.DAY);
 
+let string = summary.stringify();
 
-await createTestDataSet();
+console.log(JSON.parse(string));
 
 // let q = new pdw.Query();
 // q.tags('tag1');
@@ -225,4 +207,107 @@ async function createTestDataSet() {
     });
 
     await quote.setPointVal('bbb2', 'Michael SCOTT').save();
+}
+
+async function createSummaryDataSet() {
+    const nap = await pdwRef.newDef({
+        _lbl: "Nap",
+        _scope: pdw.Scope.SECOND,
+        _pts: [
+            {
+                _pid: "b111",
+                _lbl: "Duration",
+                _emoji: "🕰️",
+                _rollup: pdw.Rollup.SUM,
+                _type: pdw.PointType.DURATION
+            },
+            {
+                _pid: "b222",
+                _lbl: "Felt Rested",
+                _emoji: "😀",
+                _rollup: pdw.Rollup.COUNTOFEACH,
+                _type: pdw.PointType.BOOL
+            },
+            {
+                _pid: "b333",
+                _lbl: "Start time",
+                _rollup: pdw.Rollup.AVERAGE,
+                _type: pdw.PointType.TIME
+            }
+        ]
+    })
+    const event = await pdwRef.newDef({
+        _lbl: "Event",
+        _scope: pdw.Scope.HOUR,
+        _pts: [
+            {
+                _pid: 'aaaa',
+                _type: pdw.PointType.TEXT
+            },
+            {
+                _pid: 'bbbb',
+                _type: pdw.PointType.NUMBER,
+                _rollup: pdw.Rollup.COUNTUNIQUE
+            }
+        ]
+
+    })
+    const daily = await pdwRef.newDef({
+        _did: 'dddd',
+        _lbl: "Journal",
+        _scope: pdw.Scope.DAY,
+        _pts: [
+            {
+                _pid: 'ddd1',
+                _lbl: 'Nightly Review',
+                _type: pdw.PointType.MARKDOWN
+            }
+        ]
+    })
+
+    event.newEntry({
+        _period: '2023-08-23T01',
+        'aaaa': 'Whatever',
+        'bbbb': 1,
+    });
+    event.newEntry({
+        _period: '2023-08-23T02',
+        'aaaa': 'Something else',
+        'bbbb': 2,
+    });
+    event.newEntry({
+        _period: '2023-08-23T03',
+        'aaaa': 'A third time, but only a second new number',
+        'bbbb': 2,
+    });
+
+    daily.newEntry({
+        _period: '2023-08-23',
+        'ddd1': "Today I did *a lot*"
+    })
+    
+    nap.newEntry({
+        _period: "2023-08-23T16:30:29",
+        'b111': "PT25M",
+        "b222": true,
+        'b333': "23:30:29"
+    })
+    nap.newEntry({
+        _period: "2023-08-21T12:42:26",
+        'b111': "PT25M",
+        "b222": false,
+        'b333': '02:28:29'
+    })
+    nap.newEntry({
+        _period: "2023-08-21T17:42:26",
+        'b111': "PT2H11M",
+        "b222": true,
+        'b333': '17:42:26'
+    })
+    nap.newEntry({
+        _period: "2023-08-22T16:30:29",
+        'b111': "PT1H5M",
+        "b222": true,
+        'b333': '16:30:29'
+    })
 }

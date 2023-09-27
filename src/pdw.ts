@@ -201,7 +201,7 @@ export interface StandardParams {
     /**
      * Entry period. Sets the Query.from and Query.to values internally.
      */
-    inPeriod?: Period
+    inPeriod?: Period | string
     /**
      * The lower-bound of Element.created, represented as an {@link EpochStr}
      * or Temporal.ZonedDateTime. 
@@ -249,7 +249,7 @@ export interface StandardParams {
      * A list of strings.
      * Will return any Tag(s) whose Tag.lbl is in the list.
      */
-    tag?: string[] | string,
+    tag?: string,
     /**
      * Reduces the resulting {@link Def} and {@link} Entry results to those whose
      * scope is in the provided list.
@@ -301,7 +301,6 @@ export interface ReducedParams {
     eid?: UID[],
     defLbl?: string[],
     pointLbl?: string[],
-    tag?: string[],
 
     limit?: number, //#TODO
     /**
@@ -530,23 +529,6 @@ export interface EntryData extends ElementData {
     [_pid: string]: any
 }
 
-export interface PointRollupData {
-    pid: SmallID;
-    val: any;
-    method: Rollup
-}
-
-export interface EntryRollupData {
-    did: SmallID;
-    pts: PointRollupData[];
-    entries?: EntryData[];
-}
-
-export interface PeriodSummaryData {
-    period: PeriodStr | "all";
-    entries: EntryRollupData[];
-}
-
 export interface PointRollup {
     pid: SmallID;
     lbl: string;
@@ -568,6 +550,29 @@ export interface PeriodSummary {
     period: Period | "all";
     entryRollups: EntryRollup[];
     entries: Entry[]
+}
+
+export interface PeriodSummaryMap {
+    [periodStr: string]: DidSummaryMap
+}
+
+export interface DidSummaryMap {
+    [did: string]: {
+        did: SmallID,
+        emoji: string,
+        lbl: string,
+        pts: PidSummaryMap,
+        entryData: EntryData[]
+    }
+}
+
+export interface PidSummaryMap{
+    [pid: string]: {
+        lbl: string,
+        method: Rollup,
+        pid: SmallID,
+        val: any
+    }
 }
 
 /**
@@ -621,7 +626,7 @@ export interface DataStoreOverview {
 
 export class PDW {
     dataStore: DataStore;
-    private _manifest: Def[];    
+    private _manifest: Def[];
     private static instance: PDW;
     private constructor(store?: DataStore) {
         if (store !== undefined) {
@@ -644,7 +649,7 @@ export class PDW {
         return PDW.instance;
     }
 
-    public static getManifest(): Def[]{
+    public static getManifest(): Def[] {
         return this.getInstance()._manifest;
     }
 
@@ -676,7 +681,7 @@ export class PDW {
             defs: defs,
             entries: entries.entries
         }
-        
+
         return PDW.addOverviewToCompleteDataset(dataset);
     }
 
@@ -719,8 +724,8 @@ export class PDW {
     }
 
     getFromManifest(did: string): Def {
-        const matchedDef = this.manifest.find(d=>d.data._did === did);
-        if(matchedDef === undefined) throw new Error("No Def found in Manifest with id: " + did);
+        const matchedDef = this.manifest.find(d => d.data._did === did);
+        if (matchedDef === undefined) throw new Error("No Def found in Manifest with id: " + did);
         return matchedDef!
     }
 
@@ -736,14 +741,18 @@ export class PDW {
         })
     }
 
-    private async handleManifestDeletionChange(deles: DeletionMsg[]){
-        if(!Array.isArray(deles)) deles = [deles];
-        const deletions = deles.filter(d=>d.deleted);
-        const undeletions = deles.filter(d=>!d.deleted);
-        this._manifest = this.manifest.filter(md=>!deletions.some(d=>d.uid === md.data._uid));
-        if(undeletions.length>0){
+    private async handleManifestDeletionChange(deles: DeletionMsg[]) {
+        if (!Array.isArray(deles)) deles = [deles];
+        const deletions = deles.filter(d => d.deleted);
+        const undeletions = deles.filter(d => !d.deleted);
+        this._manifest = this.manifest.filter(md => !deletions.some(d => d.uid === md.data._uid));
+        if (undeletions.length > 0) {
             this.manifest.push(...(await PDW.getInstance().getDefs(false)));
         }
+    }
+
+    query(params?: StandardParams): Query {
+        return new Query(params);
     }
 
     async getEntries(rawParams?: StandardParams): Promise<Entry[]> {
@@ -930,30 +939,27 @@ export class PDW {
      * @param params rawParams in
      * @returns santized params out
      */
-    static sanitizeParams(params: StandardParams | ReducedParams): ReducedParams {
+    static sanitizeParams(params: StandardParams): ReducedParams {
         //ensure default
         if (params.includeDeleted === undefined) params.includeDeleted = 'no';
 
-        if (params.hasOwnProperty("inPeriod")){
-            let period = (<StandardParams>params).inPeriod as Period
-            params.from = new Period(period);
-            params.to = new Period(period);
+        if (params.hasOwnProperty("inPeriod")) {
+            let period = params.inPeriod as Period
+            if (typeof params.inPeriod === 'string') period = new Period(params.inPeriod);
+            params.from = new Period(period).getStart();
+            params.to = new Period(period).getEnd();
         }
 
         //make periods from period strings
         if (params.from !== undefined) {
             if (typeof params.from === 'string') {
                 params.from = new Period(params.from);
-            } else {
-                console.warn('From and To should be PeriodStr type.')
             }
             //otherwise I guess I'll assume it's okay
         }
         if (params.to !== undefined) {
             if (typeof params.to === 'string') {
                 params.to = new Period(params.to);
-            } else {
-                console.warn('From and To should be PeriodStr type.')
             }
             //otherwise I guess I'll assume it's okay
         }
@@ -998,14 +1004,12 @@ export class PDW {
 
         //ensure arrays
         if (params.uid !== undefined && typeof params.uid == 'string') params.uid = [params.uid]
-        if (params.did !== undefined && typeof params.did == 'string') params.did = [params.did]
-        // if (params.pid !== undefined && typeof params.pid == 'string') params.pid = [params.pid]
         if (params.eid !== undefined && typeof params.eid == 'string') params.eid = [params.eid]
+        if (params.defLbl !== undefined && typeof params.defLbl == 'string') params.did = PDW.getInstance().manifest.filter(def => (<string[]>params.defLbl)!.some(dl => dl === def.lbl)).map(def => def.did);
+        if (params.did !== undefined && typeof params.did == 'string') params.did = [params.did]
+        if (params.scope !== undefined && typeof params.scope == 'string') params.scope = [params.scope];
 
-        if (params.defLbl !== undefined && typeof params.defLbl == 'string') params.defLbl = [params.defLbl]
-        // if (params.pointLbl !== undefined && typeof params.pointLbl == 'string') params.pointLbl = [params.pointLbl]
-        if (params.tag !== undefined && typeof params.tag == 'string') params.tag = [params.tag]
-        if (params.scope !== undefined && typeof params.scope == 'string') params.scope = [params.scope]
+        if (params.tag !== undefined && typeof params.tag == 'string') params.did = PDW.getInstance().manifest.filter(def => def.hasTag(params.tag!)).map(def => def.did);
 
         if (params.limit !== undefined && typeof params.limit !== "number") {
             console.error('Your params were: ', params)
@@ -1063,6 +1067,7 @@ export class PDW {
         const def = entries[0].def;
         const pointDefs = def.pts;
         let returnObj = {
+            entries: entries,
             did: def.did,
             lbl: def.lbl,
             emoji: def.emoji,
@@ -1078,7 +1083,6 @@ export class PDW {
                 pid: pd.pid,
                 lbl: pd.lbl,
                 method: pd.rollup,
-                entries: entries,
                 vals: vals,
                 val: undefined
             }
@@ -1099,6 +1103,7 @@ export class PDW {
                 if (type === PointType.DURATION) ptRlp.val = doSumDuration(vals);
             }
             if (pd.rollup === Rollup.COUNTOFEACH) ptRlp.val = doCountOfEach(vals);
+            if (pd.rollup === Rollup.COUNTUNIQUE) ptRlp.val = doCountUnique(vals);
 
             //@ts-expect-error
             returnObj.pts[pd.pid] = ptRlp;
@@ -1159,6 +1164,15 @@ export class PDW {
             })
             return stringCounts.substring(0, stringCounts.length - 2);
         }
+
+        function doCountUnique(vals: any[]): number{
+            return [...new Set(vals)].length;
+            
+        }
+    }
+
+    summarize(entries:Entry[], scope: Scope): Summary{
+        return new Summary(entries, scope)
     }
 }
 
@@ -1231,7 +1245,7 @@ export abstract class Element {
     /**
      * Create a **static** copy of the Element's ElementData.
      */
-    toData(): ElementData | DefData | EntryData  {
+    toData(): ElementData | DefData | EntryData {
         return JSON.parse(JSON.stringify(this.data));
     }
 
@@ -1354,10 +1368,6 @@ export abstract class Element {
         const type = this.getType()!;
 
         if (params.defLbl !== undefined && type === 'DefData' && !params.defLbl.some(lbl => lbl === this.data._lbl)) return false;
-        if (params.tag !== undefined && type === 'DefData') {
-            let isMatch = params.tag.some(lbl => this.data._tags.some((tag: string)=>tag.toUpperCase() === lbl.toUpperCase()))
-            if(!isMatch) return false;
-        }
 
         if (params.createdBeforeEpochStr !== undefined && params.createdBeforeEpochStr < this.data._created) return false;
         if (params.createdAfterEpochStr !== undefined && params.createdAfterEpochStr > this.data._created) return false;
@@ -1531,7 +1541,7 @@ export class Def extends Element {
     get scope() {
         return this.data._scope;
     }
-    get tags(){
+    get tags() {
         return this.data._tags;
     }
     public get pts(): PointDef[] {
@@ -1573,29 +1583,29 @@ export class Def extends Element {
     /**
      * Will return true of the Def has that tag, or the def has a tag in the passed-in array
      */
-    hasTag(tag: string[] | string): boolean{
-        if(Array.isArray(tag)) return tag.some(item => this.data._tags.includes(item))
-        return this.data._tags.some(t=>t.toUpperCase() === (<string> tag).toUpperCase());
+    hasTag(tag: string[] | string): boolean {
+        if (Array.isArray(tag)) return tag.some(item => this.data._tags.includes(item))
+        return this.data._tags.some(t => t.toUpperCase() === (<string>tag).toUpperCase());
     }
 
     addTag(tag: string): Def {
-        if(this.data._tags.some(t=>t===tag)){
+        if (this.data._tags.some(t => t === tag)) {
             console.warn('tried to add already-existing tag to def, ingoring request')
-        }else{
+        } else {
             this.data._tags.push(tag);
         }
         return this
     }
 
-    clearTags(): Def{
+    clearTags(): Def {
         this.data._tags = [];
         return this;
     }
 
     removeTag(tag: string): Def {
-        if(this.data._tags.some(t=>t===tag)){
-            this.data._tags = this.data._tags.filter(t=>t!==tag);
-        }else{
+        if (this.data._tags.some(t => t === tag)) {
+            this.data._tags = this.data._tags.filter(t => t !== tag);
+        } else {
             console.warn('tried to remove a non-existant tag from a def, ingoring request')
         }
         return this
@@ -1952,9 +1962,9 @@ export class Entry extends Element {
     private _period: Period;
     constructor(entryData: EntryLike, def?: Def) {
         super(entryData);
-        if(def !== undefined){
+        if (def !== undefined) {
             this._def = def;
-        }else{
+        } else {
             this._def = PDW.getInstance().getFromManifest(entryData._did!)
         }
 
@@ -2156,11 +2166,11 @@ export class Period {
         return this.periodStr;
     }
 
-    toTemporalPlainDate(){
+    toTemporalPlainDate() {
         return Temporal.PlainDate.from(this.periodStr);
     }
 
-    toTemporalPlainDateTime(){
+    toTemporalPlainDateTime() {
         return Temporal.PlainDateTime.from(this.periodStr);
     }
 
@@ -2447,30 +2457,41 @@ export class Query {
         // this.verbosity = 'normal';
         // this.rollup = false;
         this.params = { includeDeleted: 'no' }; //default
-        if(paramsIn!==undefined) this.parseParamsObject(paramsIn)
+        if (paramsIn !== undefined) this.parseParamsObject(paramsIn)
     }
 
-    parseParamsObject(paramsIn: StandardParams){
-        if(paramsIn?.includeDeleted !== undefined){
-            if(paramsIn.includeDeleted === 'no')this.includeDeleted(false);
-            if(paramsIn.includeDeleted === 'yes')this.includeDeleted(true);
-            if(paramsIn.includeDeleted === 'only')this.onlyIncludeDeleted();            
+    parseParamsObject(paramsIn: StandardParams) {
+        if (paramsIn?.includeDeleted !== undefined) {
+            if (paramsIn.includeDeleted === 'no') this.includeDeleted(false);
+            if (paramsIn.includeDeleted === 'yes') this.includeDeleted(true);
+            if (paramsIn.includeDeleted === 'only') this.onlyIncludeDeleted();
         }
-        if(paramsIn?.allOnPurpose !== undefined) this.allOnPurpose(paramsIn.allOnPurpose);
-        if(paramsIn?.createdAfter !== undefined) this.createdAfter(paramsIn.createdAfter);
-        if(paramsIn?.createdBefore !== undefined) this.createdBefore(paramsIn.createdBefore);
-        if(paramsIn?.updatedAfter !== undefined) this.updatedAfter(paramsIn.updatedAfter);
-        if(paramsIn?.updatedBefore !== undefined) this.updatedBefore(paramsIn.updatedBefore);
-        if(paramsIn?.defLbl !== undefined) this.forDefsLbld(paramsIn.defLbl);
-        if(paramsIn?.did !== undefined) this.forDids(paramsIn.did);
-        if(paramsIn?.uid !== undefined) this.uids(paramsIn.uid);
-        if(paramsIn?.eid !== undefined) this.eids(paramsIn.eid);
-        if(paramsIn?.tag !== undefined) this.tags(paramsIn.tag);
-        if(paramsIn?.from !== undefined) this.from(paramsIn.from);
-        if(paramsIn?.to !== undefined) this.to(paramsIn.to);
-        if(paramsIn?.inPeriod !== undefined) this.inPeriod(paramsIn.inPeriod);
-        if(paramsIn?.scope !== undefined) this.scope(paramsIn.scope);
+        if (paramsIn?.allOnPurpose !== undefined) this.allOnPurpose(paramsIn.allOnPurpose);
+        if (paramsIn?.createdAfter !== undefined) this.createdAfter(paramsIn.createdAfter);
+        if (paramsIn?.createdBefore !== undefined) this.createdBefore(paramsIn.createdBefore);
+        if (paramsIn?.updatedAfter !== undefined) this.updatedAfter(paramsIn.updatedAfter);
+        if (paramsIn?.updatedBefore !== undefined) this.updatedBefore(paramsIn.updatedBefore);
+        if (paramsIn?.defLbl !== undefined) this.forDefsLbld(paramsIn.defLbl);
+        if (paramsIn?.did !== undefined) this.forDids(paramsIn.did);
+        if (paramsIn?.uid !== undefined) this.uids(paramsIn.uid);
+        if (paramsIn?.eid !== undefined) this.eids(paramsIn.eid);
+        if (paramsIn?.tag !== undefined) this.tags(paramsIn.tag);
+        if (paramsIn?.from !== undefined) this.from(paramsIn.from);
+        if (paramsIn?.to !== undefined) this.to(paramsIn.to);
+        if (paramsIn?.inPeriod !== undefined) this.inPeriod(paramsIn.inPeriod);
+        if (paramsIn?.scope !== undefined) this.scope(paramsIn.scope);
         return this
+    }
+
+    static parseFromURL(url: string): Query {
+        console.log(url);
+
+        throw new Error('unimplemented')
+
+    }
+
+    encodeAsURL(): string {
+        throw new Error('unimplemented')
     }
 
     includeDeleted(b = true) {
@@ -2478,11 +2499,9 @@ export class Query {
             this.params.includeDeleted = 'yes';
         } else {
             this.params.includeDeleted = 'no';
-        }        
+        }
         return this
     }
-
-    // createdAfter()
 
     onlyIncludeDeleted() {
         this.params.includeDeleted = 'only';
@@ -2525,22 +2544,10 @@ export class Query {
         return this;
     }
 
-
     forDefs(defList: Def[] | Def) {
         if (!Array.isArray(defList)) defList = [defList];
         return this.forDids(defList.map(def => def.did));
     }
-
-    /*
-    forDefs(defList: Def | Def[] | string[] | string) {
-        //@ts-expect-error
-        if (!Array.isArray(defList)) defList = [defList];
-        if(typeof defList !== 'string') defList = (<Def[]>defList).map(d=>d._did);
-
-        this.params.did = defList;
-        return this
-    }
-    */
 
     uids(uid: string[] | string) {
         if (!Array.isArray(uid)) uid = [uid];
@@ -2563,8 +2570,8 @@ export class Query {
         if (!Array.isArray(tags)) tags = [tags];
         //convert tags into dids
         const manifest = PDW.getManifest();
-        const dids = manifest.filter(def=> def.hasTag(tags))
-        this.params.did = dids.map(d=>d.data._did);
+        const dids = manifest.filter(def => def.hasTag(tags))
+        this.params.did = dids.map(d => d.data._did);
         return this
     }
 
@@ -2642,7 +2649,7 @@ export class Query {
             count: entries.length,
             params: {
                 paramsIn: this.params,
-                asParsed: {todo: 'Also to do'}
+                asParsed: PDW.sanitizeParams(this.params)
             },
             entries: entries
         }
@@ -2710,6 +2717,43 @@ export class Summary {
     }
     public get periods(): PeriodSummary[] {
         return this._periods;
+    }
+
+    toPeriodMap(): PeriodSummaryMap {
+        let perMap: { [period: string]: any } = {}
+        this._periods.forEach(periodSummary => {
+            let didMap: DidSummaryMap = {}
+            periodSummary.entryRollups.forEach(er => {
+                didMap[er.did] = {
+                    did: er.did,
+                    emoji: er.emoji,
+                    lbl: er.lbl,
+                    entryData: er.entries?.map(e=>e.toData()) as EntryData[],
+                    pts: Summary.makePidMap(er.pts)
+                }
+            })
+            perMap[periodSummary.period.toString()] = didMap
+        })
+        return perMap
+    }
+
+    private static makePidMap(pts: PointRollup): PidSummaryMap{
+        let returnObj: PidSummaryMap = {};
+        Object.keys(pts).forEach(key=>{
+            //@ts-expect-error
+            let obj = pts[key];
+            returnObj[key] = {
+                lbl: obj.lbl as string,
+                method: obj.method as Rollup,
+                pid: obj.pid as SmallID,
+                val: obj.val as any,
+            }
+        })
+        return returnObj;
+    }
+
+    stringify(): string {
+        return JSON.stringify(this.toPeriodMap());
     }
 }
 
@@ -2800,8 +2844,8 @@ export class DefaultDataStore implements DataStore {
     }
 
     async getDefs(includedDeleted = false): Promise<DefData[]> {
-        let params: ReducedParams = {includeDeleted: 'no'};
-        if(includedDeleted) params.includeDeleted = 'yes';
+        let params: ReducedParams = { includeDeleted: 'no' };
+        if (includedDeleted) params.includeDeleted = 'yes';
         const allMatches = this.defs.filter(def => def.passesFilters(params));
         let noDupes = new Set(allMatches);
         return Array.from(noDupes).map(def => def.toData() as DefData)
