@@ -266,6 +266,26 @@ export interface StandardParams {
      * which could be expensive in cloud-based datastores.
      */
     allOnPurpose?: boolean
+    /**
+     * If provdided, will query for the current day. Will ignore any provided values
+     */
+    today?: any;
+    /**
+     * If provdided, will query for the current week. Will ignore any provided values
+     */
+    thisWeek?: any;
+    /**
+     * If provdided, will query for the current month. Will ignore any provided values
+     */
+    thisMonth?: any;
+    /**
+     * If provdided, will query for the current quarter. Will ignore any provided values
+     */
+    thisQuarter?: any;
+    /**
+     * If provdided, will query for the current year. Will ignore any provided values
+     */
+    thisYear?: any;
 }
 
 /**
@@ -942,6 +962,12 @@ export class PDW {
     static sanitizeParams(params: StandardParams): ReducedParams {
         //ensure default
         if (params.includeDeleted === undefined) params.includeDeleted = 'no';
+
+        if (params?.today !== undefined) params.inPeriod = Period.now(Scope.DAY);
+        if (params?.thisWeek !== undefined) params.inPeriod = Period.now(Scope.WEEK);
+        if (params?.thisMonth !== undefined) params.inPeriod = Period.now(Scope.MINUTE);
+        if (params?.thisQuarter !== undefined) params.inPeriod = Period.now(Scope.QUARTER);
+        if (params?.thisYear !== undefined) params.inPeriod = Period.now(Scope.YEAR);
 
         if (params.hasOwnProperty("inPeriod")) {
             let period = params.inPeriod as Period
@@ -2480,6 +2506,11 @@ export class Query {
         if (paramsIn?.to !== undefined) this.to(paramsIn.to);
         if (paramsIn?.inPeriod !== undefined) this.inPeriod(paramsIn.inPeriod);
         if (paramsIn?.scope !== undefined) this.scope(paramsIn.scope);
+        if (paramsIn?.today !== undefined) this.inPeriod(Period.now(Scope.DAY));
+        if (paramsIn?.thisWeek !== undefined) this.inPeriod(Period.now(Scope.WEEK));
+        if (paramsIn?.thisMonth !== undefined) this.inPeriod(Period.now(Scope.MINUTE));
+        if (paramsIn?.thisQuarter !== undefined) this.inPeriod(Period.now(Scope.QUARTER));
+        if (paramsIn?.thisYear !== undefined) this.inPeriod(Period.now(Scope.YEAR));
         return this
     }
 
@@ -2491,6 +2522,7 @@ export class Query {
     }
 
     encodeAsURL(): string {
+        //new URLSearchParams(obj).toString(); //ref code
         throw new Error('unimplemented')
     }
 
@@ -2670,7 +2702,7 @@ export class Query {
 
 export class Summary {
     private _periods: PeriodSummary[];
-    constructor(entries: Entry[], scope: Scope) {
+    constructor(entries: Entry[], scope: Scope | "all") {
         if (entries.length === 0) throw new Error("No entries to summarize");
         let periodStrs: PeriodStr[] = [...new Set(entries.map(e => e.period.toString()))];
         let earliest = periodStrs.reduce((prev, periodStr) => {
@@ -2681,7 +2713,20 @@ export class Summary {
             const end = new Period(periodStr).getEnd().toString();
             return end > prev ? end : prev
         });
-        let periods = Period.allPeriodsIn(new Period(earliest), new Period(latest), scope, false) as Period[];
+        if(scope === 'all'){
+            let entsByType = splitEntriesByType(entries);
+            const keys = Object.keys(entsByType);
+            let rollups: EntryRollup[] = [];
+            keys.forEach(key =>
+                rollups.push(PDW.rollupEntries(entsByType[key])))
+            this._periods = [{
+                period: 'all',
+                entryRollups: rollups,
+                entries: entries
+            }];
+            return
+        }
+        let periods = Period.allPeriodsIn(new Period(earliest), new Period(latest), (<Scope>scope), false) as Period[];
         this._periods = periods.map(p => {
             let ents = entries.filter(e => p.contains(e.period));
             let entsByType = splitEntriesByType(ents);

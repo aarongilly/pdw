@@ -8,10 +8,12 @@ import * as pdw from './pdw.js'
 const pdwRef = pdw.PDW.getInstance();
 
 await createSummaryDataSet();
+console.log(typeof createTestDataSet);//stopping errors
 
-let result = await pdwRef.query({includeDeleted: 'yes', allOnPurpose: true, inPeriod: '2023-08-23'}).run();
 
-let summary = new pdw.Summary(result.entries,pdw.Scope.DAY);
+let result = await pdwRef.query({includeDeleted: 'yes', allOnPurpose: true}).run();
+
+let summary = new pdw.Summary(result.entries,'all');
 
 let string = summary.stringify();
 
