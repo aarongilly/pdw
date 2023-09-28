@@ -1284,19 +1284,31 @@ test('Summarizer', async () => {
 
     let all = (await new pdw.Query().inPeriod(new pdw.Period('2023-08-21').zoomOut()).run()).entries;
 
-    let summary = new pdw.Summary(all, pdw.Scope.WEEK);
-    expect(summary.periods.length).toBe(1);
-    expect(summary.periods[0].entryRollups[0].pts['b111'].val).toBe('PT14760S')
-    expect(summary.periods[0].entryRollups[0].pts['b222'].val).toBe('false: 1, true: 3')
-    expect(summary.periods[0].entryRollups[0].pts['b333'].val).toBe('21:02:58')
-    summary = new pdw.Summary(all, pdw.Scope.DAY);
-    expect(summary.periods.length).toBe(3);
-    expect(summary.periods[0].entryRollups[0].pts['b111'].val).toBe('PT9360S')
-    expect(summary.periods[0].entryRollups[0].pts['b222'].val).toBe('true: 1, false: 1')
-    expect(summary.periods[0].entryRollups[0].pts['b333'].val).toBe('22:05:28')
-
+    //summarize by week
+    let periods = pdw.PDW.summarize(all, pdw.Scope.WEEK);
+    expect(periods.length).toBe(1);
     
+    let checkRollup = periods[0].entryRollups.find(er=>er.lbl === 'Nap')!
+    expect(checkRollup.pts['b111'].val).toBe('PT14760S')
+    expect(checkRollup.pts['b222'].val).toBe('false: 1, true: 3')
+    expect(checkRollup.pts['b333'].val).toBe('21:02:58')
+    checkRollup = periods[0].entryRollups.find(er=>er.lbl === 'Event')!
+    expect(checkRollup.pts['aaaa'].val).toBe(3); //point._rollup = COUNT
+    expect(checkRollup.pts['bbbb'].val).toBe(2); //point._rollup = COUNTUNIQUE
 
+    //summarize by day
+    periods = pdw.PDW.summarize(all, pdw.Scope.DAY);
+    expect(periods.length).toBe(3);
+    checkRollup = periods[0].entryRollups.find(er=>er.lbl === 'Nap')!
+    expect(checkRollup.pts['b111'].val).toBe('PT9360S')
+    expect(checkRollup.pts['b222'].val).toBe('true: 1, false: 1')
+    expect(checkRollup.pts['b333'].val).toBe('22:05:28')
+    
+    //summarize all into one "ALL" period
+    periods = pdw.PDW.summarize(all, "ALL");
+    expect(periods.length).toBe(1);
+    console.log(periods[0].entryRollups, 'yo');
+    
 })
 
 test('DataStore Tester', async () => {
@@ -1495,6 +1507,56 @@ async function createSummaryDataSet() {
             }
         ]
     })
+    const event = await pdwRef.newDef({
+        _lbl: "Event",
+        _scope: pdw.Scope.HOUR,
+        _pts: [
+            {
+                _pid: 'aaaa',
+                _type: pdw.PointType.TEXT
+            },
+            {
+                _pid: 'bbbb',
+                _type: pdw.PointType.NUMBER,
+                _rollup: pdw.Rollup.COUNTUNIQUE
+            }
+        ]
+
+    })
+    const daily = await pdwRef.newDef({
+        _did: 'dddd',
+        _lbl: "Journal",
+        _scope: pdw.Scope.DAY,
+        _pts: [
+            {
+                _pid: 'ddd1',
+                _lbl: 'Nightly Review',
+                _type: pdw.PointType.MARKDOWN
+            }
+        ]
+    })
+
+    event.newEntry({
+        _period: '2023-08-23T01',
+        'aaaa': 'Whatever',
+        'bbbb': 1,
+    });
+    event.newEntry({
+        _period: '2023-08-23T02',
+        'aaaa': 'Something else',
+        'bbbb': 2,
+    });
+    event.newEntry({
+        _period: '2023-08-23T03',
+        'aaaa': 'A third time, but only a second new number',
+        'bbbb': 2,
+    });
+
+    daily.newEntry({
+        _period: '2023-08-23',
+        'ddd1': "Today I did *a lot*"
+    })
+    
     nap.newEntry({
         _period: "2023-08-23T16:30:29",
         'b111': "PT25M",

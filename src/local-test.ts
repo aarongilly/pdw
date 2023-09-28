@@ -11,13 +11,8 @@ await createSummaryDataSet();
 console.log(typeof createTestDataSet);//stopping errors
 
 
-let result = await pdwRef.query({includeDeleted: 'yes', allOnPurpose: true}).run();
+await pdwRef.query({includeDeleted: 'yes', allOnPurpose: true}).run();
 
-let summary = new pdw.Summary(result.entries,'all');
-
-let string = summary.stringify();
-
-console.log(JSON.parse(string));
 
 // let q = new pdw.Query();
 // q.tags('tag1');

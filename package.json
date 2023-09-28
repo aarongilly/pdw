@@ -25,6 +25,6 @@
     "vitest": "^0.28.5"
   },
   "dependencies": {
-    "temporal-polyfill": "^0.0.8"
+    "temporal-polyfill": "^0.1.1"
   }
 }
