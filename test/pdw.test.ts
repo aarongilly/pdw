@@ -129,8 +129,8 @@ test('Def Creation and Getting', async () => {
             }
         ]
     );
-    expect(thirdAndForthDef[0].lbl).toBe('Third def');
-    expect(thirdAndForthDef[1].lbl).toBe('Forth def');
+    expect(thirdAndForthDef.defData![0]._lbl).toBe('Third def');
+    expect(thirdAndForthDef.defData![1]._lbl).toBe('Forth def');
     defs = await pdwRef.getDefs()
     expect(defs.length).toBe(4);
 
@@ -250,8 +250,8 @@ test('Def Creation and Getting', async () => {
             }
         }
     ]);
-    expect(defsFourAndFive[0].pts[0].lbl).toBe('Def 4 point 1');
-    expect(defsFourAndFive[1].pts[0].lbl).toBe('Def 5 point 1');
+    expect(defsFourAndFive.defData![0]._pts[0]._lbl).toBe('Def 4 point 1');
+    expect(defsFourAndFive.defData![1]._pts[0]._lbl).toBe('Def 5 point 1');
 
     /**
      * Def.getPoint(pid)
@@ -461,7 +461,7 @@ test('Entry Creation and Getting', async () => {
         _updated: epochStr
     }]);
 
-    testEntry = tempArr[0];
+    testEntry = new pdw.Entry(tempArr.entryData![0]);
     entries = await pdwRef.getEntries();
     expect(entries.length).toBe(3);
     expect(entries[2]).toEqual(testEntry);

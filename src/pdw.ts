@@ -555,6 +555,7 @@ export interface EntryData extends ElementData {
 export interface PointRollup {
     pid: SmallID;
     lbl: string;
+    emoji: string;
     val: any;
     method: Rollup;
     vals: any[];
@@ -598,7 +599,11 @@ export interface ReducedQueryResponse {
 
 export interface CommitResponse {
     success: boolean;
-    msgs?: string[]
+    msgs?: string[];
+    defData?: DefData[];
+    entryData?: EntryData[];
+    delDefs?: DeletionMsg[];
+    delEntries?: DeletionMsg[];
 }
 
 interface CurrentAndDeletedCounts {
@@ -761,7 +766,7 @@ export class PDW {
         return PDW.inflateEntriesFromData(entriesQuery.entries);
     }
 
-    async setDefs(createDefs: DefLike[] = [], updateDefs: DefLike[] = [], deletionDefs: DeletionMsg[] = []): Promise<Def[]> {
+    async setDefs(createDefs: DefLike[] = [], updateDefs: DefLike[] = [], deletionDefs: DeletionMsg[] = []): Promise<CommitResponse> {
         let trans: Transaction = {
             create: {
                 defs: createDefs.map(def => new Def(def)),
@@ -776,14 +781,14 @@ export class PDW {
                 entries: []
             }
         }
-        this.dataStore.commit(trans)
+        const response = await this.dataStore.commit(trans)
         const defs = [...trans.create.defs, ...trans.update.defs];
         this.handleManifestDeletionChange(trans.delete.defs);
         this.pushDefsToManifest(defs);
-        return defs.map(e => e.makeStaticCopy()) as Def[]
+        return response
     }
 
-    async setEntries(createEntries: EntryData[] = [], updateEntries: EntryData[] = [], deletionEntries: DeletionMsg[] = []): Promise<Entry[]> {
+    async setEntries(createEntries: EntryData[] = [], updateEntries: EntryData[] = [], deletionEntries: DeletionMsg[] = []): Promise<CommitResponse> {
 
         let trans: Transaction = {
             create: {
@@ -799,11 +804,9 @@ export class PDW {
                 entries: deletionEntries
             }
         }
-        this.dataStore.commit(trans);
+        const response = await this.dataStore.commit(trans);
 
-        const entries = [...trans.create.entries, ...trans.update.entries];
-
-        return entries.map(e => e.makeStaticCopy()) as Entry[]
+        return response
     }
 
     async setAll(completeDataset: CompleteDataset) {
@@ -1087,6 +1090,7 @@ export class PDW {
             let ptRlp: PointRollup = {
                 pid: pd.pid,
                 lbl: pd.lbl,
+                emoji: pd.emoji,
                 method: pd.rollup,
                 vals: vals,
                 val: undefined
@@ -2743,7 +2747,7 @@ export class DefaultDataStore implements DataStore {
         let returnObj: CommitResponse = {
             success: false
         }
-        // try {
+        
         //creating new Elements
         trans.create.defs.forEach(newDef => {
             this.defs.push(newDef);
@@ -2756,17 +2760,18 @@ export class DefaultDataStore implements DataStore {
             ${trans.create.entries.length} Entries`)
 
         //updating existing
-        //is there a race condition here possibly?
-        //NO IDEA WHAT'S GOING ON HERE - if I "await", this is causing tests to fail, it skips the "deletions" section
-        this.setElementsInRepo(trans.update.defs.map(d => d.data) as DefData[], this.defs);
-        this.setElementsInRepo(trans.update.entries.map(d => d.data) as EntryData[], this.entries);
+        const flatUpdatedDefs = trans.update.defs.map(d => d.data) as DefData[]
+        const flatUpdatedEntries = trans.update.entries.map(d => d.data) as EntryData[]
+        this.setElementsInRepo(flatUpdatedDefs, this.defs);
+        this.setElementsInRepo(flatUpdatedEntries, this.entries);
 
-        //deletions
+        //deletions        
         trans.delete.defs.forEach(def => {
             let matched = this.defs.find(defInRepo => defInRepo.uid === def.uid);
             if (matched !== undefined) {
                 matched.updated = def.updated;
                 matched.deleted = def.deleted;
+                returnObj.delEntries?.push(def);
             }
         })
         trans.delete.entries.forEach(entry => {
@@ -2774,14 +2779,14 @@ export class DefaultDataStore implements DataStore {
             if (matched !== undefined) {
                 matched.updated = entry.updated;
                 matched.deleted = entry.deleted;
+                returnObj.delEntries?.push(entry);
             }
         })
 
         returnObj.success = true;
-        // } catch (e) {
-        //     console.log(e);
-        //     returnObj.msgs = ['An error occurred when querying the DefaultDataStore']
-        // }
+        returnObj.defData = [...flatUpdatedDefs, ...trans.create.defs.map(d=>d.toData() as DefData)]
+        returnObj.entryData = [...flatUpdatedEntries, ...trans.create.entries.map(d=>d.toData() as EntryData)]
+        returnObj.msgs = [`Stored ${returnObj.defData.length} Defs, ${returnObj.entryData.length} Entries, and toggled deletition for ${returnObj.delDefs?.length} Defs and ${returnObj.delEntries?.length} Entries.`];
         return returnObj;
     }
 
