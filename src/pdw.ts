@@ -1077,7 +1077,7 @@ export class PDW {
         pointDefs.forEach(pd => {
             let vals: any[] = [];
             entries.forEach(e => {
-                
+
                 let point = e[pd.pid];
                 if (point !== undefined) vals.push(point);
             })
@@ -1198,7 +1198,7 @@ export class PDW {
                 entries: entryDataArr
             }];
         }
-        
+
         let periods = Period.allPeriodsIn(new Period(earliest), new Period(latest), (<Scope>scope), false) as Period[];
         return periods.map(p => {
             let ents = entryDataArr.filter(e => p.contains(e._period));
@@ -1501,31 +1501,6 @@ export abstract class Element {
         if (data.hasOwnProperty("_did")) return "DefData"
         return null
     }
-
-    // /**
-    //  * Analyzes an object and tries to find one UNDELETED Element that
-    //  * has the same Xid(s). Does not look at UIDs or Labels.
-    //  * @param dataIn an object that may be part of an existing Element
-    //  * @param ofType optional, allows you to override what the dataIn would suggest it should be
-    //  */
-    // static async findExistingData(dataIn: any, ofType?: 'Def' | 'Entry' ): Promise<any> {
-    //     //replace any passed in Element instances with their Data replacement
-    //     if (dataIn.hasOwnProperty('__modified') && dataIn.hasOwnProperty('data')) dataIn = dataIn.data;
-    //     const type = ofType === undefined ? Element.getTypeOfElement(dataIn) : ofType + 'Data';
-    //     if (type === null) return undefined;
-
-    //     let pdwRef = PDW.getInstance();
-    //     if (type === 'DefData') {
-    //         let storeResult = await pdwRef.dataStore.reducedQuery({ did: [dataIn._did], includeDeleted: 'no' });
-    //         if (storeResult.defs.length === 1) return storeResult.defs[0];
-    //         return undefined;
-    //     }
-    //     if (type === 'EntryData') {
-    //         let storeResult = await pdwRef.dataStore.reducedQuery({ eid: [dataIn._eid], includeDeleted: 'no' });
-    //         if (storeResult.entries.length === 1) return storeResult.entries[0];
-    //         return undefined;
-    //     }
-    // }
 
     public static getMostRecent(elementArr: ElementData[]): ElementData | undefined {
         if (elementArr.length == 0) {
@@ -2168,7 +2143,6 @@ export class Entry extends Element {
  * They are basically wrappers around a string.
  */
 export class Period {
-
     /**
      * The Period itself, represented in a {@link PeriodStr} format.  
      * 
@@ -2189,11 +2163,27 @@ export class Period {
         if (typeof periodStr !== 'string') periodStr = periodStr.periodStr;
         this.periodStr = periodStr;
         this.scope = Period.inferScope(periodStr);
+        if (this.scope === Scope.SECOND && this.periodStr.length > 20) this.periodStr = convertFullISOToPlainDateStr(this.periodStr);
         this._zoomLevel = Period.zoomLevel(this.scope)
 
         if (desiredScope !== undefined && this.scope !== desiredScope) {
             console.log('Converting ' + periodStr + ' to scope ' + desiredScope);
             return this.zoomTo(desiredScope);
+        }
+
+        /**
+         * This sucked to figure out and was annoying to need to do at all.
+         * @param isoString an ISO formatting string, along with the timezone offset
+         * @returns an ISO formatted string without the offset, representing the time *in that timezone*
+         */
+        function convertFullISOToPlainDateStr(isoString: string): string {
+            let temp = Temporal.PlainDateTime.from(isoString);
+            const tzString = Temporal.TimeZone.from(isoString).toString();
+            const offsetString = tzString.substring(0,1) + 'PT' + Number.parseInt(tzString.substring(1,3)) + 'h' + + Number.parseInt(tzString.substring(5,7)) + 'm';
+            console.log(offsetString);
+            temp = temp.add(offsetString);
+            let str = temp.toJSON()
+            return str
         }
     }
 
@@ -2378,7 +2368,7 @@ export class Period {
     }
 
     contains(period: Period | PeriodStr): boolean {
-        if(typeof period === 'string') period = new Period(period);
+        if (typeof period === 'string') period = new Period(period);
         //converting week scopes to THURSDAY of that week
         if (period.scope === Scope.WEEK) period = Period.getMidWeek(period)
         const inBegin = Temporal.PlainDateTime.from(period.getStart().periodStr)
