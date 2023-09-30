@@ -1289,25 +1289,25 @@ test('Summarizer', async () => {
     expect(periods.length).toBe(1);
     
     let checkRollup = periods[0].entryRollups.find(er=>er.lbl === 'Nap')!
-    expect(checkRollup.pts['b111'].val).toBe('PT14760S')
-    expect(checkRollup.pts['b222'].val).toBe('false: 1, true: 3')
-    expect(checkRollup.pts['b333'].val).toBe('21:02:58')
+    expect(checkRollup.pts.find(pt=>pt.pid==='b111')!.val).toBe('PT14760S')
+    expect(checkRollup.pts.find(pt=>pt.pid==='b222')!.val).toBe('false: 1, true: 3')
+    expect(checkRollup.pts.find(pt=>pt.pid==='b333')!.val).toBe('21:02:58')
     checkRollup = periods[0].entryRollups.find(er=>er.lbl === 'Event')!
-    expect(checkRollup.pts['aaaa'].val).toBe(3); //point._rollup = COUNT
-    expect(checkRollup.pts['bbbb'].val).toBe(2); //point._rollup = COUNTUNIQUE
+    expect(checkRollup.pts.find(pt=>pt.pid==='aaaa')!.val).toBe(3); //point._rollup = COUNT
+    expect(checkRollup.pts.find(pt=>pt.pid==='bbbb')!.val).toBe(2); //point._rollup = COUNTUNIQUE
 
     //summarize by day
     periods = pdw.PDW.summarize(all, pdw.Scope.DAY);
     expect(periods.length).toBe(3);
     checkRollup = periods[0].entryRollups.find(er=>er.lbl === 'Nap')!
-    expect(checkRollup.pts['b111'].val).toBe('PT9360S')
-    expect(checkRollup.pts['b222'].val).toBe('true: 1, false: 1')
-    expect(checkRollup.pts['b333'].val).toBe('22:05:28')
+    expect(checkRollup.pts.find(pt=>pt.pid==='b111')!.val).toBe('PT9360S')
+    expect(checkRollup.pts.find(pt=>pt.pid==='b222')!.val).toBe('true: 1, false: 1')
+    expect(checkRollup.pts.find(pt=>pt.pid==='b333')!.val).toBe('22:05:28')
     
     //summarize all into one "ALL" period
     periods = pdw.PDW.summarize(all, "ALL");
     expect(periods.length).toBe(1);
-    console.log(periods[0].entryRollups, 'yo');
+    // console.log(periods[0].entryRollups, 'yo');
     
 })
 

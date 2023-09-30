@@ -285,6 +285,10 @@ export interface StandardParams {
      * If provdided, will query for the current year. Will ignore any provided values
      */
     thisYear?: any;
+    /**
+     * If provided, the query response will include Period rollups
+     */
+    rollup?: Scope
 }
 
 /**
@@ -553,15 +557,14 @@ export interface PointRollup {
     lbl: string;
     val: any;
     method: Rollup;
-    vals?: any[];
+    vals: any[];
 }
 
 export interface EntryRollup {
     did: SmallID;
     lbl: string;
     emoji: string;
-    pts: PointRollup;
-    entries?: EntryData[];
+    pts: PointRollup[];
 }
 
 export interface PeriodSummary {
@@ -583,6 +586,7 @@ export interface QueryResponse {
     msgs?: string[];
     params: { paramsIn: object, asParsed: object };
     entries: Entry[];
+    summary?: PeriodSummary[];
     // defs: Def[]; //maybe not needed? Entry contains Def
 }
 
@@ -1068,11 +1072,10 @@ export class PDW {
         const def: Def = PDW.getInstance().getFromManifest(entries[0]._did);
         const pointDefs = def.pts;
         let returnObj = {
-            entries: entries,//.map(e => e.toData() as EntryData),
             did: def.did,
             lbl: def.lbl,
             emoji: def.emoji,
-            pts: {} as PointRollup
+            pts: [] as PointRollup[]
         }
         pointDefs.forEach(pd => {
             let vals: any[] = [];
@@ -1107,8 +1110,7 @@ export class PDW {
             if (pd.rollup === Rollup.COUNTOFEACH) ptRlp.val = doCountOfEach(vals);
             if (pd.rollup === Rollup.COUNTUNIQUE) ptRlp.val = doCountUnique(vals);
 
-            //@ts-expect-error
-            returnObj.pts[pd.pid] = ptRlp;
+            returnObj.pts.push(ptRlp);
         })
         return returnObj
 
@@ -2610,6 +2612,12 @@ export class Query {
         return this
     }
 
+    rollup(to: Scope){
+        to = to.toUpperCase() as Scope;
+        this.params.rollup = to;
+        return this
+    }
+
     /**
      * Cannot be used in conjuction with dids. This sets `params.did` internally.
      * @param tid tag ID of tags to be used
@@ -2700,7 +2708,8 @@ export class Query {
                 paramsIn: this.params,
                 asParsed: PDW.sanitizeParams(this.params)
             },
-            entries: entries
+            entries: entries,
+            summary: this.params.hasOwnProperty('rollup') ? PDW.summarize(entries, this.params.rollup as Scope) : undefined
         }
         return resp
     }
@@ -2716,73 +2725,6 @@ export class Query {
         })
     }
 }
-
-// export class Summary {
-//     private _periods: PeriodSummary[];
-//     constructor(entries: Entry[] | EntryData[], scope: Scope | "ALL") {
-//         if (entries.length === 0) throw new Error("No entries to summarize");
-//         let entryDataArr = entries as EntryData[];
-//         if(!entryDataArr[0].hasOwnProperty('_eid')) entryDataArr = entryDataArr.map(e=>e.toData()) as EntryData[];
-//         let periodStrs: PeriodStr[] = [...new Set(entryDataArr.map(e => e.period.toString()))];
-//         let earliest = periodStrs.reduce((prev, periodStr) => {
-//             const start = new Period(periodStr).getStart().toString();
-//             return start < prev ? start : prev
-//         });
-//         let latest = periodStrs.reduce((prev, periodStr) => {
-//             const end = new Period(periodStr).getEnd().toString();
-//             return end > prev ? end : prev
-//         });
-//         if(scope === 'ALL'){
-//             let entsByType = splitEntriesByType(entryDataArr);
-//             const keys = Object.keys(entsByType);
-//             let rollups: EntryRollup[] = [];
-//             keys.forEach(key =>
-//                 rollups.push(PDW.rollupEntries(entsByType[key])))
-//             this._periods = [{
-//                 period: 'ALL',
-//                 entryRollups: rollups,
-//                 entries: entryDataArr
-//             }];
-//             return
-//         }
-//         let periods = Period.allPeriodsIn(new Period(earliest), new Period(latest), (<Scope>scope), false) as Period[];
-//         this._periods = periods.map(p => {
-//             let ents = entryDataArr.filter(e => p.contains(e.period));
-//             let entsByType = splitEntriesByType(ents);
-//             const keys = Object.keys(entsByType);
-//             let rollups: EntryRollup[] = [];
-//             keys.forEach(key =>
-//                 rollups.push(PDW.rollupEntries(entsByType[key])))
-//             return {
-//                 period: p.toString(),
-//                 entryRollups: rollups,
-//                 entries: ents
-//             }
-//         })
-
-//         function splitEntriesByType(entries: EntryData[]): { [dids: string]: any; } {
-//             let entryTypes: { [dids: string]: any; } = {};
-//             entries.forEach(entry => {
-//                 if (entryTypes.hasOwnProperty(entry._did)) {
-//                     entryTypes[entry._did].push(entry);
-//                 } else {
-//                     entryTypes[entry._did] = [entry];
-//                 }
-//             })
-//             return entryTypes
-//         }
-
-//         // if(typeof period === 'string') period = new Period(period);
-//         // if(period.scope === Scope.SECOND) throw new Error('Cannot summarize to the 1-second level');
-//         // this.entries = entries;
-//         // this._def = entries[0].getDef();
-//         // this.period = period;
-//         // let pivot: any[] = [];
-//     }
-//     public get periods(): PeriodSummary[] {
-//         return this._periods;
-//     }
-// }
 
 export class DefaultDataStore implements DataStore {
     serviceName: string;
