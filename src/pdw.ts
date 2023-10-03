@@ -793,11 +793,11 @@ export class PDW {
         let trans: Transaction = {
             create: {
                 defs: [],
-                entries: await PDW.inflateEntriesFromData(createEntries)
+                entries: PDW.inflateEntriesFromData(createEntries)
             },
             update: {
                 defs: [],
-                entries: await PDW.inflateEntriesFromData(updateEntries)
+                entries: PDW.inflateEntriesFromData(updateEntries)
             },
             delete: {
                 defs: [],
@@ -809,15 +809,34 @@ export class PDW {
         return response
     }
 
-    async setAll(completeDataset: CompleteDataset) {
-        if (completeDataset.defs !== undefined) this.setDefs(completeDataset.defs);
-        if (completeDataset.entries !== undefined) this.setEntries(completeDataset.entries);
+    async setAll(completeDataset: ElementMap | CompleteDataset): Promise<CommitResponse> {
+        if(completeDataset.entries.length > 0 && completeDataset.entries[0].hasOwnProperty('_uid')) completeDataset.entries = PDW.inflateEntriesFromData(completeDataset.entries as EntryData[]);
+        if(completeDataset.defs.length > 0 && completeDataset.defs[0].hasOwnProperty('_uid')) completeDataset.defs = completeDataset.defs.map(def => new Def(def as DefData))
+        const result = await this.dataStore.commit({
+            create: {
+                defs: [],
+                entries: []
+            },
+            update: {
+                defs: completeDataset.defs as Def[],
+                entries: completeDataset.entries as Entry[],
+            },
+            delete: {
+                defs: [],
+                entries: []
+            },
+        })
+        if(result.success === false){
+            console.error(result);
+            throw new Error('Setting Defs and Entries failed')
+        }
+        return result;
     }
 
     async newDef(defInfo: DefLike): Promise<Def> {
         let newDef = new Def(defInfo);
         const storeCopy = newDef.makeStaticCopy() as Def;
-        this.dataStore.commit({
+        const result = await this.dataStore.commit({
             create: {
                 defs: [storeCopy],
                 entries: []
@@ -831,6 +850,10 @@ export class PDW {
                 entries: []
             },
         })
+        if(result.success === false){
+            console.error(result);
+            throw new Error('Def Creation failed')
+        }
         this.manifest.push(storeCopy);
         return newDef;
     }
@@ -838,7 +861,7 @@ export class PDW {
     async newEntry(entryInfo: EntryLike, def: Def): Promise<Entry> {
         let newEntry = new Entry(entryInfo, def);
         const storeCopy = newEntry.makeStaticCopy() as Entry;
-        this.dataStore.commit({
+        const result = await this.dataStore.commit({
             create: {
                 defs: [],
                 entries: [storeCopy]
@@ -852,6 +875,10 @@ export class PDW {
                 entries: []
             },
         })
+        if(result.success === false){
+            console.error(result);
+            throw new Error('Entry Creation failed')
+        }
         return newEntry;
     }
 
@@ -1993,6 +2020,11 @@ export class Entry extends Element {
     declare data: EntryData
     private _def: Def;
     private _period: Period;
+    /**
+     * Creates a LOCAL entry instance
+     * @param entryData data to use to build the entry
+     * @param def def to use, if none is supplied it will pull from the local manifest based on entryData._did
+     */
     constructor(entryData: EntryLike, def?: Def) {
         super(entryData);
         if (def !== undefined) {
@@ -2745,7 +2777,8 @@ export class DefaultDataStore implements DataStore {
 
     async commit(trans: Transaction): Promise<CommitResponse> {
         let returnObj: CommitResponse = {
-            success: false
+            success: false,
+            msgs: []
         }
         
         //creating new Elements
@@ -2762,8 +2795,8 @@ export class DefaultDataStore implements DataStore {
         //updating existing
         const flatUpdatedDefs = trans.update.defs.map(d => d.data) as DefData[]
         const flatUpdatedEntries = trans.update.entries.map(d => d.data) as EntryData[]
-        this.setElementsInRepo(flatUpdatedDefs, this.defs);
-        this.setElementsInRepo(flatUpdatedEntries, this.entries);
+        this.setElementsInRepo(flatUpdatedDefs, this.defs, returnObj.msgs!);
+        this.setElementsInRepo(flatUpdatedEntries, this.entries, returnObj.msgs!);
 
         //deletions        
         trans.delete.defs.forEach(def => {
@@ -2786,7 +2819,7 @@ export class DefaultDataStore implements DataStore {
         returnObj.success = true;
         returnObj.defData = [...flatUpdatedDefs, ...trans.create.defs.map(d=>d.toData() as DefData)]
         returnObj.entryData = [...flatUpdatedEntries, ...trans.create.entries.map(d=>d.toData() as EntryData)]
-        returnObj.msgs = [`Stored ${returnObj.defData.length} Defs, ${returnObj.entryData.length} Entries, and toggled deletition for ${returnObj.delDefs?.length} Defs and ${returnObj.delEntries?.length} Entries.`];
+        returnObj.msgs!.push(`Stored ${returnObj.defData.length} Defs, ${returnObj.entryData.length} Entries, and toggled deletition for ${returnObj.delDefs?.length} Defs and ${returnObj.delEntries?.length} Entries.`);
         return returnObj;
     }
 
@@ -2843,7 +2876,7 @@ export class DefaultDataStore implements DataStore {
      * @param elementsIn list of Elements (Defs, Entries, etc) to set
      * @param elementRepo the existing set of Elements in the DataStore (this.defs, this.entries, etc)
      */
-    async setElementsInRepo(elementsIn: ElementData[], elementRepo: Element[]): Promise<void> {
+    async setElementsInRepo(elementsIn: ElementData[], elementRepo: Element[], msgs: string[]): Promise<void> {
         if (elementsIn.length === 0) return;
         let newElements: ElementData[] = [];
         elementsIn.forEach(el => {
@@ -2866,6 +2899,8 @@ export class DefaultDataStore implements DataStore {
                     sameId.deleted = true;
                     sameId.updated = makeEpochStr();
                     newElements.push(el);
+                }else{
+                    msgs.push('Skipped saving entry with uid ' + el._uid + ', as a more recently updated element is already in stores');
                 }
             } else {
                 newElements.push(el);
@@ -2875,14 +2910,6 @@ export class DefaultDataStore implements DataStore {
         if (type === 'DefData') elementRepo.push(...newElements.map(d => new Def(d)));
         if (type === 'EntryData') elementRepo.push(...await PDW.inflateEntriesFromData(newElements as EntryData[]));
         // return elementsIn;
-    }
-
-    async setDefs(defsIn: Def[]): Promise<DefData[]> {
-        return this.setElementsInRepo(defsIn.map(d => d.data) as DefData[], this.defs) as unknown as DefData[];
-    }
-
-    async setEntries(entriesIn: Entry[]): Promise<EntryData[]> {
-        return this.setElementsInRepo(entriesIn.map(e => e.data), this.entries) as unknown as EntryData[];
     }
 
     async getOverview(): Promise<DataStoreOverview> {

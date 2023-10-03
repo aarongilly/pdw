@@ -7,19 +7,7 @@ import * as pdw from './pdw.js'
 
 const pdwRef = pdw.PDW.getInstance();
 
-let defs = allDefs();
-
-//@ts-expect-error
-await pdwRef.setDefs(defs);
-
-let def = pdwRef.getFromManifest('zzfh');
-console.log(new Date().toString());
-
-let entry = await def.newEntry({
-    _period: '2023-09-29T17:01:23-05:00'
-})
-
-console.log(pdwRef);
+console.log(pdw.parseTemporalFromEpochStr('ln9pwhux').toLocaleString());
 
 
 // await createSummaryDataSet();
