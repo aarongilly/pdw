@@ -699,6 +699,7 @@ export class PDW {
     async getDefs(includedDeleted = false): Promise<Def[]> {
         const defDatas = await this.dataStore.getDefs(includedDeleted);
         let defs = defDatas.map(dl => new Def(dl));
+        this._manifest = defs.filter(d=>!d.deleted);
         return defs;
 
         // //#TODO - extract this logic to a dedicated "PDW.sync(datastores:DataStore[])" method
@@ -1147,7 +1148,9 @@ export class PDW {
 
         function doAverage(vals: number[]) {
             let sum = doSum(vals)
-            return sum / vals.length;
+            const ave = sum / vals.length;
+            const rounded = Math.round(ave * 100) / 100 //2 decimals
+            return rounded
         }
 
         function doAverageDuration(vals: string[]): string {
@@ -1208,6 +1211,7 @@ export class PDW {
 
     static summarize(entries: Entry[] | EntryData[], scope: Scope | "ALL"): PeriodSummary[] {
         if (entries.length === 0) throw new Error("No entries to summarize");
+        if(scope === Scope.MINUTE || scope === Scope.SECOND) throw new Error("Rollups to scopes below one hour are not supported."); //I imagine if this happens it would be unintentional
         let entryDataArr = entries as EntryData[];
         if (!entryDataArr[0].hasOwnProperty('_eid')) entryDataArr = entryDataArr.map(e => e.toData()) as EntryData[];
         let periodStrs: PeriodStr[] = [...new Set(entryDataArr.map(e => e._period))];
