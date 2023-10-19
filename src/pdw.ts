@@ -734,7 +734,27 @@ export class PDW {
         return matchedDef!
     }
 
+    getTagsFromManifest(): string[]{
+        let tags:string[] = [];
+        this.manifest.forEach(def=>{
+            def.tags.forEach(tag=>{
+                if(!tags.some(t=>t.toUpperCase()===tag.toUpperCase())) tags.push(tag);
+            })
+        })
+        return tags;
+    }
+
+    //#TODO maybe
+    // relabelTag(oldTagLbl: string, newTagLbl: string){
+    //     this.manifest.forEach(def=>{
+    //         def.tags.forEach(tag=>{
+    //             if(!tags.some(t=>t.toUpperCase()===oldTagLbl.toUpperCase())) ...
+    //         })
+    //     })
+    // }
+
     private pushDefsToManifest(defs: Def[]) {
+        console.trace('Is this being called?')
         if (!Array.isArray(defs)) return;
         if (defs.length === 0) return;
         defs.forEach((def: any) => {
@@ -1154,9 +1174,8 @@ export class PDW {
         }
 
         function doAverageDuration(vals: string[]): string {
-            if (typeof vals[0] !== 'string') throw new Error('Period average saw a non-string')
-            // let temp = Temporal.Duration.from(vals[0]).total('seconds');
-            const sum = vals.reduce((pv, val) => pv + Temporal.Duration.from(val).total('seconds'), 0);
+            if (typeof vals[0] !== 'string') throw new Error('Period average saw a non-string');
+            const sum = vals.reduce((pv, val) => Math.round(pv + Temporal.Duration.from(val).total('seconds')), 0);
             const ave = sum / vals.length;
             return Temporal.Duration.from({ seconds: ave }).toLocaleString();
         }
