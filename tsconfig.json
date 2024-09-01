@@ -33,8 +33,9 @@
   "typedocOptions": {
     "entryPoints": [
       "src/pdw.ts",
-      "src/dataStores/fileAsyncDataStores.ts"
+      "src/translators/fileTranslators.ts"
     ],
-    "out": "docs"
+    "out": "docs",
+    "excludeExternals": true
   }
 }

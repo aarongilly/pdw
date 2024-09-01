@@ -1120,7 +1120,7 @@ test('Data Merge', () => {
     expect(merge.defs.length).toBe(3);
     expect(merge.entries.length).toBe(3);
 
-    function tinyDataA(): pdw.CompleteDataset {
+    function tinyDataA(): pdw.CanonicalDataset {
         return {
             defs: [
                 {
@@ -1164,7 +1164,7 @@ test('Data Merge', () => {
         }
     }
 
-    function tinyDataB(): pdw.CompleteDataset {
+    function tinyDataB(): pdw.CanonicalDataset {
         return {
             defs: [
                 {

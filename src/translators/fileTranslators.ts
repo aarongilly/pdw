@@ -5,21 +5,21 @@ import { Temporal } from 'temporal-polyfill';
 import * as pdw from '../pdw.js';
 
 //#region ### EXPORTED FUNCTIONS ###
-export function exportToFile(filepath: string, data: pdw.CompleteDataset) {
+export function canonicalDataToFile(filepath: string, data: pdw.CanonicalDataset) {
     const fileType = inferFileType(filepath)
-    if (fileType === 'excel') return new AsyncExcelTabular().exportTo(data, filepath);
-    if (fileType === 'json') return new AsyncJson().exportTo(data, filepath);
-    if (fileType === 'yaml') return new AsyncYaml().exportTo(data, filepath);
-    if (fileType === 'csv') return new AsyncCSV().exportTo(data, filepath);
+    if (fileType === 'excel') return new AsyncExcelTabular().fromCanonicalData(data, filepath);
+    if (fileType === 'json') return new AsyncJson().fromCanonicalData(data, filepath);
+    if (fileType === 'yaml') return new AsyncYaml().fromCanonicalData(data, filepath);
+    if (fileType === 'csv') return new AsyncCSV().fromCanonicalData(data, filepath);
     throw new Error('Unimplemented export type: ' + fileType)
 }
  
-export async function importFromFile(pdwRef: pdw.PDW, filepath: string) {
+export async function fileToCanonicalData(filepath: string) {
     const fileType = inferFileType(filepath)
-    if (fileType === 'excel') return await new AsyncExcelTabular().importFrom(pdwRef, filepath);
-    if (fileType === 'json') return await new AsyncJson().importFrom(pdwRef, filepath);
-    if (fileType === 'yaml') return await new AsyncYaml().importFrom(pdwRef, filepath);
-    if (fileType === 'csv') return await new AsyncCSV().importFrom(pdwRef, filepath);
+    if (fileType === 'excel') return await new AsyncExcelTabular().toCanonicalData(filepath);
+    if (fileType === 'json') return await new AsyncJson().toCanonicalData(filepath);
+    if (fileType === 'yaml') return await new AsyncYaml().toCanonicalData(filepath);
+    if (fileType === 'csv') return await new AsyncCSV().toCanonicalData(filepath);
     throw new Error('Unimplemented import type: ' + fileType)
 }
 
@@ -27,55 +27,21 @@ export async function importFromFile(pdwRef: pdw.PDW, filepath: string) {
 
 //#region #### DONE ####
 
-export class AsyncJson implements pdw.ImporterExporter {
-    async exportTo(data: pdw.CompleteDataset, filepath: string) {
+export class AsyncJson implements pdw.CanonicalDataTranslator {
+    async fromCanonicalData(data: pdw.CanonicalDataset, filepath: string) {
         // data = pdw.PDW.flattenCompleteDataset(data); //remove circular references and stuff
         let json = JSON.stringify(data);
         fs.writeFileSync(filepath, json, 'utf8');
     }
 
-    // async importDefData(filepath: string, includeDeleted = false): Promise<pdw.DefData[]> {
-    //     const file = JSON.parse(fs.readFileSync(filepath).toString());
-    //     if(file.defs === undefined) throw new Error("No Defs found (JSON object had no 'defs' key");
-    //     /* using a temporary PDW instance to inflate Defs */
-    //     const tempLocalPDWInstance = pdw.PDW.newPDWUsingDefs(file.defs);
-    //     /* so that I can ensure these are full-up DefData objects */
-    //     return (await tempLocalPDWInstance.getDefs(includeDeleted)).map(def=>def.data);
-    // }
-
-    // async importEntryData(usingDefData: pdw.DefData[], filepath: string): Promise<pdw.EntryData[]> {
-    //     const file = JSON.parse(fs.readFileSync(filepath).toString());
-    //     if(file.entries === undefined) throw new Error("No Entries found (JSON object had no 'defs' key");
-    //     /* using a temporary PDW instance to inflate Entries */
-    //     const tempLocalPDWInstance = pdw.PDW.newPDWUsingDefs(usingDefData);
-    //     tempLocalPDWInstance.setEntries(file.entries);
-    //     /* so that I can ensure these are full-up EntryData objects */
-    //     return (await tempLocalPDWInstance.getEntries()).map(entry=>entry.data);
-    // }
-
-    async importFrom(pdwRef: pdw.PDW, filepath: string): Promise<pdw.CompleteDataset> {
+    async toCanonicalData(filepath: string): Promise<pdw.CanonicalDataset> {
         const file = JSON.parse(fs.readFileSync(filepath).toString());
-        const returnData: pdw.CompleteDataset = {
+        const returnData: pdw.CanonicalDataset = {
             defs: file.defs,
             entries: file.entries
         }
-        if (returnData.defs !== undefined) await pdwRef.setDefs([], returnData.defs);
-        if (returnData.entries !== undefined) await pdwRef.setEntries([], returnData.entries);
 
-        returnData.overview = {
-            storeName: filepath,
-            defs: {
-                current: returnData.defs?.filter(element => element._deleted === false).length,
-                deleted: returnData.defs?.filter(element => element._deleted).length
-            },
-            entries: {
-                current: returnData.entries?.filter(element => element._deleted === false).length,
-                deleted: returnData.entries?.filter(element => element._deleted).length
-            },
-            lastUpdated: pdw.PDW.getDatasetLastUpdate(returnData)
-        }
-
-        return returnData;
+        return pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
     }
 }
 
@@ -87,9 +53,9 @@ export class AsyncJson implements pdw.ImporterExporter {
  * yaml -> dates stored as ISO Strings (native YAML dates)
  * excel -> dates stored as Local Strings AND native Excel dates! 
  */
-export class AsyncYaml implements pdw.ImporterExporter {
+export class AsyncYaml implements pdw.CanonicalDataTranslator {
 
-    async exportTo(data: pdw.CompleteDataset, filepath: string) {
+    async fromCanonicalData(data: pdw.CanonicalDataset, filepath: string) {
         //crazy simple implementation
         const newData = this.translateToYamlFormat(data);
         const yaml = YAML.stringify(newData);
@@ -97,22 +63,20 @@ export class AsyncYaml implements pdw.ImporterExporter {
     }
 
     //@ts-expect-error
-    async importFrom(pdwRef: pdw.PDW, filepath: string): pdw.CompleteDataset {
+    async toCanonicalData(filepath: string): pdw.CanonicalDataset {
         const file = YAML.parse(fs.readFileSync(filepath).toString());
-        let returnData: pdw.CompleteDataset = {
+        let returnData: pdw.CanonicalDataset = {
             defs: file.defs,
             entries: file.entries
         }
         this.translateFromYamlFormat(returnData);
-        if (returnData.defs !== undefined) await pdwRef.setDefs([], returnData.defs);
-        if (returnData.entries !== undefined) await pdwRef.setEntries([], returnData.entries);
 
         returnData = pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
 
         return returnData;
     }
 
-    translateFromYamlFormat(data: pdw.CompleteDataset) {
+    translateFromYamlFormat(data: pdw.CanonicalDataset) {
         if (data.overview !== undefined) {
             let temporal = this.makeEpochStrFromISO(data.overview.lastUpdated);
             data.overview.lastUpdated = temporal.toString().split('[')[0]
@@ -174,7 +138,7 @@ export class AsyncYaml implements pdw.ImporterExporter {
         return pdw.makeEpochStrFrom(temp)!;
     }
 
-    translateToYamlFormat(data: pdw.CompleteDataset) {
+    translateToYamlFormat(data: pdw.CanonicalDataset) {
 
         let staticCopy = JSON.parse(JSON.stringify(data));
         if (staticCopy.overview !== undefined) {
@@ -245,81 +209,8 @@ export class AsyncYaml implements pdw.ImporterExporter {
 
 //#endregion
 
-export class AsyncCSV implements pdw.ImporterExporter {
-    //@ts-expect-error
-    async importFrom(pdwRef: pdw.PDW, filepath: string, useFs = true): pdw.CompleteDataset {
-        console.log('loading...');
-        if(useFs) XLSX.set_fs(fs);
-        let loadedWb = XLSX.readFile(filepath);
-        const shts = loadedWb.SheetNames;
-        const sht = loadedWb.Sheets[shts[0]];
-        let elements = XLSX.utils.sheet_to_json(sht, { raw: false }) as any;
-
-        let rawDefs: pdw.DefData[] = elements.filter((e:any) => e['Row Type'] === 'Def') as pdw.DefData[];
-        let rawPointDefs: pdw.PointDefData[] = elements.filter((e:any) => e['Row Type'] === 'PointDef') as pdw.PointDefData[];
-        let rawEntries: pdw.EntryData[] = elements.filter((e:any) => e['Row Type'] === 'Entry') as pdw.EntryData[];
-
-        let defs = rawDefs.map(rd => makeDef(rd));
-        let entries = rawEntries.map(re => makeEntry(re));
-        rawPointDefs.forEach((rpd: pdw.PointDefData) => {
-            //@ts-expect-error
-            delete rpd['Row Type'];
-            //@ts-expect-error
-            let def = defs.find(d => d._uid === rpd._uid);
-            //@ts-expect-error
-            rpd._opts = rpd._opts === undefined ? undefined : JSON.parse(rpd._opts)
-            def!._pts.push(rpd);
-        })
-
-        await pdwRef.setDefs([], (<pdw.DefData[]>defs));
-        await pdwRef.setEntries([], (<pdw.EntryData[]>entries));
-
-        return {
-            defs: defs,
-            entries: entries,
-        }
-
-        function makeDef(data: pdw.DefData): pdw.DefData {
-            delete data['Row Type'];
-            //@ts-expect-error
-            data._deleted = data._deleted === "TRUE";
-            data._tags = JSON.parse(data._tags.toString());
-            data._pts = [];
-            return data
-        }
-        function makeEntry(data: pdw.EntryData): pdw.EntryData {
-            delete data['Row Type']
-            //@ts-expect-error
-            data._deleted = data._deleted === "TRUE";
-            data._period = parsePeriod(data._period);
-            data = addVals(data);
-            return data
-        }
-        function addVals(data: any): any {
-            let parsed = JSON.parse(data._vals);
-            //cool object merging syntax
-            return {
-                ...data,
-                ...parsed
-            }
-        }
-
-        function parsePeriod(period: any): string {
-            if (typeof period === 'string') return period
-            if (typeof period === 'number') {
-                period = Math.round(period * 10000) / 10000
-                try {
-                    return Temporal.Instant.fromEpochMilliseconds(Math.round((period - (25567 + 1)) * 86400 * 1000)).toZonedDateTimeISO(Temporal.Now.timeZone()).toPlainDate().toString();
-                } catch (e) {
-                    console.log('did not work');
-
-                }
-            }
-            throw new Error('Unhandled period val...')
-        }
-    }
-
-    exportTo(allData: pdw.CompleteDataset, filename: string, useFs = true) {
+export class AsyncCSV implements pdw.CanonicalDataTranslator {
+    async fromCanonicalData(allData: pdw.CanonicalDataset, filename: string, useFs = true) {
         if(useFs) XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();
         const data: string[][] = []
@@ -424,32 +315,79 @@ export class AsyncCSV implements pdw.ImporterExporter {
                 JSON.stringify(vals, null, 2), //'',//'_vals',    //entry
             ])
         }
-
-        // function makeRowFromElement(data: any) {//pdw.Def | pdw.Entry | pdw.Tag | pdw.TagDef | pdw.PointDef | pdw.EntryPoint): string[]{
-        //     return [
-        //         pdw.getElementType(data).slice(0, -4),
-        //         data._uid,
-        //         data._created,
-        //         data._updated,
-        //         data._deleted.toString().toUpperCase(),
-        //         data._did === undefined ? '' : data._did!,
-        //         data._pid === undefined ? '' : data._pid!,
-        //         data._eid === undefined ? '' : data._eid!,
-        //         data._tid === undefined ? '' : data._tid!,
-        //         data._lbl === undefined ? '' : data._lbl!,
-        //         data._emoji === undefined ? '' : data._emoji!,
-        //         data._desc === undefined ? '' : data._desc,
-        //         data._scope === undefined ? '' : data._scope!,
-        //         data._type === undefined ? '' : data._type!,
-        //         data._rollup === undefined ? '' : data._rollup!,
-        //         data._period === undefined ? '' : data._period.toString()!,
-        //         data._note === undefined ? '' : data._note!,
-        //         data._source === undefined ? '' : data._source!,
-        //         data._val === undefined ? '' : data._val.toString()!,
-        //     ]
-        // }
     }
 
+    async toCanonicalData(filepath: string, useFs = true): Promise<pdw.CanonicalDataset> {
+        console.log('loading...');
+        if(useFs) XLSX.set_fs(fs);
+        let loadedWb = XLSX.readFile(filepath);
+        const shts = loadedWb.SheetNames;
+        const sht = loadedWb.Sheets[shts[0]];
+        let elements = XLSX.utils.sheet_to_json(sht, { raw: false }) as any;
+
+        let rawDefs: pdw.DefData[] = elements.filter((e:any) => e['Row Type'] === 'Def') as pdw.DefData[];
+        let rawPointDefs: pdw.PointDefData[] = elements.filter((e:any) => e['Row Type'] === 'PointDef') as pdw.PointDefData[];
+        let rawEntries: pdw.EntryData[] = elements.filter((e:any) => e['Row Type'] === 'Entry') as pdw.EntryData[];
+
+        let defs = rawDefs.map(rd => makeDef(rd));
+        let entries = rawEntries.map(re => makeEntry(re));
+        rawPointDefs.forEach((rpd: pdw.PointDefData) => {
+            //@ts-expect-error
+            delete rpd['Row Type'];
+            //@ts-expect-error
+            let def = defs.find(d => d._uid === rpd._uid);
+            //@ts-expect-error
+            rpd._opts = rpd._opts === undefined ? undefined : JSON.parse(rpd._opts)
+            def!._pts.push(rpd);
+        })
+
+        /* Trying to clean up some of the junk xlsx adds on there easily */
+        const tempPDW = pdw.PDW.newPDWUsingDefs([]);
+        await tempPDW.setDefs([], (<pdw.DefData[]>defs));
+        await tempPDW.setEntries([], (<pdw.EntryData[]>entries));
+        let returnData = await tempPDW.getAll({includeDeleted: 'yes'});
+        //turned out that ⬆️ was the easiest way, huh.
+        return returnData
+
+        function makeDef(data: pdw.DefData): pdw.DefData {
+            delete data['Row Type'];
+            //@ts-expect-error
+            data._deleted = data._deleted === "TRUE";
+            data._tags = JSON.parse(data._tags.toString());
+            data._pts = [];
+            return data
+        }
+        function makeEntry(data: pdw.EntryData): pdw.EntryData {
+            delete data['Row Type']
+            //@ts-expect-error
+            data._deleted = data._deleted === "TRUE";
+            data._period = parsePeriod(data._period);
+            data = addVals(data);
+            return data
+        }
+        function addVals(data: any): any {
+            let parsed = JSON.parse(data._vals);
+            //cool object merging syntax
+            return {
+                ...data,
+                ...parsed
+            }
+        }
+
+        function parsePeriod(period: any): string {
+            if (typeof period === 'string') return period
+            if (typeof period === 'number') {
+                period = Math.round(period * 10000) / 10000
+                try {
+                    return Temporal.Instant.fromEpochMilliseconds(Math.round((period - (25567 + 1)) * 86400 * 1000)).toZonedDateTimeISO(Temporal.Now.timeZone()).toPlainDate().toString();
+                } catch (e) {
+                    console.log('did not work');
+
+                }
+            }
+            throw new Error('Unhandled period val...')
+        }
+    }
 }
 
 /**
@@ -457,13 +395,13 @@ export class AsyncCSV implements pdw.ImporterExporter {
  * TABULAR Excel. These stack all types on one-another
  * and are **not** the "natural" way of working within Excel
  */
-export class AsyncExcelTabular implements pdw.ImporterExporter {
+export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
     static overViewShtName = '!Overview';
     static defShtName = '!Defs';
     static tagShtName = '!Tags';
     static pointShtName = '!DefPoints';
 
-    exportTo(data: pdw.CompleteDataset, filename: string, useFs = true) {
+    fromCanonicalData(data: pdw.CanonicalDataset, filename: string, useFs = true) {
         if(useFs) XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();
 
@@ -587,19 +525,22 @@ export class AsyncExcelTabular implements pdw.ImporterExporter {
         ]
     }
 
-    async importFrom(pdwRef: pdw.PDW, filepath: string, useFs = true): Promise<pdw.CompleteDataset> {
+    async toCanonicalData(filepath: string, useFs = true): Promise<pdw.CanonicalDataset> {
         /**
          * Note to self: ran into an issue with XLSX.JS wherein it doesn't like opening
          * files with the .xlsx file type here on Mac. You could fight it later, perhaps.
          */
         console.log('loading...');
-        let returnData: pdw.CompleteDataset = {
+        let returnData: pdw.CanonicalDataset = {
             defs: [],
             entries: []
         }
         if(useFs) XLSX.set_fs(fs);
         let loadedWb = XLSX.readFile(filepath);
         const shts = loadedWb.SheetNames;
+
+        //again this turned out to just be easier
+        let tempPDW = pdw.PDW.newPDWUsingDefs([])
 
         if (!shts.some(name => name === AsyncExcelTabular.pointShtName)) {
             console.warn('No PointDefs sheet found, skipping Defs import');
@@ -615,23 +556,22 @@ export class AsyncExcelTabular implements pdw.ImporterExporter {
                 const parsedDef = AsyncExcelTabular.parseExcelDef(rawDef, points);
                 returnData.defs.push(parsedDef as pdw.DefData);
             });
-
-            await pdwRef.setDefs(returnData.defs);
+            await tempPDW.setDefs(returnData.defs);
         }
 
         shts.forEach(name => {
             if (name === AsyncExcelTabular.pointShtName) return; //skip
             if (name === AsyncExcelTabular.overViewShtName) return; //skip
             if (name === AsyncExcelTabular.defShtName) return; //skip
-            const assDef = pdwRef.manifest.find(def=>def.lbl===name)!;
+            const assDef = tempPDW.manifest.find(def=>def.lbl===name)!;
             const entrySht = loadedWb.Sheets[name];
             const entryRawArr = XLSX.utils.sheet_to_json(entrySht, { raw: false }) as pdw.EntryLike[];
             const entries = entryRawArr.map(rawEntry=>parseRawEntry(rawEntry, assDef));
             returnData.entries.push(...entries);
         });
-        await pdwRef.setEntries(returnData.entries);
+        await tempPDW.setEntries(returnData.entries);
 
-        returnData = pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
+        returnData = await tempPDW.getAll({includeDeleted: 'yes'});
         return returnData;
 
         function parseRawEntry(entryRow: any, def: pdw.Def): pdw.EntryData{

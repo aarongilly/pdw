@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import * as pdw from '../src/pdw';
-import * as ie from '../src/ImportExport/fileImportExport'
+import * as ie from '../src/translators/fileTranslators'
 
 const testData = getTestData();
 
@@ -13,12 +13,11 @@ test('Roundtrip JSON', async () => {
     const dataset = await pdwRef.getAll({});
     /* Write it to file */
     let jsonExp = new ie.AsyncJson();
-    await jsonExp.exportTo(dataset, 'test/localTestFileDir/dataset.json');
-    /* Create 2nd fresh PDW instance */
-    const secondPDW = pdw.PDW.newPDWUsingDefs([]);
+    await jsonExp.fromCanonicalData(dataset, 'test/localTestFileDir/dataset.json');
     /* Load data from the file */
-    await jsonExp.importFrom(secondPDW, 'test/localTestFileDir/dataset.json');
-    const comparisonDataset = await secondPDW.getAll({});
+    const comparisonDataset = await jsonExp.toCanonicalData('test/localTestFileDir/dataset.json');
+    //The store name only comes with the imported data
+    delete comparisonDataset.overview?.storeName;
     expect(dataset).toEqual(comparisonDataset);
 })
 
@@ -31,12 +30,11 @@ test('Roundtrip YAML', async () => {
     const dataset = await pdwRef.getAll({});
     /* Write it to file */
     let yamlExp = new ie.AsyncYaml();
-    await yamlExp.exportTo(dataset, 'test/localTestFileDir/dataset.yaml');
-    /* Create 2nd fresh PDW instance */
-    const secondPDW = pdw.PDW.newPDWUsingDefs([]);
+    await yamlExp.fromCanonicalData(dataset, 'test/localTestFileDir/dataset.yaml');
     /* Load data from the file */
-    await yamlExp.importFrom(secondPDW, 'test/localTestFileDir/dataset.yaml');
-    const comparisonDataset = await secondPDW.getAll({});
+    const comparisonDataset = await yamlExp.toCanonicalData('test/localTestFileDir/dataset.yaml');
+    //The store name only comes with the imported data
+    delete comparisonDataset.overview?.storeName;
     expect(dataset).toEqual(comparisonDataset);
 })
 
@@ -49,12 +47,11 @@ test('Roundtrip CSV', async () => {
     const dataset = await pdwRef.getAll({});
     /* Write it to file */
     let csvExp = new ie.AsyncCSV();
-    await csvExp.exportTo(dataset, 'test/localTestFileDir/dataset.csv');
-    /* Create 2nd fresh PDW instance */
-    const secondPDW = pdw.PDW.newPDWUsingDefs([]);
+    await csvExp.fromCanonicalData(dataset, 'test/localTestFileDir/dataset.csv');
     /* Load data from the file */
-    await csvExp.importFrom(secondPDW, 'test/localTestFileDir/dataset.csv');
-    const comparisonDataset = await secondPDW.getAll({});
+    const comparisonDataset = await csvExp.toCanonicalData('test/localTestFileDir/dataset.csv');
+    //The store name only comes with the imported data
+    delete comparisonDataset.overview?.storeName;
     expect(dataset).toEqual(comparisonDataset);
 })
 
@@ -66,14 +63,12 @@ test('Roundtrip Excel', async () => {
     /* Pull the data out */
     const dataset = await pdwRef.getAll({});
     /* Write it to file */
-    let xlExp = new ie.AsyncExcelTabular();
-    await xlExp.exportTo(dataset, 'test/localTestFileDir/dataset.xlsx');
-    /* Create 2nd fresh PDW instance */
-    const secondPDW = pdw.PDW.newPDWUsingDefs([]);
+    let xlsxExp = new ie.AsyncExcelTabular();
+    await xlsxExp.fromCanonicalData(dataset, 'test/localTestFileDir/dataset.xlsx');
     /* Load data from the file */
-    await xlExp.importFrom(secondPDW, 'test/localTestFileDir/dataset.xlsx');
-    const comparisonDataset = await secondPDW.getAll({});
-
+    const comparisonDataset = await xlsxExp.toCanonicalData('test/localTestFileDir/dataset.xlsx');
+    //The store name only comes with the imported data
+    delete comparisonDataset.overview?.storeName;
     /* 
         Using native Excel dates, which round to the nearest second.
         This causes the EpochStrs to be wrong by a tiny bit, which is
@@ -119,7 +114,7 @@ test('Roundtrip Excel', async () => {
     expect(dataset).toEqual(comparisonDataset);
 })
 
-function getTestData(): pdw.CompleteDataset {
+function getTestData(): pdw.CanonicalDataset {
     return {
         "defs": [
             {

@@ -47,7 +47,7 @@ export type Markdown = string
  */
 type Omit<T, K extends keyof T> = {
     [P in keyof T as P extends K ? never : P]: T[P];
-  };
+};
 
 //#endregion
 
@@ -154,9 +154,11 @@ export interface DataStore {
 }
 
 /**
- * The means to get data to and from external data repositories (.csv files, etc)
+ * The means to convert {@link CanonicalDataset}s to and from other formats
  */
-export interface ImporterExporter {
+export interface CanonicalDataTranslator {
+    toCanonicalData(params: any): Promise<CanonicalDataset>;
+    fromCanonicalData(canonicalDataset: CanonicalDataset, params: any): any;
     /**
      * Data from the external library are imported into a PDW instance.
      */
@@ -166,7 +168,7 @@ export interface ImporterExporter {
      * Data from the PDW is supplied, it's saved in an exported format
      * according to the Exporter logic & whatnot.
      */
-    exportTo(allData: CompleteDataset, params: any): any
+    // exportTo(allData: CanonicalDataset, params: any): any
 }
 /**
  * Basic data filtering parameters, supported by the {@link PDW} methods for
@@ -347,14 +349,11 @@ export interface ElementMap {
 }
 
 /**
- * 
-    overview?: DataStoreOverview
-    storeName?: string;
-    defs: CurrentAndDeletedCounts;
-    entries: CurrentAndDeletedCounts;
-    lastUpdated: EpochStr;
+    The main data structure.  
+    Contanis a map of DefLike and EntryLike objects, along 
+    with an optional overview.
  */
-export interface CompleteDataset extends ElementDataMap {
+export interface CanonicalDataset extends ElementDataMap {
     overview?: DataStoreOverview;
 }
 
@@ -645,15 +644,15 @@ export class PDW {
     /**
      * 
      * @param rawParams an object of any {@link StandardParams} to include
-     * @returns a {@link CompleteDataset} containing a {@link Def}s, {@link Entry}s
+     * @returns a {@link CanonicalDataset} containing a {@link Def}s, {@link Entry}s
      */
-    async getAll(rawParams: StandardParams): Promise<CompleteDataset> {
+    async getAll(rawParams: StandardParams): Promise<CanonicalDataset> {
         const params = this.sanitizeParams(rawParams);
         const entries = await this.dataStore.getEntries(params);
         const includeDeletedDefs = params.hasOwnProperty('includeDeleted') && params.includeDeleted != 'no';
         const defs = (await this.dataStore.getDefs(includeDeletedDefs)) as DefData[];
 
-        const dataset: CompleteDataset = {
+        const dataset: CanonicalDataset = {
             defs: defs,
             entries: entries.entries
         }
@@ -734,8 +733,8 @@ export class PDW {
      */
     getDefFromManifest(did: string): Def | undefined {
         let foundDef = this._manifest.find(def => def.did === did);
-        if(foundDef === undefined) foundDef = this._manifest.find(def => def.lbl.toUpperCase() === did.toUpperCase().trim());
-        if(foundDef === undefined) throw new Error("Did not find Def in manifest ")
+        if (foundDef === undefined) foundDef = this._manifest.find(def => def.lbl.toUpperCase() === did.toUpperCase().trim());
+        if (foundDef === undefined) throw new Error("Did not find Def in manifest ")
         return foundDef
     }
 
@@ -765,16 +764,16 @@ export class PDW {
         this.pushDefsToManifest(defs);
         return response
     }
-    
-    async setAll(completeDataset: ElementMap | CompleteDataset): Promise<any> {
+
+    async setAll(completeDataset: ElementMap | CanonicalDataset): Promise<any> {
         let defs: Def[] = [];
-        if (completeDataset.defs.length > 0){
+        if (completeDataset.defs.length > 0) {
             defs = completeDataset.defs.map(def => new Def(def as DefData, this))
             this.pushDefsToManifest(defs);
         }
 
         let entries: Entry[] = [];
-        if (completeDataset.entries.length > 0){
+        if (completeDataset.entries.length > 0) {
             entries = this.inflateEntriesFromData(completeDataset.entries as EntryData[]);
         }
 
@@ -850,11 +849,11 @@ export class PDW {
 
 
     /**
-     * Combines two complete(ish) datasets ({@link CompleteDataset}). 
+     * Combines two complete(ish) datasets ({@link CanonicalDataset}). 
      * Returns a CompleteDataset that merges each type of ElementData
      */
-    mergeComplete(a: CompleteDataset, b: CompleteDataset): CompleteDataset {
-        let returnObj: CompleteDataset = {
+    mergeComplete(a: CanonicalDataset, b: CanonicalDataset): CanonicalDataset {
+        let returnObj: CanonicalDataset = {
             defs: [],
             entries: []
         };
@@ -1141,10 +1140,10 @@ export class PDW {
     }
 
     /**
-     * Finds the most-recently updated Element from a {@link CompleteDataset}
+     * Finds the most-recently updated Element from a {@link CanonicalDataset}
      * @returns EpochStr of the most recently-updated thing in the set
      */
-    static getDatasetLastUpdate(dataset: CompleteDataset): string {
+    static getDatasetLastUpdate(dataset: CanonicalDataset): string {
         let recents: ElementData[] = [];
         if (dataset.defs !== undefined && dataset.defs.length > 0) recents.push(Element.getMostRecent(dataset.defs)!)
         if (dataset.entries !== undefined && dataset.entries.length > 0) recents.push(Element.getMostRecent(dataset.entries)!)
@@ -1153,9 +1152,9 @@ export class PDW {
     }
 
     /**
-     * Slap a {@link DatasetOverview} to a {@link CompleteDataset}
+     * Slap a {@link DatasetOverview} to a {@link CanonicalDataset}
      */
-    static addOverviewToCompleteDataset(data: CompleteDataset, storeName?: string): CompleteDataset {
+    static addOverviewToCompleteDataset(data: CanonicalDataset, storeName?: string): CanonicalDataset {
         if (data.overview !== undefined) {
             console.warn('Tried to add an overview to a dataset that already had one:', data);
             return data
@@ -1784,10 +1783,10 @@ export class PointDef {
         this.def.save();
     }
 
-    hasOpt(lbl: string): boolean{
-        if(this.data._opts === undefined) return false;
+    hasOpt(lbl: string): boolean {
+        if (this.data._opts === undefined) return false;
         const trimmedUpperCasedLabel = lbl.toUpperCase().trim();
-        return this.data._opts.some(opt=>opt.toUpperCase().trim() === trimmedUpperCasedLabel);
+        return this.data._opts.some(opt => opt.toUpperCase().trim() === trimmedUpperCasedLabel);
     }
 
     addOpt(lbl: string) {
@@ -1826,7 +1825,7 @@ export class PointDef {
         return this.def;
     };
 
-    shouldHaveOpts(): boolean{
+    shouldHaveOpts(): boolean {
         return PointDef.shouldHaveOpts(this.type);
     }
 
@@ -1966,8 +1965,8 @@ export class Entry extends Element {
 
         //migrate points up - to support using a _pts: map on the entryData object. Not preferred, but may be handy.
         //probably YAGNI
-        if(entryData.hasOwnProperty('_pts')){
-            Object.keys(entryData._pts).forEach(key=>{
+        if (entryData.hasOwnProperty('_pts')) {
+            Object.keys(entryData._pts).forEach(key => {
                 entryData[key] = entryData._pts[key];
             })
         }
