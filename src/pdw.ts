@@ -617,13 +617,12 @@ export class PDW {
     dataStore: DataStore;
     private _manifest: Def[];
     private constructor(manifest: DefLike[], store?: DataStore,) {
+        this._manifest = this._manifest = manifest.map(defData => new Def(defData, this));
         if (store !== undefined) {
             this.dataStore = store;
         } else {
             this.dataStore = new DefaultDataStore(this);
         }
-        this._manifest = [];
-        if (manifest !== undefined) this._manifest = manifest.map(defData => new Def(defData, this));
 
         console.log('PDW instance created with the ' + this.dataStore.serviceName + ' DataStore, with ' + this._manifest.length + ' definitions.');
     }
@@ -632,8 +631,10 @@ export class PDW {
         return this._manifest;
     }
 
-    static newPDWUsingDefs(defManifest: DefLike[]): PDW {
-        return new PDW(defManifest);
+    static async newPDWUsingDefs(defManifest: DefLike[]): Promise<PDW> {
+        let instance = new PDW([]);
+        await instance.setDefs(defManifest);
+        return instance
     }
 
     static async newPDWUsingDatastore(dataStore: DataStore): Promise<PDW> {
@@ -1605,10 +1606,12 @@ export class Def extends Element {
         this.__modified = true;
     }
 
-    getPoint(pidOrLbl: string): PointDef {
+    getPoint(pidOrLbl: string): PointDef | undefined {
         let point = this.pts.find(point => point.pid === pidOrLbl);
         if (point === undefined) point = this.pts.find(point => point.lbl.toUpperCase() === pidOrLbl.toUpperCase());
         if (point !== undefined) return point
+        //warning maybe?
+        return undefined;
         throw new Error('No point found with pid or lbl when getting "' + pidOrLbl + '" for the Def labeled "' + this.lbl + '"');
     }
 
@@ -1760,7 +1763,7 @@ export class PointDef {
             return
         }
         this.data._emoji = newEmoji
-        this.def.getPoint(this.data._pid).data._emoji = newEmoji;
+        this.def.getPoint(this.data._pid)!.data._emoji = newEmoji;
         this.def.__modified = true;
     }
     set opts(newOptArray: string[]) {

@@ -342,7 +342,7 @@ export class AsyncCSV implements pdw.CanonicalDataTranslator {
         })
 
         /* Trying to clean up some of the junk xlsx adds on there easily */
-        const tempPDW = pdw.PDW.newPDWUsingDefs([]);
+        const tempPDW = await pdw.PDW.newPDWUsingDefs([]);
         await tempPDW.setDefs([], (<pdw.DefData[]>defs));
         await tempPDW.setEntries([], (<pdw.EntryData[]>entries));
         let returnData = await tempPDW.getAll({includeDeleted: 'yes'});
@@ -540,7 +540,7 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
         const shts = loadedWb.SheetNames;
 
         //again this turned out to just be easier
-        let tempPDW = pdw.PDW.newPDWUsingDefs([])
+        let tempPDW = await pdw.PDW.newPDWUsingDefs([])
 
         if (!shts.some(name => name === AsyncExcelTabular.pointShtName)) {
             console.warn('No PointDefs sheet found, skipping Defs import');
@@ -594,7 +594,7 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
             Object.keys(entryRow).forEach(key=>{
                 if(key.substring(0,1)==="_") return
                 const assPd = def.getPoint(key);
-                entryData[assPd.pid] = entryRow[key];
+                entryData[assPd!.pid] = entryRow[key];
             })
 
             if(!pdw.Entry.isEntryData(entryData)) throw new Error("Error in parsing an entry row");

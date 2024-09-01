@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import * as pdw from '../src/pdw';
 import { Temporal } from 'temporal-polyfill';
 
-const pdwRef = pdw.PDW.newPDWUsingDefs([]);
+const pdwRef = await pdw.PDW.newPDWUsingDefs([]);
 
 function resetTestDataset() {
     //@ts-expect-error - hacking to set the private manifest prop, it has no setter on purpose
@@ -12,8 +12,8 @@ function resetTestDataset() {
 
 test('Basic setup', async ()=>{
     resetTestDataset();
-    let pdwOne = pdw.PDW.newPDWUsingDefs([]);
-    let pdwTwo = pdw.PDW.newPDWUsingDefs([]);
+    let pdwOne = await pdw.PDW.newPDWUsingDefs([]);
+    let pdwTwo = await pdw.PDW.newPDWUsingDefs([]);
     await pdwOne.newDef({_did:'test'});
     await pdwTwo.newDef({_did:'two instances'});
     /**
@@ -24,7 +24,7 @@ test('Basic setup', async ()=>{
     expect(pdwTwo.manifest.length).toBe(1);
     expect(pdwTwo.getDefFromManifest('two instances')!.did).toBe('two instances');
 
-    let pdwThree = pdw.PDW.newPDWUsingDefs([{_did:'three instances'}]);
+    let pdwThree = await pdw.PDW.newPDWUsingDefs([{_did:'three instances'}]);
     expect(pdwThree.manifest.length).toBe(1);
     expect(pdwThree.getDefFromManifest('three instances')!.did).toBe('three instances')
 })
@@ -265,21 +265,19 @@ test('Def Creation and Getting', async () => {
     /**
      * Def.getPoint(pid)
      */
-    let point = firstDef.getPoint('a111');
+    let point = firstDef.getPoint('a111')!;
     expect(point.type).toBe(pdw.PointType.TEXT);
 
     /**
      * Def.getPoint(lbl)
      */
-    point = firstDef.getPoint('Def 1 point 2');
+    point = firstDef.getPoint('Def 1 point 2')!;
     expect(point.type).toBe(pdw.PointType.BOOL);
 
     /**
      * Def.getPoint() that doesn't exist
      */
-    expect(() => {
-        firstDef.getPoint('NO SUCH POINT')
-    }).toThrowError()
+    expect(firstDef.getPoint('NO SUCH POINT')).toBeUndefined()
 
     /**
      * Point.getDef
@@ -289,9 +287,9 @@ test('Def Creation and Getting', async () => {
     /**
      * Should have Options Property
      */
-    let textType = firstDef.getPoint('a111');
-    let selectType = secondDef.getPoint('b222');
-    let multiselectType = thirdDef.getPoint('c222');
+    let textType = firstDef.getPoint('a111')!;
+    let selectType = secondDef.getPoint('b222')!;
+    let multiselectType = thirdDef.getPoint('c222')!;
     //predicate
     expect(pdw.PointDef.shouldHaveOpts(textType.type)).toBe(false);
     expect(pdw.PointDef.shouldHaveOpts(selectType.type)).toBe(true);
@@ -357,7 +355,7 @@ test('Def Creation and Getting', async () => {
             }
         ]
     });
-    const pointWithOptions = defWithOptions.getPoint('aaaa');
+    const pointWithOptions = defWithOptions.getPoint('aaaa')!;
     expect(Object.keys(pointWithOptions.opts!).length).toBe(2);
     expect(pointWithOptions.hasOpt('Opt 1')).toBe(true);
     expect(pointWithOptions.hasOpt('Opt 3')).toBe(false);
@@ -788,14 +786,14 @@ test('Update Logic', async () => {
         _lbl: 'Added',
         _type: pdw.PointType.SELECT
     });
-    expect(def.getPoint('a111').pid).toBe('a111');
-    expect(def.getPoint('a222').pid).toBe('a222');
-    expect(def.getPoint('a333').pid).toBe('a333');
+    expect(def.getPoint('a111')!.pid).toBe('a111');
+    expect(def.getPoint('a222')!.pid).toBe('a222');
+    expect(def.getPoint('a333')!.pid).toBe('a333');
 
     /**
      * PointDef modification
      */
-    let point = def.getPoint('Added');
+    let point = def.getPoint('Added')!;
     expect(point.pid).toBe('a333');
     point.desc = "Added dynamically";
     expect(point.desc).toBe('Added dynamically');
@@ -807,7 +805,7 @@ test('Update Logic', async () => {
     notDeletedFromStore = await pdwRef.getDefs();
     expect(notDeletedFromStore.length).toBe(1);
     expect(notDeletedFromStore[0].pts.length).toBe(3);
-    expect(notDeletedFromStore[0].getPoint('a333').desc).toBe('Added dynamically');
+    expect(notDeletedFromStore[0].getPoint('a333')!.desc).toBe('Added dynamically');
 
     /**
      * Data Validation on PointDef.setProps on emoji, rollup, and type
@@ -823,7 +821,7 @@ test('Update Logic', async () => {
     /**
      * Opts
      */
-    point = def.getPoint('a333');
+    point = def.getPoint('a333')!;
     expect(point.shouldHaveOpts()).toBe(true);
     point.addOpt('Option 1');
     expect(Object.keys(point.opts).length).toBe(1);
@@ -882,7 +880,6 @@ test('Update Logic', async () => {
     /**
      * Multiselect Opts
      */
-    console.log(def.pts.length + ' BITCH');
     def.addPoint({
         _pid: 'a444',
         _lbl: 'Multiselect Test',
@@ -890,7 +887,6 @@ test('Update Logic', async () => {
         _opts: ['A','B']
     })
     await def.save(); //must save to make the new point available to new entries
-    console.log(def.pts.length + ' BITCH');
     entry = await def.newEntry({
         'a444': []
     });

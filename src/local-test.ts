@@ -1,5 +1,6 @@
 import * as pdw from './pdw.js'
-import * as ie from './translators/fileTranslators.js'
+// import * as ie from './translators/fileTranslators.js'
+import * as obs from './translators/obsidianTranslator.js'
 // import { Query, Scope } from './pdw.js'
 // import { exportToFile, importFromFile } from './dataStores/fileAsyncDataStores.js';
 // import { Temporal, toTemporalInstant } from 'temporal-polyfill';
@@ -11,21 +12,22 @@ import * as ie from './translators/fileTranslators.js'
 // const origResult = await q.run();
 // console.log(origResult);
 
+// const vaultPath = '/Users/aaron/Desktop/Journal Island';
 
 const testData = getTestData();
-/* Load up fresh PDW instance */
-const pdwRef = pdw.PDW.newPDWUsingDefs([]);
-/* Load it with test data */
-await pdwRef.setAll(testData);
-/* Pull the data out */
-const dataset = await pdwRef.getAll({});
-/* Write it to file */
-let xlsxExp = new ie.AsyncExcelTabular();
-await xlsxExp.fromCanonicalData(dataset, 'test/localTestFileDir/dataset.xlsx');
-/* Load data from the file */
-const comparisonDataset = await xlsxExp.toCanonicalData('test/localTestFileDir/dataset.xlsx');
 
-console.log('hi')
+const vaultPath = 'test/localTestFileDir/localObsidianVault';
+const configFileSubpath = "PDW/PDW Config.md"
+
+let pdwRef = await pdw.PDW.newPDWUsingDefs(testData.defs);
+console.log(pdwRef)
+
+let ODS = await obs.ObsidianTranslator.NewObsidianTranslator(vaultPath, configFileSubpath);
+const canonicalDataset = await ODS.toCanonicalData();
+// await obs.ObsidianTranslator.BuildConfigFileAndTemplatesForDefs(defs,vaultPath,'pdw')
+// let parsedData = await ODS.toCanonicalData();
+
+console.log(canonicalDataset)
 
 function getTestData(): pdw.CanonicalDataset{
     return {
