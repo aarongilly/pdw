@@ -1,0 +1,169 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://pdw.com/json-schema",
+    "title": "PDW overall JSON import/export schema.",
+    "type": "object",
+    "properties": {
+        "defs": {
+            "type": "object",
+            "description": "Definitions that describe a type of Entry that can exist",
+            "additionalProperties": false,
+            "properties": {
+                "_uid": {
+                    "type": "string"
+                },
+                "_eid": {
+                    "type": "string"
+                },
+                "_created": {
+                    "type": "string"
+                },
+                "_updated": {
+                    "type": "string"
+                },
+                "_deleted": {
+                    "type": "boolean"
+                },
+                "_lbl": {
+                    "type": "string"
+                },
+                "_emoji": {
+                    "type": "string"
+                },
+                "_desc": {
+                    "type": "string"
+                },
+                "_scope": {
+                    "type": "string",
+                    "enum": [
+                        "SECOND",
+                        "MINUTE",
+                        "HOUR",
+                        "DAY",
+                        "WEEK",
+                        "MONTH",
+                        "YEAR"
+                    ]
+                },
+                "_pts": {
+                    "type": "object",
+                    "properties": {
+                        "_pid": {
+                            "type": "string"
+                        },
+                        "_lbl": {
+                            "type": "string"
+                        },
+                        "_desc": {
+                            "type": "string"
+                        },
+                        "_emoji": {
+                            "type": "string"
+                        },
+                        "_type": {
+                            "type": "string",
+                            "enum": [
+                                "NUMBER",
+                                "TEXT",
+                                "MARKDOWN",
+                                "SELECT",
+                                "DURATION",
+                                "TIME",
+                                "MULTISELECT",
+                                "BOOL",
+                                "JSON"
+                            ]
+                        },
+                        "_rollup": {
+                            "type": "string",
+                            "enum": [
+                                "COUNT",
+                                "SUM",
+                                "AVERAGE",
+                                "COUNTUNIQUE",
+                                "COUNTOFEACH"
+                            ]
+                        },
+                        "_opts": {
+                            "type": "object",
+                            "description": "A map of options to include for use with SELECT or MULTISELECT-type PointDefs. Intended to be keyed with surrogate ID and value of the label for the option."
+                        }
+                    },
+                    "required": [
+                        "_pid",
+                        "_lbl",
+                        "_type"
+                    ]
+                }
+            },
+            "required": [
+                "_uid",
+                "_eid",
+                "_updated",
+                "_deleted",
+                "_lbl",
+                "_scope"
+            ]
+        },
+        "entries": {
+            "type": "object",
+            "description": "A record of an event that happened, described by a `def` with the corresponding `_did` property.",
+            "properties": {
+                "_uid": {
+                    "type": "string"
+                },
+                "_eid": {
+                    "type": "string"
+                },
+                "_created": {
+                    "type": "string"
+                },
+                "_updated": {
+                    "type": "string"
+                },
+                "_deleted": {
+                    "type": "boolean"
+                },
+                "_period": {
+                    "type": "string"
+                },
+                "_source": {
+                    "type": "string"
+                },
+                "_note": {
+                    "type": "string"
+                },
+                "_pts": {
+                    "type": "object"
+                }
+            },
+            "required": [
+                "_uid",
+                "_eid",
+                "_updated",
+                "_source"
+            ]
+        },
+        "overview": {
+            "type": "object",
+            "properties": {
+                "storeName": {
+                    "type": "string"
+                },
+                "defs": {
+                    "type": "string"
+                },
+                "entries": {
+                    "type": "string"
+                },
+                "lastUpdated": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "required": [
+        "defs",
+        "entries"
+    ]
+}

@@ -1,9 +1,8 @@
 import { expect, test } from 'vitest'
 import * as pdw from '../src/pdw';
 import { Temporal } from 'temporal-polyfill';
-// import { importFromFile } from '../src/dataStores/fileAsyncDataStores';
 
-const pdwRef = pdw.PDW.getInstance();
+const pdwRef = pdw.PDW.newPDWUsingDefs([]);
 
 function resetTestDataset() {
     //@ts-expect-error - hacking to set the private manifest prop, it has no setter on purpose
@@ -11,18 +10,27 @@ function resetTestDataset() {
     (<pdw.DefaultDataStore>pdwRef.dataStore).clearAllStoreArrays();
 }
 
-// test('PDW Top-Level Concepts', async () =>{
-//     resetTestDataset();
+test('Basic setup', async ()=>{
+    resetTestDataset();
+    let pdwOne = pdw.PDW.newPDWUsingDefs([]);
+    let pdwTwo = pdw.PDW.newPDWUsingDefs([]);
+    await pdwOne.newDef({_did:'test'});
+    await pdwTwo.newDef({_did:'two instances'});
+    /**
+     * Independent Instances of PDW can be created & manipulated
+     */
+    expect(pdwOne.manifest.length).toBe(1);
+    expect(pdwOne.getDefFromManifest('test')!.did).toBe('test');
+    expect(pdwTwo.manifest.length).toBe(1);
+    expect(pdwTwo.getDefFromManifest('two instances')!.did).toBe('two instances');
 
-//     //data store manipulation
-//     pdwRef.dataStore.serviceName
-
-//     let firstDef = await pdwRef.newDef({
-//         _did: 'aaaa'
-//     });
-// })
+    let pdwThree = pdw.PDW.newPDWUsingDefs([{_did:'three instances'}]);
+    expect(pdwThree.manifest.length).toBe(1);
+    expect(pdwThree.getDefFromManifest('three instances')!.did).toBe('three instances')
+})
 
 test('Def Creation and Getting', async () => {
+    resetTestDataset();
     /**
      * Most Basic Def Creation
     */
@@ -30,7 +38,7 @@ test('Def Creation and Getting', async () => {
         _did: 'aaaa'
     });
     expect(firstDef.did).toBe('aaaa'); //accepts input value
-    expect(firstDef.lbl).toBe('Unlabeled Definition aaaa'); //return value
+    expect(firstDef.lbl).toBe('aaaa'); //return value #TODO - changed default behavior here
     expect(firstDef.scope).toBe(pdw.Scope.SECOND); //default scope
     expect(firstDef.emoji).toBe('🆕') //default emoji
     expect(firstDef.pts).toEqual([]); //default points = empty array
@@ -39,7 +47,7 @@ test('Def Creation and Getting', async () => {
     expect(firstDef.deleted).toBe(false); //default deletion status
     expect(firstDef.tempCreated.epochMilliseconds).toBeGreaterThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString()) - 5000) //created not long ago...
     expect(firstDef.tempCreated.epochMilliseconds).toBeLessThan(Number.parseInt(Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString())) //...but not in the future
-    expect(pdwRef.getFromManifest('aaaa')).toEqual(firstDef); //defs are added to the manifest
+    expect(pdwRef.getDefFromManifest('aaaa')).toEqual(firstDef); //defs are added to the manifest
 
     /**
      * Fully specified Def Creation
@@ -51,7 +59,7 @@ test('Def Creation and Getting', async () => {
         _emoji: '🌭',
         _scope: pdw.Scope.DAY,
         _uid: 'handjammed-30so',
-        _tags: ['#mytag'],
+        _tags: ['mytag'],
         _did: 'gggg',
         _lbl: 'Second Def',
         _desc: 'Test Desc'
@@ -62,7 +70,7 @@ test('Def Creation and Getting', async () => {
     expect(secondDef.uid).toBe('handjammed-30so');
     expect(secondDef.did).toBe('gggg');
     expect(secondDef.lbl).toBe('Second Def');
-    expect(secondDef.tags).toEqual(['#mytag']);
+    expect(secondDef.tags).toEqual(['mytag']);
     expect(secondDef.deleted).toBe(false);
     //checking epochStr
     const epochMillis = parseInt(secondDef.created, 36)
@@ -86,7 +94,7 @@ test('Def Creation and Getting', async () => {
         _emoji: '🌭',
         _scope: pdw.Scope.DAY,
         _uid: 'handjammed-30so',
-        _tags: ['#mytag'],
+        _tags: ['mytag'],
         _did: 'gggg',
         _lbl: 'Second Def',
         _desc: 'Test Desc',
@@ -96,12 +104,12 @@ test('Def Creation and Getting', async () => {
     expect(copy).toEqual(firstDef); //copies start off equal
     copy.lbl = 'changed.'
     expect(copy.lbl).toBe('changed.'); //copy IS changed.
-    expect(firstDef.lbl).toBe('Unlabeled Definition aaaa'); //original is NOT changed
+    expect(firstDef.lbl).toBe('aaaa'); //original is NOT changed
 
     /**
      * Def.hasTag
      */
-    expect(secondDef.hasTag('#MYTAG')).toBe(true); //tags aren't case-sensitive
+    expect(secondDef.hasTag('MYtAg')).toBe(true); //tags aren't case-sensitive
 
     /**
     * Wide-open getter
@@ -122,16 +130,16 @@ test('Def Creation and Getting', async () => {
     let thirdAndForthDef = await pdwRef.setDefs(
         [
             {
-                _lbl: 'Third def'
+                _did: 'Third def'
             },
             {
-                _lbl: 'Forth def'
+                _did: 'Forth def'
             }
         ]
     );
     expect(thirdAndForthDef.defData![0]._lbl).toBe('Third def');
     expect(thirdAndForthDef.defData![1]._lbl).toBe('Forth def');
-    defs = await pdwRef.getDefs()
+    defs = await pdwRef.getDefs();
     expect(defs.length).toBe(4);
 
     /**
@@ -139,6 +147,7 @@ test('Def Creation and Getting', async () => {
      */
     expect(async () =>
         await pdwRef.newDef({
+            _did: 'temp',
             _emoji: 'not an emoji' //emoji isn't 1 character long
         })).rejects.toThrowError()  //interesting syntax
 
@@ -246,7 +255,7 @@ test('Def Creation and Getting', async () => {
             _did: 'eeee',
             'e111': {
                 _lbl: 'Def 5 point 1',
-                _type: pdw.PointType.JSON
+                _type: pdw.PointType.TIME
             }
         }
     ]);
@@ -284,13 +293,12 @@ test('Def Creation and Getting', async () => {
     let selectType = secondDef.getPoint('b222');
     let multiselectType = thirdDef.getPoint('c222');
     //predicate
-    expect(textType.shouldHaveOpts()).toBe(false);
-    expect(selectType.shouldHaveOpts()).toBe(true);
-    expect(multiselectType.shouldHaveOpts()).toBe(true);
+    expect(pdw.PointDef.shouldHaveOpts(textType.type)).toBe(false);
+    expect(pdw.PointDef.shouldHaveOpts(selectType.type)).toBe(true);
+    expect(pdw.PointDef.shouldHaveOpts(multiselectType.type)).toBe(true);
     //existance & type of prop
-    expect(textType.opts).toEqual({});
-    expect(typeof selectType.opts).toBe('object');
-    expect(typeof multiselectType.opts).toBe('object');
+    expect(textType.opts).toBeUndefined();
+    expect(multiselectType.opts).toEqual([]);
 
     /**
      * Invalid PointDef (bad Type)
@@ -337,7 +345,7 @@ test('Def Creation and Getting', async () => {
     expect(pdw.PointDef.isPointDefData(firstDef.data)).toBe(false);
 
     /**
-     * PointDef with _opts Options
+     * PointDef with _opts --- Opt manipulations
      */
     const defWithOptions = await pdwRef.newDef({
         _did: 'ffff',
@@ -345,17 +353,20 @@ test('Def Creation and Getting', async () => {
             {
                 _pid: 'aaaa',
                 _type: pdw.PointType.SELECT,
-                _opts: {
-                    '1111': 'Opt 1',
-                    '2222': 'Opt 2'
-                }
+                _opts: ['Opt 1', 'Opt 2']
             }
         ]
     });
     const pointWithOptions = defWithOptions.getPoint('aaaa');
     expect(Object.keys(pointWithOptions.opts!).length).toBe(2);
-    expect(pointWithOptions.getOptLbl('1111')).toBe('Opt 1');
-    expect(pointWithOptions.getOptLbl('2222')).toBe('Opt 2');
+    expect(pointWithOptions.hasOpt('Opt 1')).toBe(true);
+    expect(pointWithOptions.hasOpt('Opt 3')).toBe(false);
+    //implicitly testing that this doesn't throw an error;
+    pointWithOptions.removeOpt('non-existant opt');
+    pointWithOptions.addOpt('Opt 3');
+    expect(pointWithOptions.hasOpt('Opt 3')).toBe(true);
+    pointWithOptions.removeOpt('Opt 3');
+    expect(pointWithOptions.hasOpt('Opt 3')).toBe(false);
     expect(Object.keys(pointWithOptions.opts).length).toBe(2);
 })
 
@@ -381,7 +392,7 @@ test('Entry Creation and Getting', async () => {
     const sameSecond = pdw.Period.now(pdw.Scope.SECOND);
     pdwRef.newEntry({
         _did: 'aaaa',
-    }, testDef);
+    });
     let entries = await pdwRef.getEntries();
     expect(entries.length).toBe(1);
     let entry = entries[0];
@@ -396,30 +407,31 @@ test('Entry Creation and Getting', async () => {
      * Create Entry with explicit Points
     */
     let testEntry = await pdwRef.newEntry({
+        _did: testDef.did,
         'yyyy': 'Text value', //by _pid
         'PoiNT b': true //by _lbl - case doesn't matter
-    }, testDef)
+    })
     entries = await pdwRef.getEntries();
     expect(entries.length).toBe(2);
     entry = entries[1];
     expect(testEntry.did).toBe('aaaa');
-    //checking values - the typical, easy way
     expect(entry.data['yyyy']).toBe('Text value');
     expect(entry.data['zzzz']).toBe(true);
 
-    // testEntry = await pdwRef.newEntry({
-    //     _pts: {
-    //         'yyyy': "text",
-    //         "zzzz": false
-    //     }
-    // }, testDef)
-    // entries = await pdwRef.getEntries();
-    // expect(entries.length).toBe(3);
-    // entry = entries[1];
-    // expect(testEntry.did).toBe('aaaa');
-    // //checking values - the typical, easy way
-    // expect(testEntry.data['yyyy']).toBe('text');
-    // expect(testEntry.data['zzzz']).toBe(false);
+
+    testEntry = await pdwRef.newEntry({
+        _did: testDef.did,
+        _pts: {
+            'yyyy': "text",
+            "zzzz": false
+        }
+    });
+    entries = await pdwRef.getEntries();
+    expect(entries.length).toBe(3);
+    expect(testEntry.did).toBe('aaaa');
+    //checking values - the typical, easy way
+    expect(testEntry.data['yyyy']).toBe('text');
+    expect(testEntry.data['zzzz']).toBe(false);
 
     /**
      * Entry.getPoints
@@ -461,10 +473,10 @@ test('Entry Creation and Getting', async () => {
         _updated: epochStr
     }]);
 
-    testEntry = new pdw.Entry(tempArr.entryData![0]);
+    testEntry = new pdw.Entry(tempArr.entryData![0], pdwRef);
     entries = await pdwRef.getEntries();
-    expect(entries.length).toBe(3);
-    expect(entries[2]).toEqual(testEntry);
+    expect(entries.length).toBe(4);
+    expect(entries[3]).toEqual(testEntry);
     expect(testEntry.created).toBe(epochStr);
     expect(testEntry.updated).toBe(epochStr);
     expect(testEntry.period.toString()).toBe('2023-06-03T11:29:08');
@@ -484,9 +496,10 @@ test('Entry Creation and Getting', async () => {
     /**
      * Def.newEntry method
      */
-    expect((await pdwRef.getEntries()).length).toBe(3);
-    testEntry = await testDef.newEntry({});
     expect((await pdwRef.getEntries()).length).toBe(4);
+    //_did is not required in the "Def.newEntry()" method. It's pulled from said Def
+    testEntry = await testDef.newEntry({});
+    expect((await pdwRef.getEntries()).length).toBe(5);
     expect(testEntry.did).toBe('aaaa');
 
     /**
@@ -496,7 +509,7 @@ test('Entry Creation and Getting', async () => {
         _did: 'aaaa',
         'yyyy': { 'an': 'Object is implicitly coerced to string but...' },
         'zzzz': { '...this bool': 'should fail' }
-    }, testDef)).rejects.toThrowError()
+    })).rejects.toThrowError()
 
     /**
      * Create entry with bad EntryPoint ID
@@ -505,7 +518,7 @@ test('Entry Creation and Getting', async () => {
         await pdwRef.newEntry({
             _did: 'aaaa',
             'bbbb': { 'a': 'non-existant pointDef value' }
-        }, testDef)
+        })
     }).rejects.toThrowError();
 
     //setting up further tests
@@ -563,10 +576,7 @@ test('Entry Creation and Getting', async () => {
                 _pid: 'c111',
                 _lbl: 'Select Point',
                 _type: pdw.PointType.SELECT,
-                _opts: {
-                    'ccc1': 'Opt 1',
-                    'ccc2': 'Opt 2'
-                }
+                _opts: ['Opt 1', 'Opt 2']
             }
         ]
     })
@@ -575,33 +585,30 @@ test('Entry Creation and Getting', async () => {
      */
     let entryWithOpts = await defWithOpts.newEntry({
         _note: 'Setting Opt 1',
-        'c111': 'ccc1' //weird, but how it has to work
+        'c111': 'Opt 1'
     })
-    expect(entryWithOpts.getPoint('Select Point')?.val).toBe('ccc1');
-    expect(entryWithOpts.getPoint('c111')?.pointDef.getOptLbl('ccc1')).toBe('Opt 1');
+    expect(entryWithOpts.getPoint('Select Point')?.val).toBe('Opt 1');
 
     /**
-     * Select Opts are not validated! It's not worth doing.
-     * Just check that the result is defined when running pointDef.getOpt()
+     * New select options are allowed, but don't get added to the Def.
+     * Def.addOpt() has to be explicitly called.
      */
+    expect(defWithOpts.pts[0].hasOpt('NEW OPT')).toBe(false);
     entryWithOpts = await defWithOpts.newEntry({
         _note: 'Setting Non-existant opt',
-        'c111': 'fake oid'
+        'c111': 'NEW OPT'
     })
-    let point = entryWithOpts.getPoint('c111')!;
-    expect(point.val).toBe('fake oid'); //no errors thrown
-    expect(point.pointDef.getOptLbl('fake oid')).toBeUndefined(); //is undefined
-
+    let point = entryWithOpts.getPoint('Select Point')!;
+    expect(point.val).toBe('NEW OPT'); //value is set
+    expect(defWithOpts.pts[0].hasOpt('NEW OPT')).toBe(false);// but it's still not in the def
+    
     let defWithMultiselect = await pdwRef.newDef({
         _did: 'dddd',
         _pts: [
             {
                 _pid: 'd111',
                 _type: pdw.PointType.MULTISELECT,
-                _opts: {
-                    'ddd1': 'One',
-                    'ddd2': 'Two'
-                }
+                _opts: ['ddd1', 'ddd2']
             }
         ]
     })
@@ -657,7 +664,7 @@ test('Update Logic', async () => {
     expect(def.deleted).toBe(true);
     expect(def.isSaved()).toBe(false);
     //its counterpart from the manifest isn't changed yet
-    let defFromManifest = pdwRef.getFromManifest('aaaa');
+    let defFromManifest = pdwRef.getDefFromManifest('aaaa')!;
     expect(defFromManifest.deleted).toBe(false);
     //its counterpart in the DataStore isn't changed yet
     let defFromStores = await pdwRef.getDefs();
@@ -675,7 +682,7 @@ test('Update Logic', async () => {
     expect((await pdwRef.getDefs(true)).length).toBe(1);
     //manifest no longer has the def
     expect(() => {
-        pdwRef.getFromManifest('aaaa'); //no longer exists, this throws error
+        pdwRef.getDefFromManifest('aaaa'); //no longer exists, this throws error
     }).toThrowError();
 
     //undelete the def in memory
@@ -686,17 +693,17 @@ test('Update Logic', async () => {
     expect((await pdwRef.getDefs(true)).length).toBe(1);
     //manifest still has no matching def
     expect(() => {
-        pdwRef.getFromManifest('aaaa'); //no longer exists, this throws error
+        pdwRef.getDefFromManifest('aaaa'); //no longer exists, this throws error
     }).toThrowError();
 
     //write undelete back to datastore
     await def.save();
     expect(def.isSaved()).toBe(true);
-    //DataStore now has the deletion, but didnt' spawn any additional elements
+    //DataStore now reflects the undeletion, but didnt' spawn any additional elements
     expect((await pdwRef.getDefs()).length).toBe(1);
-    expect((await pdwRef.getDefs(true)).length).toBe(1);
-    //its counterpart from the manifest isn't changed yet
-    defFromManifest = pdwRef.getFromManifest('aaaa');
+    expect((await pdwRef.getDefs(true)).length).toBe(1); //no deleted elements were spawned
+    //its counterpart from the manifest is also reflects the undeletion.
+    defFromManifest = pdwRef.getDefFromManifest('aaaa')!;
     expect(defFromManifest.deleted).toBe(false);
 
     /**
@@ -705,22 +712,21 @@ test('Update Logic', async () => {
     def.lbl = "Def 1 with new Label";
     expect(def.isSaved()).toBe(false);
     //no change yet
-    // expect(pdwRef.getDefs({ includeDeleted: 'no' })[0].lbl).toBe('Def 1');
     expect((await pdwRef.getDefs()).length).toBe(1);
     //check on the def in the manifest as well
-    defFromManifest = pdwRef.getFromManifest(def.did);
+    defFromManifest = pdwRef.getDefFromManifest(def.did)!;
     expect(defFromManifest.lbl).toBe('Def 1');
 
     //write change to the data store
     await def.save();
-    let notDeletedFromStore = await pdwRef.getDefs()
-    let deletedFromStore = (await pdwRef.getDefs(true)).filter(def=>def.deleted)
+    let notDeletedFromStore = await pdwRef.getDefs();
+    let deletedFromStore = (await pdwRef.getDefs(true)).filter(def=>def.deleted);
     expect(notDeletedFromStore.length).toBe(1);
     expect(notDeletedFromStore[0].lbl).toBe('Def 1 with new Label');
     expect(deletedFromStore.length).toBe(1);
     expect(deletedFromStore[0].lbl).toBe('Def 1');
     //check on the def in the manifest as well
-    defFromManifest = pdwRef.getFromManifest(def.did);
+    defFromManifest = pdwRef.getDefFromManifest(def.did)!;
     expect(defFromManifest.lbl).toBe('Def 1 with new Label');
 
     def.created = pdw.makeEpochStr();
@@ -749,7 +755,7 @@ test('Update Logic', async () => {
      * Tag Stuff
      */
     def.addTag('#taggy');
-
+    // #TODO - were you going to test this? You forgot.
 
     /**
      * saving without any changes no props doesn't change datastore
@@ -761,7 +767,7 @@ test('Update Logic', async () => {
     /**
      * Data validation for Emoji
      */
-    def.emoji = 'Something that is not an emoji';
+    def.emoji = 'Something that is not an emoji'; //will fail internally
     expect(def.emoji).toBe('🤿')
 
     /**
@@ -770,7 +776,6 @@ test('Update Logic', async () => {
     let stringDate = '2023-07-22T15:55:27'; //plaindatetime string
     def.created = stringDate
     expect(def.created).toBe('lkehoqoo') //lkehoqoo is right
-    //console.log(pdw.parseTemporalFromEpochStr('lkehoqoo').toPlainDateTime().toString());
     let date = new Date();
     //firstDef.setProps({_created: date}); //also works, but difficult to prove again and again
 
@@ -816,46 +821,25 @@ test('Update Logic', async () => {
     expect(point.rollup).toBe(pdw.Rollup.COUNT); //no change
 
     /**
-     * Def.hidePoint()
-     */
-    expect(def.pts.map(p => p.hide)).toEqual([false, false, false]);
-    def.hidePoint('a222');
-    expect(def.pts.length).toBe(3); //still got 3
-    expect(def.pts.filter(p => p.hide === false).length).toBe(2); //but only 2 are active
-
-    /**
-     * Def.reactivatePoint()
-     */
-    def.unhidePoint('a222');
-    expect(def.pts.map(p => p.hide)).toEqual([false, false, false]);
-
-    /**
      * Opts
      */
     point = def.getPoint('a333');
     expect(point.shouldHaveOpts()).toBe(true);
-    point.addOpt('Option 1', 'o111'); //specified _oid
+    point.addOpt('Option 1');
     expect(Object.keys(point.opts).length).toBe(1);
-    point.addOpt('Option 2'); //unspecified _oid => one is made for it
-
+    point.addOpt('Option 2');
     expect(Object.keys(point.opts).length).toBe(2);
-    point.addOpt('Option 3', 'o333'); //needed for later
-    point.setOpt('o111', 'New Title');
-    expect(point.getOptLbl('o111')).toBe('New Title'); //get by opt._oid
-    expect(point.getOptOid('New Title')).toBe('o111'); //get by opt._lbl
     point.removeOpt('Option 2');
-    expect(Object.keys(point.opts).length).toBe(2); //literally removes the option from the array
-    point.setOpt('o333', 'New Option 2'); //a common real world use case, I imagine
-    expect(Object.keys(point.opts).length).toBe(2);
-    expect(point.getOptLbl('o333')).toBe('New Option 2');
+    expect(Object.keys(point.opts).length).toBe(1);
 
     /**
      * Entries
      */
     let entry = await pdwRef.newEntry({ //minimal entry input using newEntry on PDW
+        _did: def.did,
         'Added': 'o111', //addressed using point.lbl
         'a222': 'Point value' //addressed using point.pid
-    }, def);
+    });
 
     /**
      * Base entry props updating
@@ -898,15 +882,15 @@ test('Update Logic', async () => {
     /**
      * Multiselect Opts
      */
+    console.log(def.pts.length + ' BITCH');
     def.addPoint({
         _pid: 'a444',
         _lbl: 'Multiselect Test',
         _type: pdw.PointType.MULTISELECT,
-        _opts: {
-            'aaaa': 'A',
-            'bbbb': 'B'
-        }
-    }).save(); //must save to make the new point available to new entries
+        _opts: ['A','B']
+    })
+    await def.save(); //must save to make the new point available to new entries
+    console.log(def.pts.length + ' BITCH');
     entry = await def.newEntry({
         'a444': []
     });
@@ -955,7 +939,7 @@ test('Query Basics', async () => {
     /**
      * Empty queries are rejected
      */
-    let q = new pdw.Query();
+    let q = new pdw.Query(pdwRef);
     let result = await q.run();
     expect(result.success).toBe(false);
     expect(result.msgs![0]).toBe('Empty queries not allowed. If seeking all, include {allOnPurpose: true}')
@@ -970,12 +954,12 @@ test('Query Basics', async () => {
      * and 
      * Query.onlyIncludeDeleted
      */
-    q = new pdw.Query();
+    q = new pdw.Query(pdwRef);
     q.allOnPurpose(); //"include deleted" isn't narrow enough to bypass the need for expliciy 'all'
     q.includeDeleted();
     result = await q.run();
     expect(result.count).toBe(10);
-    //q = new pdw.Query(); //good practice, probably, but not needed here
+    //q = new pdw.Query(pdwRef); //good practice, probably, but not needed here
     q.includeDeleted(false);
     result = await q.run();
     expect(result.count).toBe(9);
@@ -989,7 +973,7 @@ test('Query Basics', async () => {
      * Querty.forDefsLbld
      */
     //these all internally set the StandardParam "_did", so you don't need to make new Query instances
-    q = new pdw.Query();
+    q = new pdw.Query(pdwRef);
     q.forDids(['aaaa']); //no need for "all()"
     let origResult = await q.run();
     expect(origResult.count).toBe(3);
@@ -1006,14 +990,14 @@ test('Query Basics', async () => {
     /**
      * Query.uids()
      */
-    q = new pdw.Query();
+    q = new pdw.Query(pdwRef);
     q.uids(['lkfkuxob-0av3', 'lkfkuxo8-9ysw']);
     expect((await q.run()).count).toBe(2);
 
     /**
      * Query.eids()
      */
-    q = new pdw.Query();
+    q = new pdw.Query(pdwRef);
     q.eids(['lkfkuxon-f9ys']); // the entry that was updated
     expect((await q.run()).count).toBe(1);
     q.includeDeleted();
@@ -1025,19 +1009,19 @@ test('Query Basics', async () => {
     /**
      * Created & Updated, both Before & After
     */
-    q = new pdw.Query();
+    q = new pdw.Query(pdwRef);
     q.includeDeleted().allOnPurpose();
     expect((await q.run()).entries.length).toBe(10)
-    q = new pdw.Query().includeDeleted();
+    q = new pdw.Query(pdwRef).includeDeleted();
     expect((await q.createdBefore('2023-07-23').run()).entries.length).toBe(4);
-    q = new pdw.Query().includeDeleted();
+    q = new pdw.Query(pdwRef).includeDeleted();
     expect((await q.createdAfter('2023-07-23').run()).entries.length).toBe(6);
-    q = new pdw.Query().includeDeleted();
+    q = new pdw.Query(pdwRef).includeDeleted();
     expect((await q.updatedBefore('2023-07-23').run()).entries.length).toBe(2);
-    q = new pdw.Query().includeDeleted();
+    q = new pdw.Query(pdwRef).includeDeleted();
     expect((await q.updatedAfter('2023-07-23').run()).entries.length).toBe(8);
     //all of which also works with epochStr, Dates, Temporal.ZonedDateTimes and full ISO strings;
-    q = new pdw.Query().includeDeleted();
+    q = new pdw.Query(pdwRef).includeDeleted();
     let fullISO = '2023-07-23T03:04:50-05:00';
     let epochStr = pdw.makeEpochStrFrom('2023-07-23T03:04:50-05:00')!;
     let temp = pdw.parseTemporalFromEpochStr(epochStr);
@@ -1050,30 +1034,30 @@ test('Query Basics', async () => {
     /**
      * Entry Period: From, To, and inPeriod
      */
-    q = new pdw.Query();
+    q = new pdw.Query(pdwRef);
     q.from('2023-07-22');
     expect((await q.run()).entries.length).toBe(6);
-    q = new pdw.Query();
+    q = new pdw.Query(pdwRef);
     q.to('2023-07-22');
     expect((await q.run()).entries.length).toBe(4);
-    q = new pdw.Query();
+    q = new pdw.Query(pdwRef);
     q.from('2023-07-20').to('2023-07-25'); //specify both ends explicitly
     expect((await q.run()).entries.length).toBe(6)
-    q = new pdw.Query();
+    q = new pdw.Query(pdwRef);
     q.from('2023-07-22').to('2023-07-22'); //from = from START, end = from END, so this gets all day
     let fromTo = (await q.run()).entries;
     expect(fromTo.length).toBe(1)
-    q = new pdw.Query();
+    q = new pdw.Query(pdwRef);
     q.inPeriod('2023-07-22'); //same as specifying from().to() for same period
     expect((await q.run()).entries).toEqual(fromTo);
-    q = new pdw.Query();
+    q = new pdw.Query(pdwRef);
     q.inPeriod('2022'); //same as specifying from().to() for same period
     expect((await q.run()).entries.map(e => e.getPoint('ddd1')!.val)).toEqual(['The Time Traveller 2']);
 
     /**
      * Tags
      */
-    q = new pdw.Query();
+    q = new pdw.Query(pdwRef);
     q.tags('tag1');
     origResult = await q.run();
     expect(origResult.entries.length).toBe(5);
@@ -1081,7 +1065,7 @@ test('Query Basics', async () => {
     /**
      * Scopes
      */
-    q = new pdw.Query();
+    q = new pdw.Query(pdwRef);
     q.scope(pdw.Scope.DAY);
     expect((await q.run()).count).toBe(3);
     q.scope([pdw.Scope.DAY, pdw.Scope.SECOND]);
@@ -1100,7 +1084,7 @@ test('Query Basics', async () => {
     /**
      * Sort
      */
-    q = new pdw.Query();
+    q = new pdw.Query(pdwRef);
     q.forDefsLbld('Nightly Review');
     q.sort('_updated', 'asc');
 })
@@ -1108,30 +1092,31 @@ test('Query Basics', async () => {
 test('Data Merge', () => {
     (<pdw.DefaultDataStore>pdwRef.dataStore).clearAllStoreArrays();
 
-    // let inMemoryDataStoreTwo = new DefaultDataStore(pdwRef);
-
     let a: pdw.ElementData[] = tinyDataA().defs!;
     let b: pdw.ElementData[] = tinyDataB().defs!;
     expect(a.length).toBe(1);
     expect(b.length).toBe(2);
-    let merge: any = pdw.PDW.merge(a, b);
+    let merge: any = pdwRef.merge(a, b);
     expect(merge.length).toBe(3); //original, first update, 2nd update
+
+    merge = pdwRef.merge(a, merge); //merging the same dataset in again...
+    expect(merge.length).toBe(3);//...adds nothing new
 
     a = tinyDataA().entries!;
     b = tinyDataB().entries!;
     expect(a.length).toBe(1);
     expect(b.length).toBe(3);
-    merge = pdw.PDW.merge(a, b);
+    merge = pdwRef.merge(a, b);
     expect(merge.length).toBe(3); //a was marked deleted in b
 
     a = tinyDataA().defs!;
     let c: pdw.ElementData[] = tinyDataA().defs!;
 
-    merge = pdw.PDW.merge(a, c);
+    merge = pdwRef.merge(a, c);
     expect(merge.length).toBe(1); //a is same as c
 
     //combine all at the same time
-    merge = pdw.PDW.mergeComplete(tinyDataA(), tinyDataB());
+    merge = pdwRef.mergeComplete(tinyDataA(), tinyDataB());
     expect(merge.defs.length).toBe(3);
     expect(merge.entries.length).toBe(3);
 
@@ -1156,9 +1141,8 @@ test('Data Merge', () => {
                             "_emoji": "🎬",
                             "_type": pdw.PointType.TEXT,
                             "_rollup": pdw.Rollup.COUNT,
-                            "_hide": true,
                             "_pid": "ccc1",
-                            "_opts": {}
+                            "_opts": []
                         }
                     ]
                 },
@@ -1201,9 +1185,8 @@ test('Data Merge', () => {
                             "_emoji": "🎬",
                             "_type": pdw.PointType.TEXT,
                             "_rollup": pdw.Rollup.COUNT,
-                            "_hide": true,
                             "_pid": "ccc1",
-                            "_opts": {}
+                            "_opts": []
                         }
                     ]
                 },
@@ -1225,9 +1208,8 @@ test('Data Merge', () => {
                             "_emoji": "🎬",
                             "_type": pdw.PointType.TEXT,
                             "_rollup": pdw.Rollup.COUNT,
-                            "_hide": true,
                             "_pid": "ccc1",
-                            "_opts": {}
+                            "_opts": []
                         }
                     ]
                 },
@@ -1282,10 +1264,10 @@ test('Summarizer', async () => {
 
     let q = pdwRef.query();
 
-    let all = (await new pdw.Query().inPeriod(new pdw.Period('2023-08-21').zoomOut()).run()).entries;
+    let all = (await new pdw.Query(pdwRef).inPeriod(new pdw.Period('2023-08-21').zoomOut()).run()).entries;
 
     //summarize by week
-    let periods = pdw.PDW.summarize(all, pdw.Scope.WEEK);
+    let periods = pdwRef.summarize(all, pdw.Scope.WEEK);
     expect(periods.length).toBe(1);
     
     let checkRollup = periods[0].entryRollups.find(er=>er.lbl === 'Nap')!
@@ -1297,7 +1279,7 @@ test('Summarizer', async () => {
     expect(checkRollup.pts.find(pt=>pt.pid==='bbbb')!.val).toBe(2); //point._rollup = COUNTUNIQUE
 
     //summarize by day
-    periods = pdw.PDW.summarize(all, pdw.Scope.DAY);
+    periods = pdwRef.summarize(all, pdw.Scope.DAY);
     expect(periods.length).toBe(3);
     checkRollup = periods[0].entryRollups.find(er=>er.lbl === 'Nap')!
     expect(checkRollup.pts.find(pt=>pt.pid==='b111')!.val).toBe('PT9360S')
@@ -1305,19 +1287,10 @@ test('Summarizer', async () => {
     expect(checkRollup.pts.find(pt=>pt.pid==='b333')!.val).toBe('22:05:28')
     
     //summarize all into one "ALL" period
-    periods = pdw.PDW.summarize(all, "ALL");
+    periods = pdwRef.summarize(all, "ALL");
     expect(periods.length).toBe(1);
     // console.log(periods[0].entryRollups, 'yo');
     
-})
-
-test('DataStore Tester', async () => {
-    resetTestDataset();
-
-    let ds = new pdw.DefaultDataStore(pdwRef);
-
-    
-
 })
 
 async function createTestDataSet() {
@@ -1340,13 +1313,13 @@ async function createTestDataSet() {
                 _desc: 'Did you go in, if so where?',
                 _pid: 'aaa2',
                 _type: pdw.PointType.SELECT,
-                _opts: {
-                    'opt1': 'Weekend/Holiday',
-                    'opt2': 'North',
-                    'opt3': 'WFH',
-                    'opt4': 'Vacation',
-                    'opt5': 'sickday',
-                }
+                _opts: [
+                    'Weekend/Holiday',
+                    'North',
+                    'WFH',
+                    'Vacation',
+                    'sickday',
+                ]
             },
             {
                 _emoji: '1️⃣',
@@ -1433,7 +1406,7 @@ async function createTestDataSet() {
         _source: 'Test data',
         _note: 'Original entry',
         'aaa1': "Today I didn't do **anything**.",
-        'aaa2': 'opt1',
+        'aaa2': 'Weekend/Holiday',
         'aaa3': 9,
         'aaa4': 10
     });
@@ -1453,7 +1426,7 @@ async function createTestDataSet() {
         _note: 'pretending I felt bad',
         _source: 'Test data',
         'aaa1': "This was a Friday. I did some stuff.",
-        'aaa2': 'opt2',
+        'aaa2': 'WFH',
         'aaa3': 6,
         'aaa4': 5
     });
@@ -1484,6 +1457,7 @@ async function createTestDataSet() {
 
 async function createSummaryDataSet() {
     const nap = await pdwRef.newDef({
+        _did: 'nap',
         _lbl: "Nap",
         _scope: pdw.Scope.SECOND,
         _pts: [
@@ -1510,6 +1484,7 @@ async function createSummaryDataSet() {
         ]
     })
     const event = await pdwRef.newDef({
+        _did: 'event',
         _lbl: "Event",
         _scope: pdw.Scope.HOUR,
         _pts: [

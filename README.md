@@ -1,5 +1,4 @@
-//#TODO - update all this
-
+# Overview
 `pdw` is a library for creating quantified self applications. It's intended to be platform-agnostic with regard to the underlying database and the presentation layer. It handles the core logic, and provides interfaces out to whatever databases and whatever UI components you want to build.
 
 ```mermaid
@@ -38,15 +37,14 @@ The library is built around a few core data structures: `Def`, `PointDef`, `Entr
 - An EntryPoint has a specified data type called a `PointType`
 - An Entry has exactly one associated `Def`, which describes what the Entry means
 - Each `Def` contains zero or more `PointDef`s, which describe the `EntryPoint`s contained by the `Entry` associated with that `Def`
-- A `Tag` associates one or many `Def`s to a common label
-- `Entry`, `Def`, and `Tag` are all generically called `Element`s, because they are not contained by anything and extend the same abstract base class
+- `Entry` and `Def` are all generically called `Element`s, because they are not contained by anything and extend the same abstract base class
 - A `DataStore` is a file or database that persists `Element`s in storage
-- A `Query` searches a `DataStore` for Entries that match a set of `QueryParam`s
+- A `Query` searches a `DataStore` for Entries that match a set of `StandardParam`s
 - A list of Entries can have their `EntryPoint` values summarized using `Rollup`s
 
 > 👉 `Def`s contain `PointDef`s and describe `Entry`s, which take place in Periods
 
-An `Entry` is a record of a thing that occurred during a given period of time (`Period`). A Definition (or `Def`) describes a type of `Entry` that can exist. Every `Entry` has exactly **one** definfion. A `Def` contains zero or more `PointDef`s. A `PointDef` describes a key/value pair (called an `EntryPoint`) that can exist on its associated `Entry`. `EntryPoint`s may be of any type. Each entry is associated with exactly **one** `Period`, which range in their granularity from seconds to years. Running a `Query` will return `Entry` instances match the query's parameters. To aid in `Query`ing, there exist `Tag`s, whose only function is to help group related `Def`s together.
+An `Entry` is a record of a thing that occurred during a given period of time (`Period`). A Definition (or `Def`) describes a type of `Entry` that can exist. Every `Entry` has exactly **one** definfion. A `Def` contains zero or more `PointDef`s. A `PointDef` describes a key/value pair (called an `EntryPoint`) that can exist on its associated `Entry`. `EntryPoint`s may be of any type. Each entry is associated with exactly **one** `Period`, which range in their granularity from seconds to years. Running a `Query` will return `Entry` instances match the query's parameters.
 
 ### Simplified Conceptual Example
 
@@ -119,11 +117,7 @@ erDiagram
         string _emoji
         string _desc
         enum _scope
-    }
-    TAG{
-        SmallID _tid
-        string _lbl
-        SmallID[] _dids
+        string[] _tags
     }
 
     ENTRY {
@@ -192,6 +186,7 @@ These properties enable the PDW to uniquely identify individual instances of eac
   _emoji: "🏃‍♀️",
   _desc: "Broke a sweat in the name of fitness",
   _scope: "SECOND",
+  _tags: ["Health"]
   _pts: [
     {
       _pid: "bw7k",
@@ -227,21 +222,5 @@ Entry properties that are ***not*** prefixed with an underscore are `EntryPoint`
   _period: "2028-08-22T17:30:50",
   _source: "iOS Shortcuts",
 	"bw7k": "maaf"
-}
-```
-
-### Tag
-
-A `Tag` is a mechanism for grouping related `Def`s under a common label. If a Def is associated with a Tag, the Def’s `_did` will show up in the Tag’s `_dids` array. This allows a `Query` to quickly filter down to the set of related Defs.
-
-```json
-{
-  _uid: "ek3sf9gk-3sgi",
-  _created: "ek3sf9gk",
-  _updated: "ek3sf9gk",
-  _deleted: false,
-  _tid: "fae3",
-  _lbl: "health",
-  _dids: ["3pbm", "gpai"]
 }
 ```

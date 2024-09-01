@@ -18,6 +18,7 @@ docs
 docs/*
 out/*
 __notes_to_self.md
+test/localTestFileDir
 
 # Editor directories and files
 .vscode/*

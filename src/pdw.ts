@@ -41,6 +41,14 @@ export type PeriodStr = string;
  */
 export type Markdown = string
 
+/**
+ * This "Omit" type is a mechanism to copy types/interfaces, *except* the given keys
+ * Example use: Omit<EntryLike, '_did'>;
+ */
+type Omit<T, K extends keyof T> = {
+    [P in keyof T as P extends K ? never : P]: T[P];
+  };
+
 //#endregion
 
 //#region ### ENUMS ###
@@ -80,18 +88,6 @@ export enum PointType {
      * An array of _tid
      */
     MULTISELECT = 'MULTISELECT', //Comma-separated list of _tid 
-    /**
-     * A url to a file?
-     */
-    FILE = 'FILE', //url?
-    /**
-     * A url to a photo?
-     */
-    PHOTO = 'PHOTO', //url?
-    /**
-     * Literally JSON - circular references are **not** supported. You have to be able to run JSON.parse(JSON.stringify(Entry))
-     */
-    JSON = 'JSON'
 }
 
 /**
@@ -134,7 +130,8 @@ export enum Rollup {
  * It's *very much* a work in progress.
  */
 export interface DataStore {
-    commit(trans: Transaction): Promise<CommitResponse>;
+
+    commit(trans: Transaction): Promise<any>;
 
     getEntries(params: ReducedParams): Promise<ReducedQueryResponse>;
 
@@ -157,15 +154,20 @@ export interface DataStore {
 }
 
 /**
- * A static DataStore. Loads content to the DefaultDataStore (arrays in memory)
- * and doesn't register itself with the PDW. No changes are persisted to the 
- * place where the data was imported from until it's exported back to that place.
+ * The means to get data to and from external data repositories (.csv files, etc)
  */
-export interface AsyncDataStore {
-    importFrom(params: any): Promise<CompleteDataset>,
+export interface ImporterExporter {
+    /**
+     * Data from the external library are imported into a PDW instance.
+     */
+    // importDefData(params: any): Promise<DefData[]>,
+    // importEntryData(usingDefData: DefData[], params: any): Promise<EntryData[]>
+    /**
+     * Data from the PDW is supplied, it's saved in an exported format
+     * according to the Exporter logic & whatnot.
+     */
     exportTo(allData: CompleteDataset, params: any): any
 }
-
 /**
  * Basic data filtering parameters, supported by the {@link PDW} methods for
  * {@link getDefs} & the 2 other element "getters". The {@link DataStore} methods
@@ -378,6 +380,10 @@ export interface DeletionMsgMap {
  */
 export interface ElementLike {
     /**
+     * Definition ID - required
+     */
+    _did: string;
+    /**
      * Universal ID - uniquely identifies an INSTANCE of any element.
      */
     _uid?: UID;
@@ -407,31 +413,21 @@ export interface ElementLike {
     [x: string]: any;
 }
 
-// export interface Element {
-//     _uid: UID;
-//     _deleted: boolean;
-//     _created: EpochStr;
-//     _updated: EpochStr;
-// }
-
 /**
  * Definitions Data Shape
  */
 export interface DefLike extends ElementLike {
+
     /**
-     * Definition ID - the type of the thing.
-     */
-    _did?: string;
-    /**
-     * The label for the definition
+     * The label for the Definition
      */
     _lbl?: string;
     /**
-     * A text string describing what the definition is for
+     * A text string describing what the data are
      */
     _desc?: string;
     /**
-     * A shorthand for the definition
+     * A shorthand for these types of data
      */
     _emoji?: string;
     /**
@@ -454,18 +450,6 @@ export interface PointDefLike {
      */
     _pid?: SmallID
     /**
-    * Label for the point
-    */
-    _lbl?: string;
-    /**
-    * Point description
-    */
-    _desc?: string;
-    /**
-     * Shorthand for the point in the UI
-     */
-    _emoji?: string;
-    /**
     * Point type
     */
     _type?: PointType;
@@ -473,15 +457,23 @@ export interface PointDefLike {
      * Default rollup type
      */
     _rollup?: Rollup;
+
     /**
-     * PointDefs cannot be *deleted*, only deactivated
+     * The label for the Definition or PointDef
      */
-    _hide?: boolean;
+    _lbl?: string;
     /**
-     * Select & Multiselect options. Associated with a option ID (an {@link SmallID})
+     * A text string describing what the data are
      */
-    _opts?: OptMap;
-    // [x: string]: any;
+    _desc?: string;
+    /**
+     * A shorthand for these types of data
+     */
+    _emoji?: string;
+    /**
+     * List of potential options for Select & Multiselect
+     */
+    _opts?: string[];
 }
 
 export interface EntryLike extends ElementLike {
@@ -500,10 +492,6 @@ export interface EntryLike extends ElementLike {
      */
     _period?: PeriodStr,
     /**
-     * Associated definition ID
-     */
-    _did?: SmallID,
-    /**
      * For tracking where the tracking is coming from
      */
     _source?: string,
@@ -519,11 +507,11 @@ export interface ElementData {
     _deleted: boolean;
     _created: EpochStr;
     _updated: EpochStr;
+    _did: string;
     [x: string]: any;
 }
 
 export interface DefData extends ElementData {
-    _did: string;
     _lbl: string;
     _desc: string;
     _emoji: string;
@@ -539,15 +527,13 @@ export interface PointDefData {
     _emoji: string;
     _type: PointType;
     _rollup: Rollup;
-    _hide: boolean;
-    _opts: OptMap;
+    _opts?: string[];
 }
 
 export interface EntryData extends ElementData {
     _eid: UID,
     _note: string,
     _period: PeriodStr,
-    _did: SmallID,
     _source: string,
     [_pid: string]: any
 }
@@ -597,14 +583,14 @@ export interface ReducedQueryResponse {
     msgs?: string[];
 }
 
-export interface CommitResponse {
-    success: boolean;
-    msgs?: string[];
-    defData?: DefData[];
-    entryData?: EntryData[];
-    delDefs?: DeletionMsg[];
-    delEntries?: DeletionMsg[];
-}
+// export interface CommitResponse {
+//     success: boolean;
+//     msgs?: string[];
+//     defData?: DefData[];
+//     entryData?: EntryData[];
+//     delDefs?: DeletionMsg[];
+//     delEntries?: DeletionMsg[];
+// }
 
 interface CurrentAndDeletedCounts {
     /**
@@ -631,43 +617,29 @@ export interface DataStoreOverview {
 export class PDW {
     dataStore: DataStore;
     private _manifest: Def[];
-    private static instance: PDW;
-    private constructor(store?: DataStore) {
+    private constructor(manifest: DefLike[], store?: DataStore,) {
         if (store !== undefined) {
             this.dataStore = store;
         } else {
             this.dataStore = new DefaultDataStore(this);
         }
-        PDW.instance = this; //for singleton
         this._manifest = [];
-    }
+        if (manifest !== undefined) this._manifest = manifest.map(defData => new Def(defData, this));
 
-    /**
-     * Singleton pattern.
-     * @returns the PDW
-     */
-    public static getInstance(): PDW {
-        if (!PDW.instance) {
-            PDW.instance = new PDW();
-        }
-        return PDW.instance;
-    }
-
-    public static getManifest(): Def[] {
-        return this.getInstance()._manifest;
+        console.log('PDW instance created with the ' + this.dataStore.serviceName + ' DataStore, with ' + this._manifest.length + ' definitions.');
     }
 
     public get manifest(): Def[] {
         return this._manifest;
     }
 
-    /**
-     * Removes any existing DataStore(s) and uses the provided one
-     * @param storeInstance the DataStore to use
-     */
-    async setDataStore(storeInstance: DataStore) {
-        this.dataStore = storeInstance;
-        this._manifest = (await storeInstance.getDefs()).map(defData => new Def(defData));
+    static newPDWUsingDefs(defManifest: DefLike[]): PDW {
+        return new PDW(defManifest);
+    }
+
+    static async newPDWUsingDatastore(dataStore: DataStore): Promise<PDW> {
+        let defs = await dataStore.getDefs(false);
+        return new PDW(defs, dataStore);
     }
 
     /**
@@ -676,7 +648,7 @@ export class PDW {
      * @returns a {@link CompleteDataset} containing a {@link Def}s, {@link Entry}s
      */
     async getAll(rawParams: StandardParams): Promise<CompleteDataset> {
-        const params = PDW.sanitizeParams(rawParams);
+        const params = this.sanitizeParams(rawParams);
         const entries = await this.dataStore.getEntries(params);
         const includeDeletedDefs = params.hasOwnProperty('includeDeleted') && params.includeDeleted != 'no';
         const defs = (await this.dataStore.getDefs(includeDeletedDefs)) as DefData[];
@@ -689,72 +661,7 @@ export class PDW {
         return PDW.addOverviewToCompleteDataset(dataset);
     }
 
-    /**
-     * Grabs the Defs from the attached DataStore. 
-     * By default, does not include the deleted defs.
-     * If you want to include *all* defs, pass in `true`
-     * @param includedDeleted false by default
-     * @returns Defs inflated from the DataStore
-     */
-    async getDefs(includedDeleted = false): Promise<Def[]> {
-        const defDatas = await this.dataStore.getDefs(includedDeleted);
-        let defs = defDatas.map(dl => new Def(dl));
-        this._manifest = defs.filter(d=>!d.deleted);
-        return defs;
-
-        // //#TODO - extract this logic to a dedicated "PDW.sync(datastores:DataStore[])" method
-        // let combinedDefs: Def[] = [];
-        // //compile defs from all attached DataStores
-        // this.dataStore.forEach(async dataStore => {
-        //     let thisStoreDefDatas = await dataStore.reducedQuery(params);
-        //     let thisStoreDefs = thisStoreDefDatas.defs.map(tsdl => new Def(tsdl));
-        //     thisStoreDefs.forEach(def => {
-        //         let existingCopy = combinedDefs.find(cd => cd.sameIdAs(def.data));
-        //         if (existingCopy !== undefined) {
-        //             //duplicate found, determine which is newer & keep only it
-        //             if (existingCopy.shouldBeReplacedWith(def.data)) {
-        //                 //find & remove exising
-        //                 const ind = combinedDefs.findIndex(el => el.data._uid === existingCopy!.data._uid)
-        //                 combinedDefs.splice(ind);
-        //                 //add replacement
-        //                 combinedDefs.push(def);
-        //             }
-        //             //else{ignore it. don't do anything}
-        //         } else {
-        //             combinedDefs.push(def);
-        //         }
-        //     })
-        // })
-        // return combinedDefs;
-    }
-
-    getFromManifest(did: string): Def {
-        const matchedDef = this.manifest.find(d => d.data._did === did);
-        if (matchedDef === undefined) throw new Error("No Def found in Manifest with id: " + did);
-        return matchedDef!
-    }
-
-    getTagsFromManifest(): string[]{
-        let tags:string[] = [];
-        this.manifest.forEach(def=>{
-            def.tags.forEach(tag=>{
-                if(!tags.some(t=>t.toUpperCase()===tag.toUpperCase())) tags.push(tag);
-            })
-        })
-        return tags;
-    }
-
-    //#TODO maybe
-    // relabelTag(oldTagLbl: string, newTagLbl: string){
-    //     this.manifest.forEach(def=>{
-    //         def.tags.forEach(tag=>{
-    //             if(!tags.some(t=>t.toUpperCase()===oldTagLbl.toUpperCase())) ...
-    //         })
-    //     })
-    // }
-
     private pushDefsToManifest(defs: Def[]) {
-        console.trace('Is this being called?')
         if (!Array.isArray(defs)) return;
         if (defs.length === 0) return;
         defs.forEach((def: any) => {
@@ -772,53 +679,30 @@ export class PDW {
         const undeletions = deles.filter(d => !d.deleted);
         this._manifest = this.manifest.filter(md => !deletions.some(d => d.uid === md.data._uid));
         if (undeletions.length > 0) {
-            this.manifest.push(...(await PDW.getInstance().getDefs(false)));
+            this.manifest.push(...(await this.getDefs(false)));
         }
     }
 
     query(params?: StandardParams): Query {
-        return new Query(params);
+        return new Query(this, params);
     }
 
     async getEntries(rawParams?: StandardParams): Promise<Entry[]> {
         if (rawParams === undefined) rawParams = {};
-        const params = PDW.sanitizeParams(rawParams);
+        const params = this.sanitizeParams(rawParams);
         let entriesQuery = await this.dataStore.getEntries(params);
-        return PDW.inflateEntriesFromData(entriesQuery.entries);
+        return this.inflateEntriesFromData(entriesQuery.entries);
     }
 
-    async setDefs(createDefs: DefLike[] = [], updateDefs: DefLike[] = [], deletionDefs: DeletionMsg[] = []): Promise<CommitResponse> {
-        let trans: Transaction = {
-            create: {
-                defs: createDefs.map(def => new Def(def)),
-                entries: []
-            },
-            update: {
-                defs: updateDefs.map(def => new Def(def)),
-                entries: []
-            },
-            delete: {
-                defs: deletionDefs,
-                entries: []
-            }
-        }
-        const response = await this.dataStore.commit(trans)
-        const defs = [...trans.create.defs, ...trans.update.defs];
-        this.handleManifestDeletionChange(trans.delete.defs);
-        this.pushDefsToManifest(defs);
-        return response
-    }
-
-    async setEntries(createEntries: EntryData[] = [], updateEntries: EntryData[] = [], deletionEntries: DeletionMsg[] = []): Promise<CommitResponse> {
-
+    async setEntries(createEntries: EntryData[] = [], updateEntries: EntryData[] = [], deletionEntries: DeletionMsg[] = []): Promise<any> {
         let trans: Transaction = {
             create: {
                 defs: [],
-                entries: PDW.inflateEntriesFromData(createEntries)
+                entries: this.inflateEntriesFromData(createEntries)
             },
             update: {
                 defs: [],
-                entries: PDW.inflateEntriesFromData(updateEntries)
+                entries: this.inflateEntriesFromData(updateEntries)
             },
             delete: {
                 defs: [],
@@ -830,24 +714,85 @@ export class PDW {
         return response
     }
 
-    async setAll(completeDataset: ElementMap | CompleteDataset): Promise<CommitResponse> {
-        if(completeDataset.entries.length > 0 && completeDataset.entries[0].hasOwnProperty('_uid')) completeDataset.entries = PDW.inflateEntriesFromData(completeDataset.entries as EntryData[]);
-        if(completeDataset.defs.length > 0 && completeDataset.defs[0].hasOwnProperty('_uid')) completeDataset.defs = completeDataset.defs.map(def => new Def(def as DefData))
+    /**
+     * Grabs the Defs from the attached DataStore. 
+     * By default, does not include the deleted defs.
+     * If you want to include *all* defs, pass in `true`
+     * @param includedDeleted false by default
+     * @returns Defs inflated from the DataStore
+     */
+    async getDefsFromDataStore(includedDeleted = false): Promise<Def[]> {
+        const defDatas = await this.dataStore.getDefs(includedDeleted);
+        let defs = defDatas.map(dl => new Def(dl, this));
+        this._manifest = defs.filter(d => !d.deleted);
+        return defs;
+    }
+
+    /**
+     * Grabs the Def from the loaded manifest. 
+     * If it doesnt exist, returns undefined.
+     */
+    getDefFromManifest(did: string): Def | undefined {
+        let foundDef = this._manifest.find(def => def.did === did);
+        if(foundDef === undefined) foundDef = this._manifest.find(def => def.lbl.toUpperCase() === did.toUpperCase().trim());
+        if(foundDef === undefined) throw new Error("Did not find Def in manifest ")
+        return foundDef
+    }
+
+    async getDefs(includeDeleted = false): Promise<Def[]> {
+        return (await this.dataStore.getDefs(includeDeleted)).map(defData => new Def(defData, this));
+    }
+
+    async setDefs(createDefs: DefLike[] = [], updateDefs: DefLike[] = [], deletionDefs: DeletionMsg[] = []): Promise<any> {
+        let trans: Transaction = {
+            create: {
+                defs: createDefs.map(def => new Def(def, this)),
+                entries: []
+            },
+            update: {
+                defs: updateDefs.map(def => new Def(def, this)),
+                entries: []
+            },
+            delete: {
+                defs: deletionDefs,
+                entries: []
+            }
+        }
+        const response = await this.dataStore.commit(trans)
+        /* Update the Manifest with the transaction */
+        const defs = [...trans.create.defs, ...trans.update.defs];
+        this.handleManifestDeletionChange(trans.delete.defs);
+        this.pushDefsToManifest(defs);
+        return response
+    }
+    
+    async setAll(completeDataset: ElementMap | CompleteDataset): Promise<any> {
+        let defs: Def[] = [];
+        if (completeDataset.defs.length > 0){
+            defs = completeDataset.defs.map(def => new Def(def as DefData, this))
+            this.pushDefsToManifest(defs);
+        }
+
+        let entries: Entry[] = [];
+        if (completeDataset.entries.length > 0){
+            entries = this.inflateEntriesFromData(completeDataset.entries as EntryData[]);
+        }
+
         const result = await this.dataStore.commit({
             create: {
                 defs: [],
                 entries: []
             },
             update: {
-                defs: completeDataset.defs as Def[],
-                entries: completeDataset.entries as Entry[],
+                defs: defs,
+                entries: entries,
             },
             delete: {
                 defs: [],
                 entries: []
             },
         })
-        if(result.success === false){
+        if (result.success === false) {
             console.error(result);
             throw new Error('Setting Defs and Entries failed')
         }
@@ -855,7 +800,7 @@ export class PDW {
     }
 
     async newDef(defInfo: DefLike): Promise<Def> {
-        let newDef = new Def(defInfo);
+        let newDef = new Def(defInfo, this);
         const storeCopy = newDef.makeStaticCopy() as Def;
         const result = await this.dataStore.commit({
             create: {
@@ -871,7 +816,7 @@ export class PDW {
                 entries: []
             },
         })
-        if(result.success === false){
+        if (result.success === false) {
             console.error(result);
             throw new Error('Def Creation failed')
         }
@@ -879,8 +824,8 @@ export class PDW {
         return newDef;
     }
 
-    async newEntry(entryInfo: EntryLike, def: Def): Promise<Entry> {
-        let newEntry = new Entry(entryInfo, def);
+    async newEntry(entryInfo: EntryLike): Promise<Entry> {
+        let newEntry = new Entry(entryInfo, this);
         const storeCopy = newEntry.makeStaticCopy() as Entry;
         const result = await this.dataStore.commit({
             create: {
@@ -896,40 +841,32 @@ export class PDW {
                 entries: []
             },
         })
-        if(result.success === false){
+        if (result.success === false) {
             console.error(result);
             throw new Error('Entry Creation failed')
         }
         return newEntry;
     }
 
-    /**
-     * Converts class instances into standard objects.
-     * @param elements Def[], Entry[], or Tag[]
-     * @returns DefData[], EntryData[], or TagData[]
-     */
-    static flatten(elements: Element[]): ElementData[] | DefData[] | EntryData[] {
-        return elements.map(e => e.toData());
-    }
 
     /**
      * Combines two complete(ish) datasets ({@link CompleteDataset}). 
      * Returns a CompleteDataset that merges each type of ElementData
      */
-    static mergeComplete(a: CompleteDataset, b: CompleteDataset): CompleteDataset {
+    mergeComplete(a: CompleteDataset, b: CompleteDataset): CompleteDataset {
         let returnObj: CompleteDataset = {
             defs: [],
             entries: []
         };
 
         if (a.defs.length > 0 && b.defs.length > 0) {
-            returnObj.defs = PDW.merge(a.defs, b.defs) as DefData[];
+            returnObj.defs = this.merge(a.defs, b.defs) as DefData[];
         } else {
             if (a.defs.length > 0) returnObj.defs = a.defs
             if (b.defs.length > 0) returnObj.defs = b.defs
         }
         if (a.entries.length > 0 && b.entries.length > 0) {
-            returnObj.entries = PDW.merge(a.entries, b.entries) as EntryData[];
+            returnObj.entries = this.merge(a.entries, b.entries) as EntryData[];
         } else {
             if (a.entries.length > 0) returnObj.entries = a.entries
             if (b.entries.length > 0) returnObj.entries = b.entries
@@ -946,7 +883,7 @@ export class PDW {
      * @param b list of Elements or ElementData
      * @returns an array of separate, data-only copies of the merged elements
      */
-    static merge(a: ElementData[] | Element[], b: ElementData[] | Element[]): ElementData[] {
+    merge(a: ElementData[] | Element[], b: ElementData[] | Element[]): ElementData[] {
         if (a.hasOwnProperty('__modified')) a = a.map(el => el.data);
         if (b.hasOwnProperty('__modified')) b = b.map(el => el.data);
         //make static copy of A
@@ -989,7 +926,7 @@ export class PDW {
      * @param params rawParams in
      * @returns santized params out
      */
-    static sanitizeParams(params: StandardParams): ReducedParams {
+    sanitizeParams(params: StandardParams): ReducedParams {
         //ensure default
         if (params.includeDeleted === undefined) params.includeDeleted = 'no';
 
@@ -1061,11 +998,11 @@ export class PDW {
         //ensure arrays
         if (params.uid !== undefined && typeof params.uid == 'string') params.uid = [params.uid]
         if (params.eid !== undefined && typeof params.eid == 'string') params.eid = [params.eid]
-        if (params.defLbl !== undefined && typeof params.defLbl == 'string') params.did = PDW.getInstance().manifest.filter(def => (<string[]>params.defLbl)!.some(dl => dl === def.lbl)).map(def => def.did);
+        if (params.defLbl !== undefined && typeof params.defLbl == 'string') params.did = this._manifest.filter(def => (<string[]>params.defLbl)!.some(dl => dl === def.lbl)).map(def => def.did);
         if (params.did !== undefined && typeof params.did == 'string') params.did = [params.did]
         if (params.scope !== undefined && typeof params.scope == 'string') params.scope = [params.scope];
 
-        if (params.tag !== undefined && typeof params.tag == 'string') params.did = PDW.getInstance().manifest.filter(def => def.hasTag(params.tag!)).map(def => def.did);
+        if (params.tag !== undefined && typeof params.tag == 'string') params.did = this._manifest.filter(def => def.hasTag(params.tag!)).map(def => def.did);
 
         if (params.limit !== undefined && typeof params.limit !== "number") {
             console.error('Your params were: ', params)
@@ -1075,52 +1012,18 @@ export class PDW {
         return params as ReducedParams
     }
 
-    /**
-     * Finds the most-recently updated Element from a {@link CompleteDataset}
-     * @returns EpochStr of the most recently-updated thing in the set
-     */
-    static getDatasetLastUpdate(dataset: CompleteDataset): string {
-        let recents: ElementData[] = [];
-        if (dataset.defs !== undefined && dataset.defs.length > 0) recents.push(Element.getMostRecent(dataset.defs)!)
-        if (dataset.entries !== undefined && dataset.entries.length > 0) recents.push(Element.getMostRecent(dataset.entries)!)
-        if (recents.length === 0) return '00000001'
-        return Element.getMostRecent(recents)!._updated!
+
+    inflateEntriesFromData(entryData: EntryData[]): Entry[] {
+        return entryData.map(e => new Entry(e, this));
     }
 
     /**
-     * Slap a {@link DatasetOverview} to a {@link CompleteDataset}
-     */
-    static addOverviewToCompleteDataset(data: CompleteDataset, storeName?: string): CompleteDataset {
-        if (data.overview !== undefined) {
-            console.warn('Tried to add an overview to a dataset that already had one:', data);
-            return data
-        }
-        data.overview = {
-            defs: {
-                current: data.defs?.filter(element => element._deleted === false).length,
-                deleted: data.defs?.filter(element => element._deleted).length
-            },
-            entries: {
-                current: data.entries?.filter(element => element._deleted === false).length,
-                deleted: data.entries?.filter(element => element._deleted).length
-            },
-            lastUpdated: PDW.getDatasetLastUpdate(data)
-        }
-        if (storeName) data.overview!.storeName = storeName
-        return data
-    }
-
-    static inflateEntriesFromData(entryData: EntryData[]): Entry[] {
-        let defs = PDW.getInstance().manifest;
-        return entryData.map(e => new Entry(e, defs.find(def => def.did === e._did)!));
-    }
-
-    /**
-     * Takes in an array of {@link Entry} instances and applies the default rollup to 
+     * Takes in an array of {@link Entry} instances sharing a common Def and applies the default rollup to 
      * each of the EntryPoints contained in the Entries. Produces an {@link EntryRollup}
      */
-    static rollupEntries(entries: EntryData[]): EntryRollup { //#TODO - add RollupOverride param
-        const def: Def = PDW.getInstance().getFromManifest(entries[0]._did);
+    rollupEntries(entries: EntryData[]): EntryRollup { //#TODO - add RollupOverride param
+        const def = this.getDefFromManifest(entries[0]._did);
+        if (def === undefined) throw new Error("No definition found with _did: " + entries[0]._did)
         const pointDefs = def.pts;
         let returnObj = {
             did: def.did,
@@ -1228,9 +1131,54 @@ export class PDW {
         }
     }
 
-    static summarize(entries: Entry[] | EntryData[], scope: Scope | "ALL"): PeriodSummary[] {
+    /**
+     * Converts class instances into standard objects.
+     * @param elements Def[], Entry[], or Tag[]
+     * @returns DefData[], EntryData[], or TagData[]
+     */
+    static flatten(elements: Element[]): ElementData[] | DefData[] | EntryData[] {
+        return elements.map(e => e.toData());
+    }
+
+    /**
+     * Finds the most-recently updated Element from a {@link CompleteDataset}
+     * @returns EpochStr of the most recently-updated thing in the set
+     */
+    static getDatasetLastUpdate(dataset: CompleteDataset): string {
+        let recents: ElementData[] = [];
+        if (dataset.defs !== undefined && dataset.defs.length > 0) recents.push(Element.getMostRecent(dataset.defs)!)
+        if (dataset.entries !== undefined && dataset.entries.length > 0) recents.push(Element.getMostRecent(dataset.entries)!)
+        if (recents.length === 0) return '00000001'
+        return Element.getMostRecent(recents)!._updated!
+    }
+
+    /**
+     * Slap a {@link DatasetOverview} to a {@link CompleteDataset}
+     */
+    static addOverviewToCompleteDataset(data: CompleteDataset, storeName?: string): CompleteDataset {
+        if (data.overview !== undefined) {
+            console.warn('Tried to add an overview to a dataset that already had one:', data);
+            return data
+        }
+        data.overview = {
+            defs: {
+                current: data.defs?.filter(element => element._deleted === false).length,
+                deleted: data.defs?.filter(element => element._deleted).length
+            },
+            entries: {
+                current: data.entries?.filter(element => element._deleted === false).length,
+                deleted: data.entries?.filter(element => element._deleted).length
+            },
+            lastUpdated: PDW.getDatasetLastUpdate(data)
+        }
+        if (storeName) data.overview!.storeName = storeName
+        return data
+    }
+
+
+    summarize(entries: Entry[] | EntryData[], scope: Scope | "ALL"): PeriodSummary[] {
         if (entries.length === 0) throw new Error("No entries to summarize");
-        if(scope === Scope.MINUTE || scope === Scope.SECOND) throw new Error("Rollups to scopes below one hour are not supported."); //I imagine if this happens it would be unintentional
+        if (scope === Scope.MINUTE || scope === Scope.SECOND) throw new Error("Rollups to scopes below one hour are not supported."); //I imagine if this happens it would be unintentional
         let entryDataArr = entries as EntryData[];
         if (!entryDataArr[0].hasOwnProperty('_eid')) entryDataArr = entryDataArr.map(e => e.toData()) as EntryData[];
         let periodStrs: PeriodStr[] = [...new Set(entryDataArr.map(e => e._period))];
@@ -1247,7 +1195,7 @@ export class PDW {
             const keys = Object.keys(entsByType);
             let rollups: EntryRollup[] = [];
             keys.forEach(key =>
-                rollups.push(PDW.rollupEntries(entsByType[key])))
+                rollups.push(this.rollupEntries(entsByType[key])))
             return [{
                 period: 'ALL',
                 entryRollups: rollups,
@@ -1262,7 +1210,7 @@ export class PDW {
             const keys = Object.keys(entsByType);
             let rollups: EntryRollup[] = [];
             keys.forEach(key =>
-                rollups.push(PDW.rollupEntries(entsByType[key])))
+                rollups.push(this.rollupEntries(entsByType[key])))
             return {
                 period: p.toString(),
                 entryRollups: rollups,
@@ -1287,15 +1235,18 @@ export class PDW {
 /**
  * Base class 
  */
-export abstract class Element {
+abstract class Element {
     data: ElementData;
+    pdw: PDW;
     __modified: boolean;
     __deletionChange?: boolean;
     readonly tempCreated: Temporal.ZonedDateTime;
     readonly tempUpdated: Temporal.ZonedDateTime;
 
-    constructor(inputData: ElementLike) {
+    constructor(inputData: ElementLike, pdwRef: PDW) {
+        this.pdw = pdwRef;
         this.data = {
+            _did: inputData._did,
             _uid: inputData._uid ?? makeUID(),
             _deleted: Element.handleDeletedInputVariability(inputData._deleted),
             _created: Element.handleEpochStrInputVariability(inputData._created),
@@ -1304,6 +1255,13 @@ export abstract class Element {
         this.tempCreated = parseTemporalFromEpochStr(this.data._created);
         this.tempUpdated = parseTemporalFromEpochStr(this.data._updated);
         this.__modified = false;
+    }
+
+    /**
+     * The identifier for the Definition associated with this element.
+     */
+    get did() {
+        return this.data._did;
     }
 
     /**
@@ -1401,11 +1359,11 @@ export abstract class Element {
 
         const elementType = this.getType();
         if (elementType === 'DefData') {
-            await PDW.getInstance().setDefs(created, [], deleted);
+            await this.pdw.setDefs(created, [], deleted);
             return this
         }
         if (elementType === 'EntryData') {
-            await PDW.getInstance().setEntries(created as EntryData[], [], deleted)
+            await this.pdw.setEntries(created as EntryData[], [], deleted)
             return this
         }
         throw new Error('What kind of element is this anyway? ' + elementType)
@@ -1502,9 +1460,8 @@ export abstract class Element {
     makeStaticCopy(): Def | Entry {
         const type = Element.getTypeOfElement(this.data);
         const data = this.toData();
-        if (type === 'DefData') return new Def(data);
-        //@ts-expect-error - Entry instances will have an existing def
-        if (type === 'EntryData') return new Entry(data, this.def);
+        if (type === 'DefData') return new Def(data, this.pdw);
+        if (type === 'EntryData') return new Entry(data, this.pdw);
         throw new Error('What type was this? ' + type);
     }
 
@@ -1564,6 +1521,7 @@ export abstract class Element {
             return undefined
         }
         let mostRecent: ElementData = {
+            _did: '',
             _uid: '',
             _deleted: true,
             _created: '',
@@ -1580,13 +1538,12 @@ export class Def extends Element {
     declare data: DefData;
     private readonly _pts: PointDef[];
 
-    constructor(defData: DefLike) {
+    constructor(defData: DefLike, pdwRef: PDW) {
         if (defData._scope !== undefined && !Def.isValidScope(defData._scope)) throw new Error('Invalid scope supplied when creating Def: ' + defData._scope);
-        super(defData);
+        super(defData, pdwRef);
         this.data = {
             ...this.data,
-            _did: defData._did ?? makeSmallID(),
-            _lbl: defData._lbl ?? 'Unlabeled Definition',
+            _lbl: defData._lbl ?? defData._did,
             _desc: defData._desc ?? 'Set a description',
             _emoji: defData._emoji ?? '🆕',
             _scope: defData._scope ?? Scope.SECOND,
@@ -1607,7 +1564,8 @@ export class Def extends Element {
         this._pts = pointsToSanitize.map(rawPoint => new PointDef(rawPoint, this));
         this.data._pts = this.pts.map(pd => pd.toData())
 
-        if (!Def.isDefData(this.data)) throw new Error('Def was mal-formed.')
+        if (!Def.isDefData(this.data)) throw new Error('Def was mal-formed.');
+        // if (!this.data._deleted) 
     }
     get did() {
         return this.data._did;
@@ -1694,33 +1652,9 @@ export class Def extends Element {
         return this
     }
 
-    /**
-     * Marks the pointDef as _hide = ture
-     */
-    hidePoint(pointIdentifier: string | PointDef, isUnhide = true) {
-        let assPoint: undefined | PointDef
-        if (typeof pointIdentifier === undefined) throw new Error("Must send a string or object as a point identifier");
-        if (typeof pointIdentifier === 'string') {
-            assPoint = this.getPoint(pointIdentifier);
-        } else {
-            assPoint = pointIdentifier;
-            if (!PointDef.isPointDefData(assPoint)) throw new Error("pointIdentifier passed in wasn't PointDefData")
-        }
-        assPoint.hide = isUnhide;
-        this.__modified = true;
-    }
-
-    /**
-     * Will set _hide = true for the identified point
-     * @param pointIdentifier the point to set as active again
-     */
-    unhidePoint(pointIdentifier: string | PointDef) {
-        this.hidePoint(pointIdentifier, false)
-    }
-
-    async newEntry(entryData: EntryLike): Promise<Entry> {
+    async newEntry(entryData: Omit<EntryLike, '_did'>): Promise<Entry> {
         entryData._did = this.did;
-        return PDW.getInstance().newEntry(entryData, this);
+        return this.pdw.newEntry((<EntryLike>entryData));
     }
 
     /**
@@ -1763,21 +1697,24 @@ export class PointDef {
         if (newPointDefData._type !== undefined && !PointDef.isValidType(newPointDefData._type)) throw new Error('Cannot parse point type ' + newPointDefData._type);
         if (newPointDefData._rollup !== undefined && !PointDef.isValidRollup(newPointDefData._rollup)) throw new Error('Cannot parse point rollup ' + newPointDefData._rollup);
 
+        //Force array for types that should have an array
+        if (
+            newPointDefData._opts === undefined &&
+            PointDef.shouldHaveOpts(newPointDefData._type!)
+        ) {
+            newPointDefData._opts = [];
+        }
+
         this._def = def;
 
         this.data = {
             _pid: newPointDefData._pid,
-            _lbl: newPointDefData._lbl ?? 'Label unset',
+            _lbl: newPointDefData._lbl ?? newPointDefData._pid,
             _type: newPointDefData._type ?? PointType.TEXT,
             _desc: newPointDefData._desc ?? 'Set a description',
             _emoji: newPointDefData._emoji ?? '🆕',
             _rollup: newPointDefData._rollup ?? Rollup.COUNT,
-            _hide: newPointDefData._hide ?? false,
-            _opts: {}
-        }
-        if (this.data._lbl == 'Label unset') this.data._lbl = "Label unset for pid " + this.data._pid;
-        if (this.shouldHaveOpts() && newPointDefData._opts !== undefined) {
-            this.data._opts = PointDef.validateOptsArray(newPointDefData._opts);
+            _opts: newPointDefData._opts
         }
 
         if (!PointDef.isPointDefData(this.data)) throw new Error('Mal-formed PointDef')
@@ -1797,11 +1734,9 @@ export class PointDef {
     get emoji() {
         return this.data._emoji;
     }
-    get hide() {
-        return this.data._hide
-    }
     get opts() {
-        return this.data._opts
+        //@ts-expect-error /// somewhere I have something that forces data._opts to be defined
+        return this.data._opts;
     }
     get rollup() {
         return this.data._rollup
@@ -1829,8 +1764,8 @@ export class PointDef {
         this.def.getPoint(this.data._pid).data._emoji = newEmoji;
         this.def.__modified = true;
     }
-    set hide(hideIt: boolean) {
-        this.data._hide = hideIt;
+    set opts(newOptArray: string[]) {
+        this.data._opts = newOptArray;
         this.def.__modified = true;
     }
     set rollup(newRollup: Rollup) {
@@ -1843,75 +1778,45 @@ export class PointDef {
     }
 
     /**
-     * 
-     * @param oid required - oid of option ot change
-     * @param newLbl optional - if supplied option label will be set
-     * @returns 
-     */
-    setOpt(oid: string, newLbl: string) {
-        if (!Object.hasOwn(this.opts!, oid)) {
-            console.warn('Tried to setOpt with a non-existant oid. If trying to create a new one, use addOpt().');
-            return this
-        }
-        this.opts![oid] = newLbl;
-        this.def.__modified = true;
-        return this
-    }
-
-    /**
      * Passes along the save to the Def that owns this.
      */
     save() {
         this.def.save();
     }
 
-    private static validateOptsArray(optsMap: OptMap) {
-        if (typeof optsMap !== 'object') throw new Error('optsMap not an object');
-        let keys = Object.keys(optsMap)
-        keys.forEach(key => {
-            //not modifiying, just looking for errors
-            if (
-                typeof key !== 'string' ||
-                typeof optsMap[key] !== 'string'
-            ) throw new Error("Option wasn't formatted like an 'opt'")
-        })
-        //you *could* create new array of objects explicitly only keeping the 3 desired keys,
-        //but you're not.
-        return optsMap
+    hasOpt(lbl: string): boolean{
+        if(this.data._opts === undefined) return false;
+        const trimmedUpperCasedLabel = lbl.toUpperCase().trim();
+        return this.data._opts.some(opt=>opt.toUpperCase().trim() === trimmedUpperCasedLabel);
     }
 
-    addOpt(lbl: string, oid?: string) {
-        if (!this.shouldHaveOpts()) {
+    addOpt(lbl: string) {
+        if (!PointDef.shouldHaveOpts(this.type)) {
             console.warn('Cannot add option to PointDef of type ' + this.type);
             return
         }
-        if (oid === undefined) oid = makeSmallID();
-        this.opts![oid] = lbl;
+        const upperTrimmedLabel = lbl.toUpperCase().trim()
+        if (this.opts?.some(opt => opt.toUpperCase().trim() === upperTrimmedLabel)) {
+            console.warn('Tried adding an already existing option to PointDef ' + this.lbl + ', the option was: ' + lbl);
+            return
+        }
+        this.opts?.push(lbl);
+        this.def.__modified = true;
+    }
+
+    removeOpt(lbl: string) {
+        if (!PointDef.shouldHaveOpts(this.type)) {
+            console.warn('Cannot remove option for PointDef of type ' + this.type);
+            return
+        }
+        const upperTrimmedLabel = lbl.toUpperCase().trim()
+        if (!this.opts?.some(opt => opt.toUpperCase().trim() === upperTrimmedLabel)) {
+            console.warn('Tried removing an non-existant option from PointDef ' + this.lbl + ', the option was: ' + lbl);
+            return
+        }
+        this.opts = this.opts.filter(opt => opt.toUpperCase().trim() !== upperTrimmedLabel);
         this.def.__modified = true;
         return this;
-    }
-
-    removeOpt(lbl?: string, oid?: string): PointDef {
-        if (lbl === undefined && oid === undefined) throw new Error("must supply either a label or option ID");
-        if (oid === undefined) {
-            oid = this.getOptOid(lbl!);
-        }
-        if (this.opts![oid!] !== undefined) {
-            delete this.opts![oid!]
-        }
-        this.def.__modified = true;
-        return this
-    }
-
-    getOptLbl(oid: string): string | undefined {
-        if (this.opts === undefined) return undefined
-        return this.opts![oid];
-    }
-
-    getOptOid(lbl: string): string | undefined {
-        if (this.opts === undefined) return undefined
-        let opt = Object.keys(this.opts!).find(key => this.opts![key] === lbl);
-        return opt
     }
 
     /**
@@ -1921,8 +1826,12 @@ export class PointDef {
         return this.def;
     };
 
-    shouldHaveOpts(): boolean {
-        return this.type === PointType.SELECT || this.type === PointType.MULTISELECT;
+    shouldHaveOpts(): boolean{
+        return PointDef.shouldHaveOpts(this.type);
+    }
+
+    static shouldHaveOpts(type: string): boolean {
+        return type === PointType.SELECT || type === PointType.MULTISELECT;
     }
 
     /**
@@ -1937,7 +1846,6 @@ export class PointDef {
         if (typeof data._desc !== 'string') return false
         if (typeof data._emoji !== 'string') return false
         if (!PointDef.isSingleEmoji(data._emoji)) return false
-        if (typeof data._hide !== 'boolean') return false
         if (data._type == undefined || !PointDef.isValidType(data._type)) return false
         if (data._rollup == undefined || !PointDef.isValidRollup(data._rollup)) return false
         return true;
@@ -1968,10 +1876,6 @@ export class PointDef {
             }
             throw new Error(`Cannot convert this to duration:` + _val)
         }
-        if (_type === PointType.FILE) {
-            if (typeof _val === 'string') return _val;
-            throw new Error(`Cannot convert this to file:` + _val)
-        }
         if (_type === PointType.MARKDOWN) {
             if (typeof _val === 'boolean') return _val.toString();
             if (typeof _val === 'string') return _val;
@@ -1988,10 +1892,6 @@ export class PointDef {
             if (typeof _val === 'string') return Number.parseInt(_val);
             if (typeof _val === "number") return _val;
             throw new Error(`Cannot convert this to number:` + _val)
-        }
-        if (_type === PointType.PHOTO) {
-            if (typeof _val === 'string') return _val;
-            throw new Error(`Cannot convert this to PHOTO:` + _val)
         }
         if (_type === PointType.SELECT) {
             if (typeof _val === 'string') return _val;
@@ -2014,11 +1914,6 @@ export class PointDef {
             }
             throw new Error(`Cannot convert this to time:` + _val)
         }
-        if (_type === PointType.JSON) {
-            if (typeof _val === 'string') return _val.trim();
-            if (typeof _val === "object") return JSON.stringify(_val);
-            throw new Error(`Cannot convert this to JSON:` + _val)
-        }
         throw new Error("Type not supported: " + _type);
     }
 
@@ -2040,7 +1935,7 @@ export class PointDef {
 }
 
 export class Entry extends Element {
-    declare data: EntryData
+    declare data: EntryData;
     private _def: Def;
     private _period: Period;
     /**
@@ -2048,13 +1943,11 @@ export class Entry extends Element {
      * @param entryData data to use to build the entry
      * @param def def to use, if none is supplied it will pull from the local manifest based on entryData._did
      */
-    constructor(entryData: EntryLike, def?: Def) {
-        super(entryData);
-        if (def !== undefined) {
-            this._def = def;
-        } else {
-            this._def = PDW.getInstance().getFromManifest(entryData._did!)
-        }
+    constructor(entryData: EntryLike, pdwRef: PDW) {
+        super(entryData, pdwRef);
+        let def = pdwRef.getDefFromManifest(entryData._did);
+        if (def === undefined) throw new Error("Tried creating an Entry with _did '" + entryData._did + "', which is not in the manifest.");
+        this._def = def;
 
         //forcing scope adherance
         if (entryData._period !== undefined) {
@@ -2065,11 +1958,18 @@ export class Entry extends Element {
 
         this.data = {
             ...this.data,
-            _did: this.def.did,
             _period: this.period.toString(),
             _eid: entryData._eid ?? makeUID(),
             _note: entryData._note ?? '',
             _source: entryData._source ?? ''
+        }
+
+        //migrate points up - to support using a _pts: map on the entryData object. Not preferred, but may be handy.
+        //probably YAGNI
+        if(entryData.hasOwnProperty('_pts')){
+            Object.keys(entryData._pts).forEach(key=>{
+                entryData[key] = entryData._pts[key];
+            })
         }
 
         //spawn new EntryPoints for any non-underscore-prefixed keys
@@ -2240,7 +2140,7 @@ export class Period {
         function convertFullISOToPlainDateStr(isoString: string): string {
             let temp = Temporal.PlainDateTime.from(isoString);
             const tzString = Temporal.TimeZone.from(isoString).toString();
-            const offsetString = tzString.substring(0,1) + 'PT' + Number.parseInt(tzString.substring(1,3)) + 'h' + + Number.parseInt(tzString.substring(5,7)) + 'm';
+            const offsetString = tzString.substring(0, 1) + 'PT' + Number.parseInt(tzString.substring(1, 3)) + 'h' + + Number.parseInt(tzString.substring(5, 7)) + 'm';
             console.log(offsetString);
             temp = temp.add(offsetString);
             let str = temp.toJSON()
@@ -2554,12 +2454,14 @@ export class Period {
 export class Query {
     // private verbosity: 'terse' | 'normal' | 'verbose'
     // private rollup: boolean
+    public pdw: PDW;
     private params: StandardParams
     private sortOrder: undefined | 'asc' | 'dsc'
     private sortBy: undefined | string
-    constructor(paramsIn?: StandardParams) {
+    constructor(pdwRef: PDW, paramsIn?: StandardParams) {
         // this.verbosity = 'normal';
         // this.rollup = false;
+        this.pdw = pdwRef;
         this.params = { includeDeleted: 'no' }; //default
         if (paramsIn !== undefined) this.parseParamsObject(paramsIn)
     }
@@ -2671,7 +2573,7 @@ export class Query {
         return this
     }
 
-    rollup(to: Scope){
+    rollup(to: Scope) {
         to = to.toUpperCase() as Scope;
         this.params.rollup = to;
         return this
@@ -2685,15 +2587,14 @@ export class Query {
     tags(tags: string[] | string) {
         if (!Array.isArray(tags)) tags = [tags];
         //convert tags into dids
-        const manifest = PDW.getManifest();
-        const dids = manifest.filter(def => def.hasTag(tags))
+        const dids = this.pdw.manifest.filter(def => def.hasTag(tags))
         this.params.did = dids.map(d => d.data._did);
         return this
     }
 
     scope(scopes: Scope[] | Scope): Query {
         if (!Array.isArray(scopes)) scopes = [scopes];
-        let defs = PDW.getInstance().manifest.filter(def => (<Scope[]>scopes).some(scope => scope === def.scope));
+        let defs = this.pdw.manifest.filter(def => (<Scope[]>scopes).some(scope => scope === def.scope));
         this.params.did = defs.map(def => def.did);
         return this
     }
@@ -2752,23 +2653,23 @@ export class Query {
                 count: 0,
                 params: {
                     paramsIn: this.params,
-                    asParsed: PDW.sanitizeParams(this.params)
+                    asParsed: this.pdw.sanitizeParams(this.params)
                 },
                 msgs: ['Empty queries not allowed. If seeking all, include {allOnPurpose: true}'],
                 entries: []
             }
         }
-        let entries = await PDW.getInstance().getEntries(this.params);
+        let entries = await this.pdw.getEntries(this.params);
         if (this.sortBy !== undefined) entries = this.applySort(entries);
         let resp: QueryResponse = {
             success: true,
             count: entries.length,
             params: {
                 paramsIn: this.params,
-                asParsed: PDW.sanitizeParams(this.params)
+                asParsed: this.pdw.sanitizeParams(this.params)
             },
             entries: entries,
-            summary: this.params.hasOwnProperty('rollup') ? PDW.summarize(entries, this.params.rollup as Scope) : undefined
+            summary: this.params.hasOwnProperty('rollup') ? this.pdw.summarize(entries, this.params.rollup as Scope) : undefined
         }
         return resp
     }
@@ -2798,12 +2699,12 @@ export class DefaultDataStore implements DataStore {
         this.entries = [];
     }
 
-    async commit(trans: Transaction): Promise<CommitResponse> {
-        let returnObj: CommitResponse = {
+    async commit(trans: Transaction): Promise<any> {
+        let returnObj: any = {
             success: false,
             msgs: []
         }
-        
+
         //creating new Elements
         trans.create.defs.forEach(newDef => {
             this.defs.push(newDef);
@@ -2840,8 +2741,8 @@ export class DefaultDataStore implements DataStore {
         })
 
         returnObj.success = true;
-        returnObj.defData = [...flatUpdatedDefs, ...trans.create.defs.map(d=>d.toData() as DefData)]
-        returnObj.entryData = [...flatUpdatedEntries, ...trans.create.entries.map(d=>d.toData() as EntryData)]
+        returnObj.defData = [...flatUpdatedDefs, ...trans.create.defs.map(d => d.toData() as DefData)]
+        returnObj.entryData = [...flatUpdatedEntries, ...trans.create.entries.map(d => d.toData() as EntryData)]
         returnObj.msgs!.push(`Stored ${returnObj.defData.length} Defs, ${returnObj.entryData.length} Entries, and toggled deletition for ${returnObj.delDefs?.length} Defs and ${returnObj.delEntries?.length} Entries.`);
         return returnObj;
     }
@@ -2922,16 +2823,16 @@ export class DefaultDataStore implements DataStore {
                     sameId.deleted = true;
                     sameId.updated = makeEpochStr();
                     newElements.push(el);
-                }else{
+                } else {
                     msgs.push('Skipped saving entry with uid ' + el._uid + ', as a more recently updated element is already in stores');
                 }
             } else {
                 newElements.push(el);
             }
         });
-        const type = getElementType(elementsIn[0])
-        if (type === 'DefData') elementRepo.push(...newElements.map(d => new Def(d)));
-        if (type === 'EntryData') elementRepo.push(...await PDW.inflateEntriesFromData(newElements as EntryData[]));
+        const type = elementsIn[0].hasOwnProperty('_eid') === true ? 'EntryData' : 'DefData';
+        if (type === 'DefData') elementRepo.push(...newElements.map(d => new Def(d, this.pdw)));
+        if (type === 'EntryData') elementRepo.push(...await this.pdw.inflateEntriesFromData(newElements as EntryData[]));
         // return elementsIn;
     }
 
@@ -2955,8 +2856,6 @@ export class DefaultDataStore implements DataStore {
 //#endregion
 
 //#region ### UTILITIES ###
-
-//TODO - do you want a utils class?
 
 /**
  * Makes a unique identifier for use with _uid and _eid
@@ -3007,17 +2906,6 @@ export function parseTemporalFromEpochStr(epochStr: EpochStr): Temporal.ZonedDat
     const parsedTemporal = Temporal.Instant.fromEpochMilliseconds(epochMillis).toZonedDateTimeISO(Temporal.Now.timeZone());
     if (parsedTemporal.epochSeconds == 0) throw new Error('Unable to parse temporal from ' + epochStr)
     return parsedTemporal
-}
-
-/**
-* Get the type of an element. Not sure if I'll use this outside
-* of the 
-* @returns string representing the type of element
-*/
-export function getElementType(element: ElementData): 'DefData' | 'EntryData' | 'TagData' {
-    if (element.hasOwnProperty("_tid") && element.hasOwnProperty("_dids")) return "TagData"
-    if (element.hasOwnProperty("_eid")) return "EntryData"
-    return "DefData"
 }
 
 //#endregion
