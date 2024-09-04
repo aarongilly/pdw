@@ -4,14 +4,27 @@ import * as obs from '../src/translators/obsidianTranslator'
 
 const testData = getTestData();
 
-test('Load from Obsidian', async () => {
-    /* Load up fresh PDW instance */
-    const pdwRef = pdw.PDW.newPDWUsingDefs([]);
-})
+test('Obsidian Roundtripping', async () => {
+    const vaultPath = 'test/localTestFileDir/localObsidianVault';
+    const configFileSubpath = "PDW/PDW Config.md"
 
-// function getDefs(): pdw.CanonicalDataset {
-    
-// }
+    let ODS = await obs.ObsidianTranslator.NewObsidianTranslator(vaultPath, configFileSubpath);
+    await ODS.fromCanonicalData(testData);
+    //@ts-expect-error - accesssing a not-exposed member:
+    let resultData = await ODS._internalPDW.getAll({includeDeleted: 'yes'});
+    //poor proxy for actually writing the data to the sheets the way I expect
+    //but better than nothing
+    expect(testData).toEqual(resultData);
+    //now actually reading the written files & pushing out to canonicalData...
+    let resultTwo = await ODS.toCanonicalData();
+    //ensuring same order to have the tests match up
+    resultData.entries.sort((a:any, b:any)=> a._uid > b._uid ? 1 : -1)
+    resultTwo.entries.sort((a:any, b:any)=> a._uid > b._uid ? 1 : -1)
+    //completing the roundtrip
+    expect(resultTwo).toEqual(resultData);
+    //NOT testing for destructive edits or anything like that, so this is definitley not covering
+    //all the "requirements" I'd want to cover, but whatever this is better than what i had.
+})
 
 function getTestData(): pdw.CanonicalDataset {
     return {

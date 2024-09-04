@@ -104,7 +104,7 @@ export function importPreviousCSV(filepath: string): pdw.CompleteishDataset{
                 try {
                     return Temporal.Instant.fromEpochMilliseconds((period - (25567 + 1)) * 86400 * 1000).toZonedDateTimeISO(Temporal.Now.timeZone()).toPlainDate().toString();
                 } catch (e) {
-                    console.log('shit');
+                    console.log('shoot');
 
                 }
             }

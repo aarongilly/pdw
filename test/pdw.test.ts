@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import * as pdw from '../src/pdw';
 import { Temporal } from 'temporal-polyfill';
 
-const pdwRef = await pdw.PDW.newPDWUsingDefs([]);
+const pdwRef = await pdw.PDW.newPDW([]);
 
 function resetTestDataset() {
     //@ts-expect-error - hacking to set the private manifest prop, it has no setter on purpose
@@ -12,8 +12,8 @@ function resetTestDataset() {
 
 test('Basic setup', async ()=>{
     resetTestDataset();
-    let pdwOne = await pdw.PDW.newPDWUsingDefs([]);
-    let pdwTwo = await pdw.PDW.newPDWUsingDefs([]);
+    let pdwOne = await pdw.PDW.newPDW([]);
+    let pdwTwo = await pdw.PDW.newPDW([]);
     await pdwOne.newDef({_did:'test'});
     await pdwTwo.newDef({_did:'two instances'});
     /**
@@ -24,7 +24,7 @@ test('Basic setup', async ()=>{
     expect(pdwTwo.manifest.length).toBe(1);
     expect(pdwTwo.getDefFromManifest('two instances')!.did).toBe('two instances');
 
-    let pdwThree = await pdw.PDW.newPDWUsingDefs([{_did:'three instances'}]);
+    let pdwThree = await pdw.PDW.newPDW([{_did:'three instances'}]);
     expect(pdwThree.manifest.length).toBe(1);
     expect(pdwThree.getDefFromManifest('three instances')!.did).toBe('three instances')
 })
@@ -1263,7 +1263,7 @@ test('Summarizer', async () => {
     let all = (await new pdw.Query(pdwRef).inPeriod(new pdw.Period('2023-08-21').zoomOut()).run()).entries;
 
     //summarize by week
-    let periods = pdwRef.summarize(all, pdw.Scope.WEEK);
+    let periods = pdw.PDW.summarize(all, pdw.Scope.WEEK);
     expect(periods.length).toBe(1);
     
     let checkRollup = periods[0].entryRollups.find(er=>er.lbl === 'Nap')!
@@ -1275,7 +1275,7 @@ test('Summarizer', async () => {
     expect(checkRollup.pts.find(pt=>pt.pid==='bbbb')!.val).toBe(2); //point._rollup = COUNTUNIQUE
 
     //summarize by day
-    periods = pdwRef.summarize(all, pdw.Scope.DAY);
+    periods = pdw.PDW.summarize(all, pdw.Scope.DAY);
     expect(periods.length).toBe(3);
     checkRollup = periods[0].entryRollups.find(er=>er.lbl === 'Nap')!
     expect(checkRollup.pts.find(pt=>pt.pid==='b111')!.val).toBe('PT9360S')
@@ -1283,7 +1283,7 @@ test('Summarizer', async () => {
     expect(checkRollup.pts.find(pt=>pt.pid==='b333')!.val).toBe('22:05:28')
     
     //summarize all into one "ALL" period
-    periods = pdwRef.summarize(all, "ALL");
+    periods = pdw.PDW.summarize(all, "ALL");
     expect(periods.length).toBe(1);
     // console.log(periods[0].entryRollups, 'yo');
     

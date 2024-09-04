@@ -631,7 +631,7 @@ export class PDW {
         return this._manifest;
     }
 
-    static async newPDWUsingDefs(defManifest: DefLike[]): Promise<PDW> {
+    static async newPDW(defManifest: DefLike[]): Promise<PDW> {
         let instance = new PDW([]);
         await instance.setDefs(defManifest);
         return instance
@@ -1012,7 +1012,6 @@ export class PDW {
         return params as ReducedParams
     }
 
-
     inflateEntriesFromData(entryData: EntryData[]): Entry[] {
         return entryData.map(e => new Entry(e, this));
     }
@@ -1023,7 +1022,16 @@ export class PDW {
      */
     rollupEntries(entries: EntryData[]): EntryRollup { //#TODO - add RollupOverride param
         const def = this.getDefFromManifest(entries[0]._did);
-        if (def === undefined) throw new Error("No definition found with _did: " + entries[0]._did)
+        if (def === undefined) throw new Error("No definition found with _did: " + entries[0]._did);
+        return PDW.rollupEntries(entries, def)
+    }
+
+    /**
+     * Takes in an array of {@link Entry} instances sharing a common Def and applies the default rollup to 
+     * each of the EntryPoints contained in the Entries. Produces an {@link EntryRollup}
+     */
+    static rollupEntries(entries: EntryData[], def: Def): EntryRollup { //#TODO - add RollupOverride param
+        if(def === undefined) console.log(entries[0])
         const pointDefs = def.pts;
         let returnObj = {
             did: def.did,
@@ -1031,6 +1039,10 @@ export class PDW {
             emoji: def.emoji,
             pts: [] as PointRollup[]
         }
+        //**********TEMP CHANGE*/
+        return returnObj
+        //************ */
+
         pointDefs.forEach(pd => {
             let vals: any[] = [];
             entries.forEach(e => {
@@ -1175,8 +1187,7 @@ export class PDW {
         return data
     }
 
-
-    summarize(entries: Entry[] | EntryData[], scope: Scope | "ALL"): PeriodSummary[] {
+    static summarize(entries: Entry[] | EntryData[], scope: Scope | "ALL"): PeriodSummary[] {
         if (entries.length === 0) throw new Error("No entries to summarize");
         if (scope === Scope.MINUTE || scope === Scope.SECOND) throw new Error("Rollups to scopes below one hour are not supported."); //I imagine if this happens it would be unintentional
         let entryDataArr = entries as EntryData[];
@@ -1190,34 +1201,42 @@ export class PDW {
             const end = new Period(periodStr).getEnd().toString();
             return end > prev ? end : prev
         });
+
+        /* Added this to support transitioning to a static function */
+        const defMap: {[did: string]: Def} = {};
+        entries.forEach(entry => {
+            defMap[entry.def.did] = entry.def;
+        })
+
         if (scope === 'ALL') {
             let entsByType = splitEntriesByType(entryDataArr);
             const keys = Object.keys(entsByType);
             let rollups: EntryRollup[] = [];
             keys.forEach(key =>
-                rollups.push(this.rollupEntries(entsByType[key])))
+                rollups.push(PDW.rollupEntries(entsByType[key], defMap[key])))
             return [{
                 period: 'ALL',
                 entryRollups: rollups,
                 entries: entryDataArr
             }];
         }
-
+        console.log('PERIODS SPOT')
         let periods = Period.allPeriodsIn(new Period(earliest), new Period(latest), (<Scope>scope), false) as Period[];
         return periods.map(p => {
+            console.log(p.periodStr);
             let ents = entryDataArr.filter(e => p.contains(e._period));
             let entsByType = splitEntriesByType(ents);
             const keys = Object.keys(entsByType);
             let rollups: EntryRollup[] = [];
             keys.forEach(key =>
-                rollups.push(this.rollupEntries(entsByType[key])))
-            return {
-                period: p.toString(),
-                entryRollups: rollups,
-                entries: ents
-            }
-        })
-
+                rollups.push(PDW.rollupEntries(entsByType[key], defMap[key])))
+                return {
+                    period: p.toString(),
+                    entryRollups: rollups,
+                    entries: ents
+                }
+            })
+            
         function splitEntriesByType(entries: EntryData[]): { [dids: string]: any; } {
             let entryTypes: { [dids: string]: any; } = {};
             entries.forEach(entry => {
@@ -1478,6 +1497,7 @@ abstract class Element {
     private static handleEpochStrInputVariability(inputSeen: any): EpochStr {
         if (inputSeen === undefined) return makeEpochStr();
         if (typeof inputSeen === 'string') {
+            inputSeen = inputSeen.trim(); //added for purpose at one point
             if (isValidEpochStr(inputSeen)) return inputSeen;
             //try passing through new Date()'s wide-open interpretations
             return makeEpochStrFrom(Temporal.Instant.fromEpochMilliseconds(new Date(inputSeen).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()))!;
@@ -2671,7 +2691,7 @@ export class Query {
                 asParsed: this.pdw.sanitizeParams(this.params)
             },
             entries: entries,
-            summary: this.params.hasOwnProperty('rollup') ? this.pdw.summarize(entries, this.params.rollup as Scope) : undefined
+            summary: this.params.hasOwnProperty('rollup') ? PDW.summarize(entries, this.params.rollup as Scope) : undefined
         }
         return resp
     }

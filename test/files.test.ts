@@ -6,7 +6,7 @@ const testData = getTestData();
 
 test('Roundtrip JSON', async () => {
     /* Load up fresh PDW instance */
-    const pdwRef = await pdw.PDW.newPDWUsingDefs([]);
+    const pdwRef = await pdw.PDW.newPDW([]);
     /* Load it with test data */
     await pdwRef.setAll(testData);
     /* Pull the data out */
@@ -23,7 +23,7 @@ test('Roundtrip JSON', async () => {
 
 test('Roundtrip YAML', async () => {
     /* Load up fresh PDW instance */
-    const pdwRef = await pdw.PDW.newPDWUsingDefs([]);
+    const pdwRef = await pdw.PDW.newPDW([]);
     /* Load it with test data */
     await pdwRef.setAll(testData);
     /* Pull the data out */
@@ -40,7 +40,7 @@ test('Roundtrip YAML', async () => {
 
 test('Roundtrip CSV', async () => {
     /* Load up fresh PDW instance */
-    const pdwRef = await pdw.PDW.newPDWUsingDefs([]);
+    const pdwRef = await pdw.PDW.newPDW([]);
     /* Load it with test data */
     await pdwRef.setAll(testData);
     /* Pull the data out */
@@ -57,7 +57,7 @@ test('Roundtrip CSV', async () => {
 
 test('Roundtrip Excel', async () => {
     /* Load up fresh PDW instance */
-    const pdwRef = await pdw.PDW.newPDWUsingDefs([]);
+    const pdwRef = await pdw.PDW.newPDW([]);
     /* Load it with test data */
     await pdwRef.setAll(testData);
     /* Pull the data out */

@@ -342,7 +342,7 @@ export class AsyncCSV implements pdw.CanonicalDataTranslator {
         })
 
         /* Trying to clean up some of the junk xlsx adds on there easily */
-        const tempPDW = await pdw.PDW.newPDWUsingDefs([]);
+        const tempPDW = await pdw.PDW.newPDW([]);
         await tempPDW.setDefs([], (<pdw.DefData[]>defs));
         await tempPDW.setEntries([], (<pdw.EntryData[]>entries));
         let returnData = await tempPDW.getAll({includeDeleted: 'yes'});
@@ -540,7 +540,7 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
         const shts = loadedWb.SheetNames;
 
         //again this turned out to just be easier
-        let tempPDW = await pdw.PDW.newPDWUsingDefs([])
+        let tempPDW = await pdw.PDW.newPDW([])
 
         if (!shts.some(name => name === AsyncExcelTabular.pointShtName)) {
             console.warn('No PointDefs sheet found, skipping Defs import');
