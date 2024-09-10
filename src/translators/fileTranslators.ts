@@ -332,7 +332,6 @@ export class AsyncCSV implements pdw.CanonicalDataTranslator {
         let defs = rawDefs.map(rd => makeDef(rd));
         let entries = rawEntries.map(re => makeEntry(re));
         rawPointDefs.forEach((rpd: pdw.PointDefData) => {
-            //@ts-expect-error
             delete rpd['Row Type'];
             //@ts-expect-error
             let def = defs.find(d => d._uid === rpd._uid);
@@ -474,7 +473,7 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
             pd._desc,
             pd._type?.toString(),
             pd._rollup?.toString(),
-            pd._opts?.join('|||')
+            Object.hasOwn(pd,'_opts') ? Object.values(pd._opts!).join('|||') : ''
             // JSON.stringify(pd._opts, null, 2)
         ]
     }
