@@ -1,6 +1,8 @@
 import * as pdw from './pdw.js'
 import * as ie from './translators/fileTranslators.js'
 import * as obs from './translators/obsidianTranslator.js'
+import * as XLSX from 'xlsx'
+import * as fs from 'fs'
 // import { Query, Scope } from './pdw.js'
 // import { exportToFile, importFromFile } from './dataStores/fileAsyncDataStores.js';
 // import { Temporal, toTemporalInstant } from 'temporal-polyfill';
@@ -12,11 +14,20 @@ import * as obs from './translators/obsidianTranslator.js'
 // const origResult = await q.run();
 // console.log(origResult);
 
-
+XLSX.set_fs(fs);
+const filename = '/Users/aaron/Desktop/out.csv' //'harvey.csv'
 
 const importer = new ie.AsyncJson();
-const data = (await importer.toCanonicalData('/Users/aaron/Desktop/PDW-export-lnqqwbkd.json'))
-console.log(data);
+const rawData = (await importer.toCanonicalData('/Users/aaron/Desktop/PDW-export-lnqqwbkd.json'))
+const exporter = new ie.AsyncCSV();
+console.log(rawData);
+const entries = rawData.entries;
+const wb = XLSX.utils.book_new();
+
+let exportSht = XLSX.utils.json_to_sheet(entries);
+XLSX.utils.book_append_sheet(wb, exportSht, 'PDW Export');
+XLSX.writeFile(wb, filename);
+
 // const vaultPath = '/Users/aaron/Desktop/Journal Island';
 // const configFileSubpath = "PDW/PDW Config.md"
 // // obs.ObsidianTranslator.BuildConfigFileAndTemplatesForDefs(data.defs, vaultPath)
