@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import * as pdw from '../pdw.js';
+import * as pdw from '../PDW.js';
 
 export class ObsidianTranslator implements pdw.CanonicalDataTranslator {
     vaultPath: string;

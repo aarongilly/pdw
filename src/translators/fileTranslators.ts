@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as YAML from 'yaml';
 import { Temporal } from 'temporal-polyfill';
-import * as pdw from '../pdw.js';
+import * as pdw from '../PDW.js';
 
 //#region ### EXPORTED FUNCTIONS ###
 export function canonicalDataToFile(filepath: string, data: pdw.CanonicalDataset) {
@@ -13,7 +13,7 @@ export function canonicalDataToFile(filepath: string, data: pdw.CanonicalDataset
     if (fileType === 'csv') return new AsyncCSV().fromCanonicalData(data, filepath);
     throw new Error('Unimplemented export type: ' + fileType)
 }
- 
+
 export async function fileToCanonicalData(filepath: string) {
     const fileType = inferFileType(filepath)
     if (fileType === 'excel') return await new AsyncExcelTabular().toCanonicalData(filepath);

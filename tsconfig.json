@@ -28,7 +28,7 @@
   },
   "include": [
     "src",
-    "out/local-test.js",
+    "out/local-test.js", "data-files/onetimeImports.ts",
     // "out/sampleData.js"
   ],
   "typedocOptions": {

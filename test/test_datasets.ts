@@ -1,4 +1,4 @@
-import * as dj from "../src/DJ.js"
+import * as dj from "../src/DataJournal.js"
 
 //#region --- DEFS
 export const bookDef: dj.Def = {

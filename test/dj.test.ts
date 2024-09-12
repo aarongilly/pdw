@@ -1,4 +1,4 @@
-import { DataJournal, DJ, Entry, Def } from "../src/DJ";
+import { DataJournal, DJ, Entry, Def } from "../src/DataJournal";
 import { describe, test, expect } from "vitest";
 import * as testData from './test_datasets';
 import { Temporal } from "temporal-polyfill";

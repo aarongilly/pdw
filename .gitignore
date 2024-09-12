@@ -13,6 +13,7 @@ dist-ssr
 *.local
 # I added this
 real-data
+data-files
 fs-test
 docs
 docs/*

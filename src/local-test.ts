@@ -1,4 +1,4 @@
-import * as pdw from './pdw.js'
+import * as pdw from './PDW.js'
 import * as ie from './translators/fileTranslators.js'
 import * as obs from './translators/obsidianTranslator.js'
 import * as XLSX from 'xlsx'
