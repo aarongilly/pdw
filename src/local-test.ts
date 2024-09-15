@@ -1,32 +1,102 @@
-import * as pdw from './PDW.js'
-import * as ie from './translators/fileTranslators.js'
-import * as obs from './translators/obsidianTranslator.js'
-import * as XLSX from 'xlsx'
-import * as fs from 'fs'
+// import * as pdw from './PDW.js'
+// import * as ie from './translators/fileTranslators.js'
+// import * as obs from './translators/obsidianTranslator.js'
+// import * as XLSX from 'xlsx'
+// import * as fs from 'fs'
+import * as test from '../test/test_datasets.js'
+import * as dj from './DataJournal.js'
+
 // import { Query, Scope } from './pdw.js'
 // import { exportToFile, importFromFile } from './dataStores/fileAsyncDataStores.js';
 // import { Temporal, toTemporalInstant } from 'temporal-polyfill';
 // import { importFirestore, importMongo, importOldV9, importOldest, importPreviousCSV } from './onetimeImports.js'
 // import * as test from '../../pdw-firestore-plugin/'
 
+const myDJ = test.journalToOverviewAndIndex
+console.log(dj.DJ.isValidDataJournal(myDJ)) //logs true
+
+//#region ---- WHERE YOU ARE GOING
+/* 
+// Sort of a note to self - beginning with the end in mind. You want to enable this.
+//const 
+//const config = loadConfigFileAtPath('path/to/pdw_config.json')
+//...or
+const config = {
+    translators: [
+        {
+            type: 'excel',
+            path: 'path/to/excel.xlsx'
+        },
+        {
+            type: 'csv',
+            path: 'path/to/csv.csv'
+        },
+        {
+            type: 'yaml',
+            path: 'path/to/yaml.yaml'
+        },
+        {
+            type: 'json',
+            path: 'path/to/json.json'
+        },
+        {
+            type: 'markdown', //uses obsidian & dataview syntax
+            path: 'path/to/markdown.md'
+        },
+        {
+            type: 'folder', //supports files of all the above types
+            path: 'path/to/folder'
+        },
+    ],
+    connectors: [
+        {
+            type: 'sqlite',
+            config: { //contents set by the connector class
+                location: 'path/to/database',
+                user: 'aaron',
+                pass: 'whatever'
+            },
+            readonly: false //allow writes to database for PDW.sync() (which may exist at some point)
+        },
+        {
+            type: 'firestore',
+            config: {
+                location: 'url or whatever',
+                otherProps: 'whatever key value pairs the connector class uses'
+            },
+            readonly: true //don't allow writes to database
+        }
+    ]
+}
+const PDW = await pdw.PDW.newPDW(config)
+PDW.saveToFile('path/to/output.xlsx');
+
+const QUERY = PDW.buildQuery().from('2024').defs(['lbl a', 'id b']);
+const result = PDW.query(QUERY)
+const altWayToResult = await PDW.buildQuery().from('2024').defs(['lbl a', 'id b']).run();
+expect(result).toEqual(altWayToResult);
+*/
+//#endregion
+
+
 // let q = new pdw.Query();
 // q.tags('tag1');
 // const origResult = await q.run();
 // console.log(origResult);
 
-XLSX.set_fs(fs);
-const filename = '/Users/aaron/Desktop/out.csv' //'harvey.csv'
+// XLSX.set_fs(fs);
+// const filename = '/Users/aaron/Desktop/out.csv' //'harvey.csv'
 
-const importer = new ie.AsyncJson();
-const rawData = (await importer.toCanonicalData('/Users/aaron/Desktop/PDW-export-lnqqwbkd.json'))
-const exporter = new ie.AsyncCSV();
-console.log(rawData);
-const entries = rawData.entries;
-const wb = XLSX.utils.book_new();
+// const importer = new ie.AsyncJson();
+// const rawData = (await importer.toCanonicalData('/Users/aaron/Desktop/PDW-export-lnqqwbkd.json'))
+// const exporter = new ie.AsyncCSV();
+// console.log(rawData);
+// const entries = rawData.entries;
+// const wb = XLSX.utils.book_new();
 
-let exportSht = XLSX.utils.json_to_sheet(entries);
-XLSX.utils.book_append_sheet(wb, exportSht, 'PDW Export');
-XLSX.writeFile(wb, filename);
+// let exportSht = XLSX.utils.json_to_sheet(entries);
+// XLSX.utils.book_append_sheet(wb, exportSht, 'PDW Export');
+// XLSX.writeFile(wb, filename);
 
 // const vaultPath = '/Users/aaron/Desktop/Journal Island';
 // const configFileSubpath = "PDW/PDW Config.md"

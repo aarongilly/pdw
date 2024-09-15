@@ -46,7 +46,6 @@ export enum DefScope {
     YEAR = 'YEAR',
 }
 
-
 //#endregion
 
 //#region  --- Interfaces
@@ -57,45 +56,6 @@ export enum DefScope {
 export interface DataJournal {
     defs: Def[],
     entries: Entry[]
-    overview?: Overview | null,
-}
-
-/**
-* Not typically operated on, but used moreso
-* for sanity checking things when merging and whatnot.
-*/
-export interface Overview {
-    updated?: {
-        localeStr?: string,
-        isoStr?: string,
-        epochStr?: string,
-    },
-    counts?: {
-        defs?: number,
-        activeEntries?: number,
-        deletedEntries?: number
-    },
-    index?: {
-        /**
-         * Position of every definition in the corresponding DataJournal.defs.
-         * Could be used like DataJournal.defs[index[defId]]
-         */
-        defMap: { [defId: string]: number }
-        /**
-         * Position of every entry in the corresponding DataJournal.entries.
-         * Could be used like DataJournal.entries[index[entryId]]
-         */
-        entryMap: { [entryId: string]: number }
-        /**
-         * Object containing:
-         * key = def._lbl
-         * value = def._id
-         * 
-         * Could be used like DataJournal.defs[index[defLblToIdMap[defId]]]
-         */
-        defLblToIdMap: { [defLbl: string]: string }
-    }
-    [x: string]: any
 }
 
 export interface Def {
@@ -333,14 +293,7 @@ export class DJ {
     static newBlankDataJournal(withDefs: Def[] = []): DataJournal {
         return {
             defs: withDefs,
-            entries: [],
-            overview: {
-                counts: {
-                    defs: 0,
-                    activeEntries: 0,
-                    deletedEntries: 0
-                }
-            }
+            entries: []
         }
     }
 
@@ -352,7 +305,7 @@ export class DJ {
         return true
     }
 
-    static addDefs(dataJournal: DataJournal, newDefs: Partial<Def>[]): DataJournal {
+    static addDefsToNewCopy(dataJournal: DataJournal, newDefs: Partial<Def>[]): DataJournal {
         //make static - actually calling 'merge' later does this
         // const newJournal = JSON.parse(JSON.stringify(dataJournal)); //not needed
         const fullDefs = newDefs.map(newDef => DJ.makeDef(newDef));
@@ -363,7 +316,7 @@ export class DJ {
         return DJ.merge([tempDJ, dataJournal])
     }
 
-    static addEntries(dataJournal: DataJournal, newEntries: Partial<Entry>[]): DataJournal {
+    static addEntriesToNewCopy(dataJournal: DataJournal, newEntries: Partial<Entry>[]): DataJournal {
         //make static - actually calling 'merge' later does this
         // const newJournal = JSON.parse(JSON.stringify(dataJournal)); //not needed
         const fullEntries = newEntries.map(newEntry => DJ.makeEntry(newEntry));
@@ -392,7 +345,7 @@ export class DJ {
     static makeDef(partDef: Partial<Def>): Def {
         //make static
         const newDef = JSON.parse(JSON.stringify(partDef));
-        if (!Object.hasOwn(newDef, '_id')) newDef._id = 'Add_Lbl_' + DJ.makeRandomString(5);
+        if (!Object.hasOwn(newDef, '_id')) throw new Error("makeDef was passed an object without an _id")
         if (!Object.hasOwn(newDef, '_lbl')) newDef._lbl = newDef._id;
         if (!Object.hasOwn(newDef, '_description')) newDef._description = 'Add Description';
         if (!Object.hasOwn(newDef, '_emoji')) newDef._emoji = '🆕';
@@ -407,22 +360,11 @@ export class DJ {
         return entries.filter(e => e._deleted);
     }
 
-    static addOverview(dataJournal: DataJournal): DataJournal {
-        //make static
-        const newDataJournal = JSON.parse(JSON.stringify(dataJournal));
-        newDataJournal.overview = DJ.makeOverview(newDataJournal);
-        return newDataJournal
-    }
-
-    static merge(dataJournalArray: DataJournal[], andMakeOverview = true) {
-        //#TODO - #MAYBE - optimize this logic to utilize Indexes if they are present
+    static merge(dataJournalArray: DataJournal[]) {
         if (!Array.isArray(dataJournalArray) || !DJ.isValidDataJournal(dataJournalArray[0])) throw new Error('DF.merge expects an array of DataJournals');
         const returnDataJournal: DataJournal = {
             defs: DJ.mergeDefs(dataJournalArray.map(dj => dj.defs)),
             entries: DJ.mergeEntries(dataJournalArray.map(dj => dj.entries))
-        }
-        if (andMakeOverview) {
-            returnDataJournal.overview = DJ.makeOverview(returnDataJournal);
         }
         return returnDataJournal;
     }
@@ -527,22 +469,28 @@ export class DJ {
                 entries = entries.filter(entry=>entry._deleted === queryObject.deleted);
             }
             if(Object.hasOwn(queryObject, 'from')){
-                entries = entries.filter(entry=>entry._period >= queryObject.from!);
+                //@ts-expect-error - its' saying queryObject may be undefined, and not letting me specify otherwise
+                entries = entries.filter(entry=>entry._period >= queryObject.from);
             }
             if(Object.hasOwn(queryObject, 'to')){
-                entries = entries.filter(entry=>entry._period <= queryObject.to!);
+                //@ts-expect-error - its' saying queryObject may be undefined, and not letting me specify otherwise
+                entries = entries.filter(entry=>entry._period <= queryObject.to);
             }
             if(Object.hasOwn(queryObject, 'to')){
-                entries = entries.filter(entry=>entry._period <= queryObject.to!);
+                //@ts-expect-error - its' saying queryObject may be undefined, and not letting me specify otherwise
+                entries = entries.filter(entry=>entry._period <= queryObject.to);
             }
             if(Object.hasOwn(queryObject, 'updatedBefore')){
-                entries = entries.filter(entry=>entry._updated < queryObject.updatedBefore!);
+                //@ts-expect-error - its' saying queryObject may be undefined, and not letting me specify otherwise
+                entries = entries.filter(entry=>entry._updated < queryObject.updatedBefore);
             }
             if(Object.hasOwn(queryObject, 'updatedAfter')){
-                entries = entries.filter(entry=>entry._updated > queryObject.updatedAfter!);
+                //@ts-expect-error - its' saying queryObject may be undefined, and not letting me specify otherwise
+                entries = entries.filter(entry=>entry._updated > queryObject.updatedAfter);
             }
             if(Object.hasOwn(queryObject, 'entryIds')){
-                entries = entries.filter(entry=>queryObject.entryIds!.some(eid=>eid===entry._id));
+                //@ts-expect-error - its' saying queryObject may be undefined, and not letting me specify otherwise
+                entries = entries.filter(entry=>queryObject.entryIds.some(eid=>eid===entry._id));
             }
             if(Object.hasOwn(queryObject, 'defs')){
                 entries = entries.filter(entry=>arraysHaveCommonElement(Object.keys(entry),queryObject.defs));
@@ -568,19 +516,9 @@ export class DJ {
      * - entries with no associated def (warning)
      * - timestamp is invalid? (Borrow Scope check regex)
      * - updated Epoch str is way off?
-     * - Overview counts wrong?
      */
     static qualityCheck(dataJournal: DataJournal, panicLevel: "logs only" | "some errors thrown" | "all errors thrown" = 'some errors thrown'): void {
-        //overview check
-        if(dataJournal.overview && dataJournal.overview.counts){
-            //Def Count bad
-            if(dataJournal.overview.counts.defs !== dataJournal.defs.length)
-                logOrThrow(`Overview Def count is wrong! \n Overview says: ${dataJournal.overview.counts.defs} & should be ${dataJournal.defs.length}`);
-            //Entry Count bad
-            const overViewEntryCount = dataJournal.overview.counts.activeEntries! + dataJournal.overview.counts.deletedEntries!; //meh
-            if(overViewEntryCount !== dataJournal.entries.length)
-                logOrThrow(`Overview Entry count is wrong! \n Overview says: ${overViewEntryCount} & should be ${dataJournal.entries.length}`);
-        }
+        
         //quality check defs
         dataJournal.defs.forEach(def=>{
             //Def missing id
@@ -681,63 +619,6 @@ export class DJ {
     }
 
     //#endregion
-
-    //#region --- private methods 
-    /**
-     * Creates a Data Journal Overview object - but does NOT append it to anything.
-     * To append to a copy of a Data Journal, used {@link addOverview}.
-     */
-    private static makeOverview(dataJournal: DataJournal): Overview {
-        if (!this.isValidDataJournal(dataJournal)) throw new Error("Invalid dataset found at fFWPIhaA");
-
-        let deletedEntryCount = 0;
-        let lastUpdated = '0'; //should be the Epoch itself
-
-        let indexObj = {
-            defMap: {},
-            entryMap: {},
-            defLblToIdMap: {}
-        }
-
-        /**
-         * Loop over entries once, capture what's necessary
-         */
-        dataJournal.entries.forEach((entry, index) => {
-            if (entry._deleted) deletedEntryCount += 1;
-            if (entry._updated > lastUpdated) lastUpdated = entry._updated;
-
-            const standardizedKey = DJ.standardizeKey(entry._id);
-            indexObj.entryMap[standardizedKey] = index;
-        })
-
-        /**
-         * Loop over defs once, capture what's necessary
-         */
-        dataJournal.defs.forEach((def, index) => {
-            if (def._updated > lastUpdated) lastUpdated = def._updated;
-
-            const standardizedKey = DJ.standardizeKey(def._id);
-            indexObj.defMap[standardizedKey] = index;
-            indexObj.defLblToIdMap[def._lbl] = def._id;
-        })
-
-        const lastUpdatedDate = DJ.parseDateFromEpochStr(lastUpdated);
-
-        const overview: Overview = {
-            updated: {
-                localeStr: lastUpdatedDate.toLocaleString(),
-                isoStr: lastUpdatedDate.toISOString(),
-                epochStr: lastUpdated,
-            },
-            counts: {
-                defs: dataJournal.defs.length,
-                activeEntries: dataJournal.entries.length - deletedEntryCount,
-                deletedEntries: deletedEntryCount
-            },
-            index: indexObj
-        }
-        return overview;
-    }
 
     /**
      * Both merges use the same logic, just a different key. This is called by the other merge techniques.

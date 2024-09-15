@@ -1,25 +1,32 @@
 import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as YAML from 'yaml';
-import { Temporal } from 'temporal-polyfill';
-import * as pdw from '../PDW.js';
+import * as dj from '../DataJournal.js'
+import { OverviewedDataJournal, Overview } from '../Overview.js'
+
+export interface Translator {
+    fromDataJournal(data: dj.DataJournal, filepath: string): void;
+    toDataJournal(filepath: string): Promise<OverviewedDataJournal>;
+}
 
 //#region ### EXPORTED FUNCTIONS ###
-export function canonicalDataToFile(filepath: string, data: pdw.CanonicalDataset) {
+export function dataJournalToFile(filepath: string, data: dj.DataJournal) {
     const fileType = inferFileType(filepath)
-    if (fileType === 'excel') return new AsyncExcelTabular().fromCanonicalData(data, filepath);
-    if (fileType === 'json') return new AsyncJson().fromCanonicalData(data, filepath);
-    if (fileType === 'yaml') return new AsyncYaml().fromCanonicalData(data, filepath);
-    if (fileType === 'csv') return new AsyncCSV().fromCanonicalData(data, filepath);
+    if (fileType === 'excel') return new ExcelTranslator().fromDataJournal(data, filepath);
+    if (fileType === 'json') return new JsonTranslator().fromDataJournal(data, filepath);
+    if (fileType === 'yaml') return new YamlTranslator().fromDataJournal(data, filepath);
+    if (fileType === 'csv') return new CsvTranslator().fromDataJournal(data, filepath);
+    if (fileType === 'markdown') return new MarkdownTranslator().fromDataJournal(data, filepath);
     throw new Error('Unimplemented export type: ' + fileType)
 }
 
-export async function fileToCanonicalData(filepath: string) {
+export async function fileToDataJournal(filepath: string) {
     const fileType = inferFileType(filepath)
-    if (fileType === 'excel') return await new AsyncExcelTabular().toCanonicalData(filepath);
-    if (fileType === 'json') return await new AsyncJson().toCanonicalData(filepath);
-    if (fileType === 'yaml') return await new AsyncYaml().toCanonicalData(filepath);
-    if (fileType === 'csv') return await new AsyncCSV().toCanonicalData(filepath);
+    if (fileType === 'excel') return await new ExcelTranslator().toDataJournal(filepath);
+    if (fileType === 'json') return await new JsonTranslator().toDataJournal(filepath);
+    if (fileType === 'yaml') return await new YamlTranslator().toDataJournal(filepath);
+    if (fileType === 'csv') return await new CsvTranslator().toDataJournal(filepath);
+    if (fileType === 'markdown') return new MarkdownTranslator().toDataJournal(filepath);
     throw new Error('Unimplemented import type: ' + fileType)
 }
 
@@ -27,21 +34,20 @@ export async function fileToCanonicalData(filepath: string) {
 
 //#region #### DONE ####
 
-export class AsyncJson implements pdw.CanonicalDataTranslator {
-    async fromCanonicalData(data: pdw.CanonicalDataset, filepath: string) {
+export class JsonTranslator implements Translator {
+    async fromDataJournal(data: dj.DataJournal, filepath: string) {
         // data = pdw.PDW.flattenCompleteDataset(data); //remove circular references and stuff
         let json = JSON.stringify(data);
         fs.writeFileSync(filepath, json, 'utf8');
     }
 
-    async toCanonicalData(filepath: string): Promise<pdw.CanonicalDataset> {
+    async toDataJournal(filepath: string): Promise<OverviewedDataJournal> {
         const file = JSON.parse(fs.readFileSync(filepath).toString());
-        const returnData: pdw.CanonicalDataset = {
+        const returnData: dj.DataJournal = {
             defs: file.defs,
             entries: file.entries
         }
-
-        return pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
+        return Overview.addOverview(returnData);
     }
 }
 
@@ -53,34 +59,27 @@ export class AsyncJson implements pdw.CanonicalDataTranslator {
  * yaml -> dates stored as ISO Strings (native YAML dates)
  * excel -> dates stored as Local Strings AND native Excel dates! 
  */
-export class AsyncYaml implements pdw.CanonicalDataTranslator {
+export class YamlTranslator implements Translator {
 
-    async fromCanonicalData(data: pdw.CanonicalDataset, filepath: string) {
+    async fromDataJournal(data: OverviewedDataJournal, filepath: string) {
         //crazy simple implementation
         const newData = this.translateToYamlFormat(data);
         const yaml = YAML.stringify(newData);
         fs.writeFileSync(filepath, yaml, 'utf8');
     }
 
-    //@ts-expect-error
-    async toCanonicalData(filepath: string): pdw.CanonicalDataset {
+    async toDataJournal(filepath: string): Promise<dj.DataJournal> {
         const file = YAML.parse(fs.readFileSync(filepath).toString());
-        let returnData: pdw.CanonicalDataset = {
+        let returnData: dj.DataJournal = {
             defs: file.defs,
             entries: file.entries
         }
         this.translateFromYamlFormat(returnData);
 
-        returnData = pdw.PDW.addOverviewToCompleteDataset(returnData, filepath);
-
-        return returnData;
+        return Overview.addOverview(returnData);
     }
 
-    translateFromYamlFormat(data: pdw.CanonicalDataset) {
-        if (data.overview !== undefined) {
-            let temporal = this.makeEpochStrFromISO(data.overview.lastUpdated);
-            data.overview.lastUpdated = temporal.toString().split('[')[0]
-        }
+    translateFromYamlFormat(data: OverviewedDataJournal) {
         data.defs = data.defs.map(def => this.translateElementFromYaml(def)) as unknown as pdw.DefData[];
         data.entries = data.entries.map(element => this.translateElementFromYaml(element)) as unknown as pdw.EntryData[];
         return data;
@@ -133,12 +132,7 @@ export class AsyncYaml implements pdw.CanonicalDataTranslator {
         }
     }
 
-    makeEpochStrFromISO(ISOString: string): pdw.EpochStr {
-        let temp = Temporal.Instant.fromEpochMilliseconds(new Date(ISOString).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone());
-        return pdw.makeEpochStrFrom(temp)!;
-    }
-
-    translateToYamlFormat(data: pdw.CanonicalDataset) {
+    translateToYamlFormat(data: dj.DataJournal) {
 
         let staticCopy = JSON.parse(JSON.stringify(data));
         if (staticCopy.overview !== undefined) {
@@ -209,9 +203,37 @@ export class AsyncYaml implements pdw.CanonicalDataTranslator {
 
 //#endregion
 
-export class AsyncCSV implements pdw.CanonicalDataTranslator {
-    async fromCanonicalData(allData: pdw.CanonicalDataset, filename: string, useFs = true) {
-        if(useFs) XLSX.set_fs(fs);
+export class MarkdownTranslator implements Translator {
+    async fromDataJournal(data: dj.DataJournal, filepath: string) {
+        throw new Error("Method not implemented")
+        // // data = pdw.PDW.flattenCompleteDataset(data); //remove circular references and stuff
+        // let json = JSON.stringify(data);
+        // fs.writeFileSync(filepath, json, 'utf8');
+    }
+
+    async toDataJournal(filepath: string): Promise<OverviewedDataJournal> {
+        throw new Error("Method not implemented")
+        // const file = JSON.parse(fs.readFileSync(filepath).toString());
+        // const returnData: dj.DataJournal = {
+        //     defs: file.defs,
+        //     entries: file.entries
+        // }
+        // return Overview.addOverview(returnData);
+    }
+
+    /**
+    * Update the .md files, look for entries, for found entries update them with current values
+    * //#THINK This a good idea? Maybe not.  
+    */
+    async updateInPlace(data: dj.DataJournal, filepath: string) {
+
+        throw new Error("Method not implemented")
+    }
+}
+
+export class CsvTranslator implements Translator {
+    async fromDataJournal(allData: dj.DataJournal, filename: string, useFs = true) {
+        if (useFs) XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();
         const data: string[][] = []
         data.push(['Row Type', ...combinedTabularHeaders])
@@ -271,7 +293,7 @@ export class AsyncCSV implements pdw.CanonicalDataTranslator {
                     pd._rollup, //'',//'_rollup',  //     ,    ,    , pointDef
 
                     JSON.stringify(pd._opts, null, 2),//.replaceAll('"','""') + '"',//'_opts',    //     ,    ,    , pointDef
-                    
+
                     '',//'_eid',     //entryß
                     '',//'_period',  //entry
                     '',//'_note',    //entry
@@ -317,17 +339,17 @@ export class AsyncCSV implements pdw.CanonicalDataTranslator {
         }
     }
 
-    async toCanonicalData(filepath: string, useFs = true): Promise<pdw.CanonicalDataset> {
+    async toDataJournal(filepath: string, useFs = true): Promise<dj.DataJournal> {
         console.log('loading...');
-        if(useFs) XLSX.set_fs(fs);
+        if (useFs) XLSX.set_fs(fs);
         let loadedWb = XLSX.readFile(filepath);
         const shts = loadedWb.SheetNames;
         const sht = loadedWb.Sheets[shts[0]];
         let elements = XLSX.utils.sheet_to_json(sht, { raw: false }) as any;
 
-        let rawDefs: pdw.DefData[] = elements.filter((e:any) => e['Row Type'] === 'Def') as pdw.DefData[];
-        let rawPointDefs: pdw.PointDefData[] = elements.filter((e:any) => e['Row Type'] === 'PointDef') as pdw.PointDefData[];
-        let rawEntries: pdw.EntryData[] = elements.filter((e:any) => e['Row Type'] === 'Entry') as pdw.EntryData[];
+        let rawDefs: pdw.DefData[] = elements.filter((e: any) => e['Row Type'] === 'Def') as pdw.DefData[];
+        let rawPointDefs: pdw.PointDefData[] = elements.filter((e: any) => e['Row Type'] === 'PointDef') as pdw.PointDefData[];
+        let rawEntries: pdw.EntryData[] = elements.filter((e: any) => e['Row Type'] === 'Entry') as pdw.EntryData[];
 
         let defs = rawDefs.map(rd => makeDef(rd));
         let entries = rawEntries.map(re => makeEntry(re));
@@ -344,7 +366,7 @@ export class AsyncCSV implements pdw.CanonicalDataTranslator {
         const tempPDW = await pdw.PDW.newPDW([]);
         await tempPDW.setDefs([], (<pdw.DefData[]>defs));
         await tempPDW.setEntries([], (<pdw.EntryData[]>entries));
-        let returnData = await tempPDW.getAll({includeDeleted: 'yes'});
+        let returnData = await tempPDW.getAll({ includeDeleted: 'yes' });
         //turned out that ⬆️ was the easiest way, huh.
         return returnData
 
@@ -394,14 +416,14 @@ export class AsyncCSV implements pdw.CanonicalDataTranslator {
  * TABULAR Excel. These stack all types on one-another
  * and are **not** the "natural" way of working within Excel
  */
-export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
+export class ExcelTranslator implements Translator {
     static overViewShtName = '!Overview';
     static defShtName = '!Defs';
     static tagShtName = '!Tags';
     static pointShtName = '!DefPoints';
 
-    fromCanonicalData(data: pdw.CanonicalDataset, filename: string, useFs = true) {
-        if(useFs) XLSX.set_fs(fs);
+    fromDataJournal(data: dj.DataJournal, filename: string, useFs = true) {
+        if (useFs) XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();
 
         if (data.overview !== undefined) {
@@ -412,25 +434,25 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
             if (data.defs !== undefined) aoa.push(['defs', data.overview.defs.current, data.overview.defs.deleted]);
             if (data.entries !== undefined) aoa.push(['entries', data.overview.entries.current, data.overview.entries.deleted]);
             let overviewSht = XLSX.utils.aoa_to_sheet(aoa);
-            XLSX.utils.book_append_sheet(wb, overviewSht, AsyncExcelTabular.overViewShtName);
+            XLSX.utils.book_append_sheet(wb, overviewSht, ExcelTranslator.overViewShtName);
         }
 
         if (data.defs !== undefined && data.defs.length > 0) {
-            let defBaseArr = data.defs.map(def => AsyncExcelTabular.makeExcelDefRow(def));
+            let defBaseArr = data.defs.map(def => ExcelTranslator.makeExcelDefRow(def));
             defBaseArr.unshift(tabularHeaders.def);
 
             let pointDefArr: any[] = [];
             pointDefArr.unshift(tabularHeaders.pointDef);
             data.defs.forEach(def => {
                 def._pts?.forEach(point => {
-                    pointDefArr.push(AsyncExcelTabular.makeExcelPointDefRow(point, def));
+                    pointDefArr.push(ExcelTranslator.makeExcelPointDefRow(point, def));
                 })
             })
 
             let defSht = XLSX.utils.aoa_to_sheet(defBaseArr);
-            XLSX.utils.book_append_sheet(wb, defSht, AsyncExcelTabular.defShtName);
+            XLSX.utils.book_append_sheet(wb, defSht, ExcelTranslator.defShtName);
             let pdSht = XLSX.utils.aoa_to_sheet(pointDefArr);
-            XLSX.utils.book_append_sheet(wb, pdSht, AsyncExcelTabular.pointShtName);
+            XLSX.utils.book_append_sheet(wb, pdSht, ExcelTranslator.pointShtName);
         }
 
         //create one sheet per definition
@@ -438,7 +460,7 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
             data.defs.forEach(def => {
                 if (def._deleted) return; //don't make tabs for deleted defs
                 let entries = data.entries!.filter(entry => entry._did === def._did);
-                if (entries.length > 0) AsyncExcelTabular.createEntryTabFor(entries, def, wb);
+                if (entries.length > 0) ExcelTranslator.createEntryTabFor(entries, def, wb);
             })
         }
 
@@ -453,7 +475,7 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
      */
     static makeExcelDefRow(def: pdw.DefLike) {
         return [
-            ...AsyncExcelTabular.makeExcelFirstFourColumns(def),
+            ...ExcelTranslator.makeExcelFirstFourColumns(def),
             def._did,
             def._lbl,
             def._emoji,
@@ -465,7 +487,7 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
 
     static makeExcelPointDefRow(pd: pdw.PointDefLike, def: pdw.DefLike) {
         return [
-            ...AsyncExcelTabular.makeExcelFirstFourColumns(def),
+            ...ExcelTranslator.makeExcelFirstFourColumns(def),
             def._did,
             pd._pid,
             pd._lbl,
@@ -473,7 +495,7 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
             pd._desc,
             pd._type?.toString(),
             pd._rollup?.toString(),
-            Object.hasOwn(pd,'_opts') ? Object.values(pd._opts!).join('|||') : ''
+            Object.hasOwn(pd, '_opts') ? Object.values(pd._opts!).join('|||') : ''
             // JSON.stringify(pd._opts, null, 2)
         ]
     }
@@ -504,7 +526,7 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
 
     static makeExcelEntryRow(entryData: pdw.EntryLike) {
         return [
-            ...AsyncExcelTabular.makeExcelFirstFourColumns(entryData),
+            ...ExcelTranslator.makeExcelFirstFourColumns(entryData),
             entryData._did,
             entryData._eid,
             entryData._period,
@@ -524,56 +546,56 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
         ]
     }
 
-    async toCanonicalData(filepath: string, useFs = true): Promise<pdw.CanonicalDataset> {
+    async toDataJournal(filepath: string, useFs = true): Promise<dj.DataJournal> {
         /**
          * Note to self: ran into an issue with XLSX.JS wherein it doesn't like opening
          * files with the .xlsx file type here on Mac. You could fight it later, perhaps.
          */
         console.log('loading...');
-        let returnData: pdw.CanonicalDataset = {
+        let returnData: dj.DataJournal = {
             defs: [],
             entries: []
         }
-        if(useFs) XLSX.set_fs(fs);
+        if (useFs) XLSX.set_fs(fs);
         let loadedWb = XLSX.readFile(filepath);
         const shts = loadedWb.SheetNames;
 
         //again this turned out to just be easier
         let tempPDW = await pdw.PDW.newPDW([])
 
-        if (!shts.some(name => name === AsyncExcelTabular.pointShtName)) {
+        if (!shts.some(name => name === ExcelTranslator.pointShtName)) {
             console.warn('No PointDefs sheet found, skipping Defs import');
         } else {
-            const defSht = loadedWb.Sheets[AsyncExcelTabular.defShtName];
-            let defBaseRawArr = XLSX.utils.sheet_to_json(defSht, { raw: false}) as pdw.DefLike[];
-            const pdSht = loadedWb.Sheets[AsyncExcelTabular.pointShtName];
+            const defSht = loadedWb.Sheets[ExcelTranslator.defShtName];
+            let defBaseRawArr = XLSX.utils.sheet_to_json(defSht, { raw: false }) as pdw.DefLike[];
+            const pdSht = loadedWb.Sheets[ExcelTranslator.pointShtName];
             let pdRawArr = XLSX.utils.sheet_to_json(pdSht, { raw: false }) as pdw.DefLike[];
             returnData.defs = [];
 
             defBaseRawArr.forEach(rawDef => {
                 const points = pdRawArr.filter(row => row["def._uid"] === rawDef._uid);
-                const parsedDef = AsyncExcelTabular.parseExcelDef(rawDef, points);
+                const parsedDef = ExcelTranslator.parseExcelDef(rawDef, points);
                 returnData.defs.push(parsedDef as pdw.DefData);
             });
             await tempPDW.setDefs(returnData.defs);
         }
 
         shts.forEach(name => {
-            if (name === AsyncExcelTabular.pointShtName) return; //skip
-            if (name === AsyncExcelTabular.overViewShtName) return; //skip
-            if (name === AsyncExcelTabular.defShtName) return; //skip
-            const assDef = tempPDW.manifest.find(def=>def.lbl===name)!;
+            if (name === ExcelTranslator.pointShtName) return; //skip
+            if (name === ExcelTranslator.overViewShtName) return; //skip
+            if (name === ExcelTranslator.defShtName) return; //skip
+            const assDef = tempPDW.manifest.find(def => def.lbl === name)!;
             const entrySht = loadedWb.Sheets[name];
             const entryRawArr = XLSX.utils.sheet_to_json(entrySht, { raw: false }) as pdw.EntryLike[];
-            const entries = entryRawArr.map(rawEntry=>parseRawEntry(rawEntry, assDef));
+            const entries = entryRawArr.map(rawEntry => parseRawEntry(rawEntry, assDef));
             returnData.entries.push(...entries);
         });
         await tempPDW.setEntries(returnData.entries);
 
-        returnData = await tempPDW.getAll({includeDeleted: 'yes'});
+        returnData = await tempPDW.getAll({ includeDeleted: 'yes' });
         return returnData;
 
-        function parseRawEntry(entryRow: any, def: pdw.Def): pdw.EntryData{
+        function parseRawEntry(entryRow: any, def: pdw.Def): pdw.EntryData {
             let entryData: pdw.EntryData = {
                 _eid: entryRow._eid,
                 _note: entryRow._note,
@@ -585,18 +607,18 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
                 _created: '',
                 _updated: ''
             }
-            
-            if(typeof entryData._deleted === 'string') entryData._deleted = (<string>entryData._deleted).toUpperCase() === "TRUE";
-            entryData._created = AsyncExcelTabular.makeEpochStrFromExcelDate(entryRow._created);
-            entryData._updated = AsyncExcelTabular.makeEpochStrFromExcelDate(entryRow._updated);
 
-            Object.keys(entryRow).forEach(key=>{
-                if(key.substring(0,1)==="_") return
+            if (typeof entryData._deleted === 'string') entryData._deleted = (<string>entryData._deleted).toUpperCase() === "TRUE";
+            entryData._created = ExcelTranslator.makeEpochStrFromExcelDate(entryRow._created);
+            entryData._updated = ExcelTranslator.makeEpochStrFromExcelDate(entryRow._updated);
+
+            Object.keys(entryRow).forEach(key => {
+                if (key.substring(0, 1) === "_") return
                 const assPd = def.getPoint(key);
                 entryData[assPd!.pid] = entryRow[key];
             })
 
-            if(!pdw.Entry.isEntryData(entryData)) throw new Error("Error in parsing an entry row");
+            if (!pdw.Entry.isEntryData(entryData)) throw new Error("Error in parsing an entry row");
             return entryData
         }
     }
@@ -617,17 +639,17 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
             _emoji: defRow._emoji,
             _tags: JSON.parse(defRow._tags),
             _scope: defRow._scope,
-            _pts: points.map((point:any)=>this.parseExcelPointDefRow(point)),
+            _pts: points.map((point: any) => this.parseExcelPointDefRow(point)),
             _uid: defRow._uid,
             _deleted: defRow._deleted, //checked for type later
             _created: '',
             _updated: ''
         }
 
-        if(typeof defRow._deleted === 'string') defData._deleted = defRow._deleted.toUpperCase() === "TRUE";
-        defData._created = AsyncExcelTabular.makeEpochStrFromExcelDate(defRow._created);
-        defData._updated = AsyncExcelTabular.makeEpochStrFromExcelDate(defRow._updated);
-        
+        if (typeof defRow._deleted === 'string') defData._deleted = defRow._deleted.toUpperCase() === "TRUE";
+        defData._created = ExcelTranslator.makeEpochStrFromExcelDate(defRow._created);
+        defData._updated = ExcelTranslator.makeEpochStrFromExcelDate(defRow._updated);
+
         if (!pdw.Def.isDefData(defData)) throw new Error('Failed to correctly parseExcelDefRow for ', defRow);
 
         return defData
@@ -641,7 +663,7 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
      */
     static makeEpochStrFromExcelDate(dateCellVal: any): any {
         if (typeof dateCellVal === 'string') {
-            if(pdw.isValidEpochStr(dateCellVal)) return pdw.parseTemporalFromEpochStr(dateCellVal);
+            if (pdw.isValidEpochStr(dateCellVal)) return pdw.parseTemporalFromEpochStr(dateCellVal);
             return pdw.makeEpochStrFrom(Temporal.Instant.fromEpochMilliseconds(new Date(dateCellVal).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()));
         }
         if (typeof dateCellVal === 'number') {
@@ -665,7 +687,7 @@ export class AsyncExcelTabular implements pdw.CanonicalDataTranslator {
             _rollup: pointDefRow._rollup.toUpperCase(),
             _opts: undefined
         };
-        if(pointDefRow._opts !== undefined) pointDef._opts = pointDefRow._opts.split('|||')
+        if (pointDefRow._opts !== undefined) pointDef._opts = pointDefRow._opts.split('|||')
         pointDefRow._pid = pointDefRow._pid.toString(); //in case I got unlucky with an all-numeric SmallID
 
         if (!pdw.PointDef.isPointDefData(pointDef)) throw new Error('Failed to correctly parseExcelDefRow for ', pointDefRow);
@@ -869,10 +891,11 @@ export const combinedTabularHeaders = [
     '_vals',    //entry
 ]
 
-function inferFileType(path: string): "excel" | "json" | "csv" | "yaml" | "unknown" {
+function inferFileType(path: string): "excel" | "json" | "csv" | "yaml" | "markdown" | "unknown" {
     if (path.slice(-5).toUpperCase() === ".XLSX") return 'excel'
     if (path.slice(-5).toUpperCase() === ".JSON") return 'json'
     if (path.slice(-4).toUpperCase() === ".CSV") return 'csv'
+    if (path.slice(-4).toUpperCase() === ".MD") return 'markdown'
     if (path.slice(-5).toUpperCase() === ".YAML" || path.slice(-4).toUpperCase() === ".YML") return 'yaml'
     return "unknown"
 }

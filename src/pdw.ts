@@ -1,36 +1,32 @@
+//@ts-ignore
 import { Temporal } from "temporal-polyfill";
 import * as dj from "./DataJournal";
 import { Period } from "./Period";
 
 //#region ### TYPES ###
 
+//none?
+
 //#endregion
 
 //#region ### INTERFACES ###
 
-/**
- * The `DataStore` interface is what you must implement when creating code to
- * hook up a new database. It is what sits between the database of choice and the PDW.
- * It's designed to be as simple-to-implement as possible.
- * 
- * The parameter sanitization & merge logic are handled by the PDW.
- * 
- * It's *very much* a work in progress.
- */
-export interface DataStore {
+export interface Connector {
 
     commit(trans: Transaction): Promise<any>;
 
-    getEntries(params: ReducedParams): Promise<ReducedQueryResponse>;
+    getEntries(params: dj.QueryObject): Promise<ReducedQueryResponse>;
 
-    getDefs(includeDeletedForArchiving?: boolean): Promise<DefData[]>;
+    getDefs(includeDeletedForArchiving?: boolean): Promise<dj.Def[]>;
 
-    getOverview(): Promise<DataStoreOverview>;
+    getManifest(): dj.Def[]
+
+    getOverview(): DataStoreOverview;
 
     connect(...params: any): Promise<boolean>;
 
     /**
-     * The name of the connector, essentially. Examples: "Excel", "Firestore"
+     * The name of the connector, essentially.
      */
     serviceName: string;
 
@@ -44,19 +40,9 @@ export interface DataStore {
 /**
  * The means to convert {@link CanonicalDataset}s to and from other formats
  */
-export interface CanonicalDataTranslator {
-    toCanonicalData(params: any): Promise<CanonicalDataset>;
-    fromCanonicalData(canonicalDataset: CanonicalDataset, params: any): any;
-    /**
-     * Data from the external library are imported into a PDW instance.
-     */
-    // importDefData(params: any): Promise<DefData[]>,
-    // importEntryData(usingDefData: DefData[], params: any): Promise<EntryData[]>
-    /**
-     * Data from the PDW is supplied, it's saved in an exported format
-     * according to the Exporter logic & whatnot.
-     */
-    // exportTo(allData: CanonicalDataset, params: any): any
+export interface Translator {
+    toDataJournal(params: any): Promise<dj.DataJournal>;
+    fromDataJournal(canonicalDataset: dj.DataJournal, params: any): any;
 }
 
 export interface Transaction {
@@ -112,7 +98,7 @@ export interface DataStoreOverview {
     storeName?: string;
     defs: CurrentAndDeletedCounts;
     entries: CurrentAndDeletedCounts;
-    lastUpdated: EpochStr;
+    lastUpdated: dj.EpochStr;
 }
 
 //#endregion
@@ -120,17 +106,10 @@ export interface DataStoreOverview {
 //#region ### CLASSES ###
 
 export class PDW {
-    dataStore: DataStore;
-    private _manifest: Def[]; //#TODO - move to Database Class
-    private constructor(manifest: DefLike[], store?: DataStore,) {
-        this._manifest = this._manifest = manifest.map(defData => new Def(defData, this));
-        if (store !== undefined) {
-            this.dataStore = store;
-        } else {
-            this.dataStore = new DefaultDataStore(this);
-        }
+    databases: Connector[];
 
-        console.log('PDW instance created with the ' + this.dataStore.serviceName + ' DataStore, with ' + this._manifest.length + ' definitions.');
+    private constructor(config: Config) {
+        
     }
 
     public get manifest(): Def[] {
@@ -143,7 +122,7 @@ export class PDW {
         return instance
     }
 
-    static async newPDWUsingDatastore(dataStore: DataStore): Promise<PDW> {
+    static async newPDWUsingDatastore(dataStore: Connector): Promise<PDW> {
         let defs = await dataStore.getDefs(false);
         return new PDW(defs, dataStore);
     }
@@ -537,7 +516,7 @@ export class PDW {
      * each of the EntryPoints contained in the Entries. Produces an {@link EntryRollup}
      */
     static rollupEntries(entries: EntryData[], def: Def): EntryRollup { //#TODO - add RollupOverride param
-        if(def === undefined) console.log(entries[0])
+        if (def === undefined) console.log(entries[0])
         const pointDefs = def.pts;
         let returnObj = {
             did: def.did,
@@ -709,7 +688,7 @@ export class PDW {
         });
 
         /* Added this to support transitioning to a static function */
-        const defMap: {[did: string]: Def} = {};
+        const defMap: { [did: string]: Def } = {};
         entries.forEach(entry => {
             defMap[entry.def.did] = entry.def;
         })
@@ -736,13 +715,13 @@ export class PDW {
             let rollups: EntryRollup[] = [];
             keys.forEach(key =>
                 rollups.push(PDW.rollupEntries(entsByType[key], defMap[key])))
-                return {
-                    period: p.toString(),
-                    entryRollups: rollups,
-                    entries: ents
-                }
-            })
-            
+            return {
+                period: p.toString(),
+                entryRollups: rollups,
+                entries: ents
+            }
+        })
+
         function splitEntriesByType(entries: EntryData[]): { [dids: string]: any; } {
             let entryTypes: { [dids: string]: any; } = {};
             entries.forEach(entry => {
@@ -757,243 +736,8 @@ export class PDW {
     }
 }
 
-//#TODO - clean up some query methods, maybe combine things like "dids" "defs" "defsLbld"
-export class Query {
-    // private verbosity: 'terse' | 'normal' | 'verbose'
-    // private rollup: boolean
-    public pdw: PDW;
-    private params: StandardParams
-    private sortOrder: undefined | 'asc' | 'dsc'
-    private sortBy: undefined | string
-    constructor(pdwRef: PDW, paramsIn?: StandardParams) {
-        // this.verbosity = 'normal';
-        // this.rollup = false;
-        this.pdw = pdwRef;
-        this.params = { includeDeleted: 'no' }; //default
-        if (paramsIn !== undefined) this.parseParamsObject(paramsIn)
-    }
 
-    parseParamsObject(paramsIn: StandardParams) {
-        if (paramsIn?.includeDeleted !== undefined) {
-            if (paramsIn.includeDeleted === 'no') this.includeDeleted(false);
-            if (paramsIn.includeDeleted === 'yes') this.includeDeleted(true);
-            if (paramsIn.includeDeleted === 'only') this.onlyIncludeDeleted();
-        }
-        if (paramsIn?.allOnPurpose !== undefined) this.allOnPurpose(paramsIn.allOnPurpose);
-        if (paramsIn?.createdAfter !== undefined) this.createdAfter(paramsIn.createdAfter);
-        if (paramsIn?.createdBefore !== undefined) this.createdBefore(paramsIn.createdBefore);
-        if (paramsIn?.updatedAfter !== undefined) this.updatedAfter(paramsIn.updatedAfter);
-        if (paramsIn?.updatedBefore !== undefined) this.updatedBefore(paramsIn.updatedBefore);
-        if (paramsIn?.defLbl !== undefined) this.forDefsLbld(paramsIn.defLbl);
-        if (paramsIn?.did !== undefined) this.forDids(paramsIn.did);
-        if (paramsIn?.uid !== undefined) this.uids(paramsIn.uid);
-        if (paramsIn?.eid !== undefined) this.eids(paramsIn.eid);
-        if (paramsIn?.tag !== undefined) this.tags(paramsIn.tag);
-        if (paramsIn?.from !== undefined) this.from(paramsIn.from);
-        if (paramsIn?.to !== undefined) this.to(paramsIn.to);
-        if (paramsIn?.inPeriod !== undefined) this.inPeriod(paramsIn.inPeriod);
-        if (paramsIn?.scope !== undefined) this.scope(paramsIn.scope);
-        if (paramsIn?.today !== undefined) this.inPeriod(Period.now(Scope.DAY));
-        if (paramsIn?.thisWeek !== undefined) this.inPeriod(Period.now(Scope.WEEK));
-        if (paramsIn?.thisMonth !== undefined) this.inPeriod(Period.now(Scope.MINUTE));
-        if (paramsIn?.thisQuarter !== undefined) this.inPeriod(Period.now(Scope.QUARTER));
-        if (paramsIn?.thisYear !== undefined) this.inPeriod(Period.now(Scope.YEAR));
-        return this
-    }
-
-    static parseFromURL(url: string): Query {
-        console.log(url);
-
-        throw new Error('unimplemented')
-
-    }
-
-    encodeAsURL(): string {
-        //new URLSearchParams(obj).toString(); //ref code
-        throw new Error('unimplemented')
-    }
-
-    includeDeleted(b = true) {
-        if (b) {
-            this.params.includeDeleted = 'yes';
-        } else {
-            this.params.includeDeleted = 'no';
-        }
-        return this
-    }
-
-    onlyIncludeDeleted() {
-        this.params.includeDeleted = 'only';
-        return this
-    }
-
-    forDids(didList: string[] | string) {
-        if (!Array.isArray(didList)) didList = [didList];
-        this.params.did = didList;
-        return this
-    }
-
-    forDefsLbld(defLbls: string[] | string) {
-        if (!Array.isArray(defLbls)) defLbls = [defLbls];
-        this.params.defLbl = defLbls;
-        return this
-    }
-
-    createdAfter(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime) {
-        const epoch = makeEpochStrFrom(epochDateOrTemporal);
-        this.params.createdAfter = epoch;
-        return this;
-    }
-
-    createdBefore(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime) {
-        const epoch = makeEpochStrFrom(epochDateOrTemporal);
-        this.params.createdBefore = epoch;
-        return this;
-    }
-
-    updatedAfter(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime) {
-        const epoch = makeEpochStrFrom(epochDateOrTemporal);
-        this.params.updatedAfter = epoch;
-        return this;
-    }
-
-    updatedBefore(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime) {
-        const epoch = makeEpochStrFrom(epochDateOrTemporal);
-        this.params.updatedBefore = epoch;
-        return this;
-    }
-
-    forDefs(defList: Def[] | Def) {
-        if (!Array.isArray(defList)) defList = [defList];
-        return this.forDids(defList.map(def => def.did));
-    }
-
-    uids(uid: string[] | string) {
-        if (!Array.isArray(uid)) uid = [uid];
-        this.params.uid = uid;
-        return this
-    }
-
-    eids(eid: string[] | string) {
-        if (!Array.isArray(eid)) eid = [eid];
-        this.params.eid = eid;
-        return this
-    }
-
-    rollup(to: Scope) {
-        to = to.toUpperCase() as Scope;
-        this.params.rollup = to;
-        return this
-    }
-
-    /**
-     * Cannot be used in conjuction with dids. This sets `params.did` internally.
-     * @param tid tag ID of tags to be used
-     * @returns 
-     */
-    tags(tags: string[] | string) {
-        if (!Array.isArray(tags)) tags = [tags];
-        //convert tags into dids
-        const dids = this.pdw.manifest.filter(def => def.hasTag(tags))
-        this.params.did = dids.map(d => d.data._did);
-        return this
-    }
-
-    scope(scopes: Scope[] | Scope): Query {
-        if (!Array.isArray(scopes)) scopes = [scopes];
-        let defs = this.pdw.manifest.filter(def => (<Scope[]>scopes).some(scope => scope === def.scope));
-        this.params.did = defs.map(def => def.did);
-        return this
-    }
-
-    scopeMin(scope: Scope): Query {
-        let scopes = Object.values(Scope);
-        let index = scopes.indexOf(scope);
-        return this.scope(scopes.slice(index));
-    }
-
-    scopeMax(scope: Scope): Query {
-        let scopes = Object.values(Scope);
-        let index = scopes.indexOf(scope);
-        return this.scope(scopes.slice(0, index + 1));
-    }
-
-    allOnPurpose(allIn = true): Query {
-        this.params.allOnPurpose = allIn;
-        return this
-    }
-
-    from(period: Period | PeriodStr) {
-        this.params.from = period;
-        return this
-    }
-
-    to(period: Period | PeriodStr) {
-        this.params.to = period;
-        return this
-    }
-
-    inPeriod(period: Period | PeriodStr) {
-        this.params.from = period;
-        this.params.to = period;
-        return this
-    }
-
-    /**
-     * How to sort the entries in the result.
-     * @param propName underscore-prefixed known prop, or the pid of the Point to sort by
-     * @param type defaults to 'asc'
-     */
-    sort(propName: string, type: undefined | 'asc' | 'dsc') {
-        if (type === undefined) type = 'asc';
-        this.sortOrder = type;
-        this.sortBy = propName;
-    }
-
-    async run(): Promise<QueryResponse> {
-        //empty queries are not allowed
-        if (this.params === undefined ||
-            (!this.params.allOnPurpose && Object.keys(this.params).length <= 1)
-        ) {
-            return {
-                success: false,
-                count: 0,
-                params: {
-                    paramsIn: this.params,
-                    asParsed: this.pdw.sanitizeParams(this.params)
-                },
-                msgs: ['Empty queries not allowed. If seeking all, include {allOnPurpose: true}'],
-                entries: []
-            }
-        }
-        let entries = await this.pdw.getEntries(this.params);
-        if (this.sortBy !== undefined) entries = this.applySort(entries);
-        let resp: QueryResponse = {
-            success: true,
-            count: entries.length,
-            params: {
-                paramsIn: this.params,
-                asParsed: this.pdw.sanitizeParams(this.params)
-            },
-            entries: entries,
-            summary: this.params.hasOwnProperty('rollup') ? PDW.summarize(entries, this.params.rollup as Scope) : undefined
-        }
-        return resp
-    }
-
-    private applySort(entries: Entry[]): Entry[] {
-        return entries.sort((a, b) => {
-            if (this.sortOrder === 'asc') {
-                //@ts-expect-error
-                return a[this.sortBy] > b[this.sortBy] ? 1 : -1
-            }
-            //@ts-expect-error
-            return a[this.sortBy] > b[this.sortBy] ? -1 : 1
-        })
-    }
-}
-
-export class DefaultDataStore implements DataStore {
+export class DefaultDataStore implements Connector {
     serviceName: string;
     pdw: PDW;
     defs: Def[];

@@ -1,8 +1,10 @@
 import fs from 'fs'
 import path from 'path'
 import * as pdw from '../PDW.js';
+//#TODO - probably refactor this as the whole-folder-based translator AND split out a Markdown trasnlator too,
+//#THINK - if your folder structure doesn't have a guaranteed file title = ISODate String how do you import Entries into it?
 
-export class ObsidianTranslator implements pdw.CanonicalDataTranslator {
+export class ObsidianTranslator implements pdw.Translator {
     vaultPath: string;
     topTag?: string;
     configFilePath: string;
@@ -92,7 +94,7 @@ ${defsString}
         }
     }
 
-    async fromCanonicalData(canonicalDataset: pdw.CanonicalDataset) {
+    async fromDataJournal(canonicalDataset: pdw.CanonicalDataset) {
         if(canonicalDataset.defs === undefined) throw new Error("No 'defs' key found in CanonicalDataset");
         if(canonicalDataset.defs.length === 0) throw new Error("No defs found in CanonicalDataset. Import requires Defs");
         /* Load pre-existing defs */
@@ -110,7 +112,7 @@ ${defsString}
         this.mergeInEntries((<pdw.Entry[]>entries));
     }
 
-    async toCanonicalData(): Promise<pdw.CanonicalDataset> {
+    async toDataJournal(): Promise<pdw.CanonicalDataset> {
         //ensure clear DataStores - basically this should have been a static method, but it's not.
         //@ts-expect-error - hacking this
         this._internalPDW.dataStore.entries = [];
