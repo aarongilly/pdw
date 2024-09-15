@@ -11,7 +11,7 @@
     "strict": true,
     "sourceMap": true,
     "resolveJsonModule": true,
-    "isolatedModules": true,
+    "isolatedModules": false, //true,
     "esModuleInterop": true,
     "declaration": true,
     // "noEmit": true,

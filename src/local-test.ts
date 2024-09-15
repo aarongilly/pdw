@@ -19,7 +19,7 @@ console.log(dj.DJ.isValidDataJournal(myDJ)) //logs true
 /* 
 // Sort of a note to self - beginning with the end in mind. You want to enable this.
 //const 
-//const config = loadConfigFileAtPath('path/to/pdw_config.json')
+//const config = loadConfigFileAtPath('path/to/pdw_config.json')d
 //...or
 const config = {
     translators: [
@@ -31,7 +31,7 @@ const config = {
             type: 'csv',
             path: 'path/to/csv.csv'
         },
-        {
+        {g
             type: 'yaml',
             path: 'path/to/yaml.yaml'
         },

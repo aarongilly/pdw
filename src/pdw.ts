@@ -1,7 +1,6 @@
-//@ts-ignore
 import { Temporal } from "temporal-polyfill";
 import * as dj from "./DataJournal";
-import { Period } from "./Period";
+import { Period, PeriodStr } from "./Period";
 
 //#region ### TYPES ###
 
@@ -15,26 +14,18 @@ export interface Connector {
 
     commit(trans: Transaction): Promise<any>;
 
-    getEntries(params: dj.QueryObject): Promise<ReducedQueryResponse>;
+    getEntries(params: dj.QueryObject): Promise<dj.Entry[]>;
 
-    getDefs(includeDeletedForArchiving?: boolean): Promise<dj.Def[]>;
+    getDefs(includeDeletedForArchiving?: boolean): dj.Def[];
 
-    getManifest(): dj.Def[]
+    getOverview(): dj.Overview;
 
-    getOverview(): DataStoreOverview;
-
-    connect(...params: any): Promise<boolean>;
+    connect(...params: any): Promise<dj.Def[]>;
 
     /**
      * The name of the connector, essentially.
      */
     serviceName: string;
-
-    /**
-     * A reference to the Personal Data Warehouse instance to 
-     * which the storage connector is connected.
-     */
-    pdw?: PDW;
 }
 
 /**
@@ -46,59 +37,31 @@ export interface Translator {
 }
 
 export interface Transaction {
-    create: ElementMap;
-    update: ElementMap;
-    delete: DeletionMsgMap;
+    create: dj.DataJournal;
+    update: dj.DataJournal;
+    delete: dj.DataJournal;
 }
 
+export interface PointRollup {
+    val: any;
+    method: dj.Rollup;
+    vals: any[];
+}
+
+export interface EntryRollup {
+    def: dj.Def;
+    pts: PointRollup[];
+}
 
 export interface PeriodSummary {
     period: PeriodStr | "ALL";
-    // entryRollups: EntryRollup[];
-    entries: EntryData[]
+    entryRollups: EntryRollup[];
+    entries: dj.Entry[]
 }
 
-export interface QueryResponse {
-    success: boolean;
-    count: number;
-    msgs?: string[];
-    params: { paramsIn: object, asParsed: object };
-    entries: Entry[];
-    summary?: PeriodSummary[];
-    // defs: Def[]; //maybe not needed? Entry contains Def
-}
-
-export interface ReducedQueryResponse {
-    success: boolean;
-    entries: EntryData[];
-    msgs?: string[];
-}
-
-// export interface CommitResponse {
-//     success: boolean;
-//     msgs?: string[];
-//     defData?: DefData[];
-//     entryData?: EntryData[];
-//     delDefs?: DeletionMsg[];
-//     delEntries?: DeletionMsg[];
-// }
-
-interface CurrentAndDeletedCounts {
-    /**
-     * undefined means zero
-     */
-    current: number | undefined,
-    /**
-     * undefined means zero
-     */
-    deleted: number | undefined
-}
-
-export interface DataStoreOverview {
-    storeName?: string;
-    defs: CurrentAndDeletedCounts;
-    entries: CurrentAndDeletedCounts;
-    lastUpdated: dj.EpochStr;
+export interface Config{
+    translators?: Translator[],
+    connectors?: Connector[],
 }
 
 //#endregion
@@ -107,24 +70,25 @@ export interface DataStoreOverview {
 
 export class PDW {
     databases: Connector[];
+    translators: Translator[];
+    inMemoryDatabase: InMemoryDatabase
 
     private constructor(config: Config) {
-        
+        this.inMemoryDatabase = new InMemoryDatabase();
+        this.databases = config.connectors ?? [];
+        this.translators = config.translators ?? [];
     }
 
-    public get manifest(): Def[] {
-        return this._manifest;
-    }
-
-    static async newPDW(defManifest: DefLike[]): Promise<PDW> {
-        let instance = new PDW([]);
-        await instance.setDefs(defManifest);
+    static async newPDW(config?: Config): Promise<PDW> {
+        if(config === undefined){
+            config = {
+                connectors: [],
+                translators: []
+            }
+        }
+        let instance = new PDW(config);
+        // await instance.setDefs(defManifest);
         return instance
-    }
-
-    static async newPDWUsingDatastore(dataStore: Connector): Promise<PDW> {
-        let defs = await dataStore.getDefs(false);
-        return new PDW(defs, dataStore);
     }
 
     /**
@@ -144,28 +108,6 @@ export class PDW {
         }
 
         return PDW.addOverviewToCompleteDataset(dataset);
-    }
-
-    private pushDefsToManifest(defs: Def[]) {
-        if (!Array.isArray(defs)) return;
-        if (defs.length === 0) return;
-        defs.forEach((def: any) => {
-            //find def with the same _did, if you find it, replace it
-            //if you don't, add it
-            const existsAt = this.manifest.findIndex(mD => mD.data._did === def.data._did);
-            if (existsAt === -1) this.manifest.push(def);
-            if (existsAt !== -1) this.manifest[existsAt] = def;
-        })
-    }
-
-    private async handleManifestDeletionChange(deles: DeletionMsg[]) {
-        if (!Array.isArray(deles)) deles = [deles];
-        const deletions = deles.filter(d => d.deleted);
-        const undeletions = deles.filter(d => !d.deleted);
-        this._manifest = this.manifest.filter(md => !deletions.some(d => d.uid === md.data._uid));
-        if (undeletions.length > 0) {
-            this.manifest.push(...(await this.getDefs(false)));
-        }
     }
 
     query(params?: StandardParams): Query {
@@ -197,31 +139,6 @@ export class PDW {
         const response = await this.dataStore.commit(trans);
 
         return response
-    }
-
-    /**
-     * Grabs the Defs from the attached DataStore. 
-     * By default, does not include the deleted defs.
-     * If you want to include *all* defs, pass in `true`
-     * @param includedDeleted false by default
-     * @returns Defs inflated from the DataStore
-     */
-    async getDefsFromDataStore(includedDeleted = false): Promise<Def[]> {
-        const defDatas = await this.dataStore.getDefs(includedDeleted);
-        let defs = defDatas.map(dl => new Def(dl, this));
-        this._manifest = defs.filter(d => !d.deleted);
-        return defs;
-    }
-
-    /**
-     * Grabs the Def from the loaded manifest. 
-     * If it doesnt exist, returns undefined.
-     */
-    getDefFromManifest(did: string): Def | undefined {
-        let foundDef = this._manifest.find(def => def.did === did);
-        if (foundDef === undefined) foundDef = this._manifest.find(def => def.lbl.toUpperCase() === did.toUpperCase().trim());
-        if (foundDef === undefined) throw new Error("Did not find Def in manifest ")
-        return foundDef
     }
 
     async getDefs(includeDeleted = false): Promise<Def[]> {
@@ -333,78 +250,6 @@ export class PDW {
         return newEntry;
     }
 
-
-    /**
-     * Combines two complete(ish) datasets ({@link CanonicalDataset}). 
-     * Returns a CompleteDataset that merges each type of ElementData
-     */
-    mergeComplete(a: CanonicalDataset, b: CanonicalDataset): CanonicalDataset {
-        let returnObj: CanonicalDataset = {
-            defs: [],
-            entries: []
-        };
-
-        if (a.defs.length > 0 && b.defs.length > 0) {
-            returnObj.defs = this.merge(a.defs, b.defs) as DefData[];
-        } else {
-            if (a.defs.length > 0) returnObj.defs = a.defs
-            if (b.defs.length > 0) returnObj.defs = b.defs
-        }
-        if (a.entries.length > 0 && b.entries.length > 0) {
-            returnObj.entries = this.merge(a.entries, b.entries) as EntryData[];
-        } else {
-            if (a.entries.length > 0) returnObj.entries = a.entries
-            if (b.entries.length > 0) returnObj.entries = b.entries
-        }
-        return returnObj;
-    }
-
-    /**
-     * Mergest two arrays of elements and returns a static COPY of the combined list
-     * without duplicates. Also handles marking things as updated & deleted when they
-     * are different in between lists (the most-recently-updated one stays, the rest
-     * are marked _deleted = true)
-     * @param a list of Elements or ElementData
-     * @param b list of Elements or ElementData
-     * @returns an array of separate, data-only copies of the merged elements
-     */
-    merge(a: ElementData[] | Element[], b: ElementData[] | Element[]): ElementData[] {
-        if (a.hasOwnProperty('__modified')) a = a.map(el => el.data);
-        if (b.hasOwnProperty('__modified')) b = b.map(el => el.data);
-        //make static copy of A
-        let result = a.map(e => JSON.parse(JSON.stringify(e)));
-
-        b.forEach(eB => {
-            let match = result.find(eA => eA._uid === (<ElementData>eB)._uid);
-            if (match !== undefined && match._updated === (<ElementData>eB)._updated) return //result is identical
-            if (match !== undefined) {
-                if (match._updated! > (<ElementData>eB)._updated!) return //result is newer
-                match._updated = (<ElementData>eB)._updated;
-                match._deleted = (<ElementData>eB)._deleted;
-                return //due to principle of not changing data on update, this makes match equal to eB
-            }
-            let matches = result.filter(eA => Element.hasSameId(eA, eB as ElementData));
-            if (matches.length === 0) {
-                result.push(JSON.parse(JSON.stringify(eB)));
-                return
-            }
-            if (matches.length > 1) {
-                //keep the most recently updated one
-                match = matches.reduce((prev, current) => (prev._updated! > current._updated!) ? prev : current);
-            } else {
-                match = matches[0]
-            }
-            if (match !== undefined) {
-                if (match._updated! > (<ElementData>eB)._updated) return
-                match._deleted = true; //match is outdated by new entry in b
-                match._updated = (<ElementData>eB)._created; //this seems appropriate
-                //intentionally not returning here, still need to push eB
-            }
-            result.push(JSON.parse(JSON.stringify(eB)));
-        })
-        return result;
-    }
-
     /**
      * Enforces defaults. Sanity check some types.
      * Less variability in the output
@@ -495,10 +340,6 @@ export class PDW {
         }
 
         return params as ReducedParams
-    }
-
-    inflateEntriesFromData(entryData: EntryData[]): Entry[] {
-        return entryData.map(e => new Entry(e, this));
     }
 
     /**
@@ -737,15 +578,13 @@ export class PDW {
 }
 
 
-export class DefaultDataStore implements Connector {
+export class InMemoryDatabase implements Connector {
     serviceName: string;
-    pdw: PDW;
-    defs: Def[];
-    entries: Entry[];
+    defs: dj.Def[];
+    entries: dj.Entry[];
 
-    constructor(pdwRef: PDW) {
+    constructor() {
         this.serviceName = 'In memory dataset';
-        this.pdw = pdwRef;
         this.defs = [];
         this.entries = [];
     }
@@ -907,50 +746,6 @@ export class DefaultDataStore implements Connector {
 //#endregion
 
 //#region ### UTILITIES ###
-
-/**
- * Makes a unique identifier for use with _uid and _eid
- */
-export function makeUID(): UID {
-    return makeEpochStr() + "-" + makeSmallID();
-}
-
-export function makeEpochStr(): EpochStr {
-    return Temporal.Now.zonedDateTimeISO().epochMilliseconds.toString(36)
-}
-
-export function makeSmallID(length = 4): SmallID {
-    return Math.random().toString(36).slice(13 - length).padStart(length, "0")
-}
-
-export function parseTemporalFromUid(uid: UID): Temporal.ZonedDateTime {
-    return parseTemporalFromEpochStr(uid.split("-")[0]);
-}
-
-export function isValidEpochStr(epochStr: string): boolean {
-    if (typeof epochStr !== 'string') return false;
-    if (epochStr.length !== 8) return false; //not supporting way in the past or future
-    //☝️ technically creates a 2059 problem... but that's my problem when I'm 2x as old as I am now
-    //console.log(parseTemporalFromEpochStr('zzzzzzz').toLocaleString()) //is "6/25/1972, 6:49:24 PM CDT"
-    //console.log(parseTemporalFromEpochStr('100000000').toLocaleString()) //is "5/25/2059, 12:38:27 PM CDT"
-    //for now this is good enough. I could parse a temporal out then check if it succeed & is in a resonable year, but meh
-    return true
-}
-
-export function makeEpochStrFrom(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime): EpochStr | undefined {
-    if (typeof epochDateOrTemporal === 'string') {
-        if (isValidEpochStr(epochDateOrTemporal)) return epochDateOrTemporal;
-        //This WILL cause errors given bad strings, but I want to support lazy strings like "2023-07-28"
-        return Temporal.Instant.fromEpochMilliseconds(new Date(epochDateOrTemporal).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()).epochMilliseconds.toString(36);
-    }
-    if (Object.prototype.toString.call(epochDateOrTemporal) === "[object Date]") {
-        return (<Date>epochDateOrTemporal).getTime().toString(36);
-    }
-    if (Object.prototype.toString.call(epochDateOrTemporal) === "[object Temporal.ZonedDateTime]") {
-        return (<Temporal.ZonedDateTime>epochDateOrTemporal).epochMilliseconds.toString(36);
-    }
-    return undefined;
-}
 
 export function parseTemporalFromEpochStr(epochStr: EpochStr): Temporal.ZonedDateTime {
     const epochMillis = parseInt(epochStr, 36)

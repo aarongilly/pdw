@@ -1,6 +1,30 @@
 import { Temporal } from "temporal-polyfill";
 
 /**
+ * A String that's parsable to a {@link Period}
+ */
+export type PeriodStr = string
+
+/**
+ * Level of granularity.
+ * 
+ * Note - all Entries take place at Scope.SECOND.  
+ * Def._scope is for use by the PDW class or as a general
+ * flag for quality checks elsewhere.
+ */
+export enum Scope {
+    SECOND = 'SECOND',
+    MINUTE = 'MINUTE',
+    HOUR = 'HOUR',
+    DAY = 'DAY',
+    WEEK = 'WEEK',
+    MONTH = 'MONTH',
+    QUARTER = 'QUARTER',
+    YEAR = 'YEAR',
+}
+
+
+/**
  * Periods are Immutable. All methods return new copies of Period.
  * They are basically wrappers around a string.
  */

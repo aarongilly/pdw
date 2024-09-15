@@ -28,8 +28,23 @@ export type Timestamp = string;
  */
 export type Markdown = string
 
+/** 
+ * Default operation to apply when performing rollups.
+ * 
+ * @default COUNT
+ * 
+ * Note - Rollups are not handled in this codebase.
+ */
+export enum Rollup {
+    COUNT = 'COUNT',
+    COUNTUNIQUE = 'COUNTUNIQUE',
+    COUNTOFEACH = 'COUNTOFEACH',
+    COUNTDISTINCT = 'COUNTDISTINCT',
+    SUM = 'SUM',
+    AVERAGE = 'AVERAGE',
+}
 /**
- * Level of granularity. Assigned to each {@link Def}
+ * Literal copy of code from Period. Not DRY. Quite wet actually.
  * 
  * Note - all Entries take place at Scope.SECOND.  
  * Def._scope is for use by the PDW class or as a general
@@ -46,6 +61,7 @@ export enum DefScope {
     YEAR = 'YEAR',
 }
 
+
 //#endregion
 
 //#region  --- Interfaces
@@ -56,6 +72,45 @@ export enum DefScope {
 export interface DataJournal {
     defs: Def[],
     entries: Entry[]
+    overview?: Overview | null,
+}
+
+/**
+* Not typically operated on, but used moreso
+* for sanity checking things when merging and whatnot.
+*/
+export interface Overview {
+    updated?: {
+        localeStr?: string,
+        isoStr?: string,
+        epochStr?: string,
+    },
+    counts?: {
+        defs?: number,
+        activeEntries?: number,
+        deletedEntries?: number
+    },
+    index?: {
+        /**
+         * Position of every definition in the corresponding DataJournal.defs.
+         * Could be used like DataJournal.defs[index[defId]]
+         */
+        defMap: { [defId: string]: number }
+        /**
+         * Position of every entry in the corresponding DataJournal.entries.
+         * Could be used like DataJournal.entries[index[entryId]]
+         */
+        entryMap: { [entryId: string]: number }
+        /**
+         * Object containing:
+         * key = def._lbl
+         * value = def._id
+         * 
+         * Could be used like DataJournal.defs[index[defLblToIdMap[defId]]]
+         */
+        defLblToIdMap: { [defLbl: string]: string }
+    }
+    [x: string]: any
 }
 
 export interface Def {
@@ -70,45 +125,54 @@ export interface Def {
      */
     _id: UniqueID,
     /**
+    * An {@link EpochStr} that describes the last time the Def was saved.
+    */
+   _updated: EpochStr
+   /**
+    * A {@link DefType} that describes what data type the Definition uses. This is 
+    * **NOT** checked or enforced anywhere in this code base - meaning any Entry
+    * property can technically have any type of data. This is mostly for signaling
+    * to applications what type of input to use or methods to display the data.
+    */
+   _type: DefType
+    /**
      * A nice, human-readable description of the Def. Ideally is (but not required to be)
      * unique within any given Data Journal. Could cause issues if there's a conflict as...
      * 
      * IF an Entry has a non-underscore-prefixed property whose key doesn't match to any
      * Def's `_id` property, it will then begin trying to find a Def with a _lbl that
-     * matches that key (when UPPERCASED and trimmed).
+     * matches that key (when standardized -> {@link standardizeKey}).
      * @example Book Name
      */
     _lbl: string
+    // #### OPTIONAL PROPS ####
     /**
      * An emoji to represent the Def. Not used for anything but UIs or whatever.
      */
-    _emoji: string
+    _emoji?: string
     /**
      * An description to represent the Def. Not used for anything but UIs or whatever.
      */
-    _description: string
+    _desc?: string
     /**
-     * An {@link EpochStr} that describes the last time the Def was saved.
-     */
-    _updated: EpochStr
+    * A group of strings. Use common tags across related Defs to group them. 
+    * @example exercise
+    */
+   _tags?: string[]
+    // #### PROPS USED BY OTHER CODE BASES ####
     /**
      * A {@link DefScope} for what level of granularity this kind of Def uses. 
      * While all {@link Entry}s are at a DefScope.SCOPE level. In this code base it
      * does nothing at all. Used by other code bases that import this one.
      */
-    _scope: DefScope
+    _scope?: DefScope
     /**
-     * A {@link DefType} that describes what data type the Definition uses. This is 
-     * **NOT** checked or enforced anywhere in this code base - meaning any Entry
-     * property can technically have any type of data. This is mostly for signaling
-     * to applications what type of input to use or methods to display the data.
+     * A {@link Rollup} describing what opeartion should be performed when multiple
+     * entries containing this Def are aggregated.. 
+     * In this code base it does nothing at all. 
+     * Used by other code bases that import this one.
      */
-    _type: DefType
-    /**
-     * A group of strings. Use common tags across related Defs to group them. 
-     * @example exercise
-     */
-    _tags: string[]
+    _rollup?: Rollup
     /**
      * The DJ class & its static members do nothing with this, but it is planned to be
      * incorporated into a Validator class which could be imported into codebases along
@@ -125,7 +189,7 @@ export interface Def {
      * ['Strength','Cardio','Mobility']
      * @example exercise
      */
-    _range: string[]
+    _range?: string[]
 }
 
 export interface Entry {
@@ -150,7 +214,7 @@ export interface Entry {
      * @example "m0ogdggg"
      * @default to equal entry._updated
      */
-    _created: EpochStr,
+    _created?: EpochStr,
     /**
      * Whether or not the entry is to be treated as real. Entries are marked
      * as "deleted" rather than simply *actually deleted* because you want 
@@ -158,18 +222,18 @@ export interface Entry {
      * than have the deleted entry re-inserted during a data merge.
      * @example true
      */
-    _deleted: boolean,
+    _deleted?: boolean,
     /**
      * Generic text to be applied to the entry. Can be used for whatever.
      * @example hello world!
      */
-    _note: Markdown,
+    _note?: Markdown,
     /**
      * Description of where the entry *came from*. This type of information is
      * always vital when revisiting data captured some time ago. 
      * @example Siri Shortcut Automation
      */
-    _source: string,
+    _source?: string,
     /**
      * Any other key/value pairs are allowed & will be treated as though the value
      * is associated to a particular {@link Def}, identified by the key used. The 
@@ -293,7 +357,14 @@ export class DJ {
     static newBlankDataJournal(withDefs: Def[] = []): DataJournal {
         return {
             defs: withDefs,
-            entries: []
+            entries: [],
+            overview: {
+                counts: {
+                    defs: 0,
+                    activeEntries: 0,
+                    deletedEntries: 0
+                }
+            }
         }
     }
 
@@ -305,7 +376,7 @@ export class DJ {
         return true
     }
 
-    static addDefsToNewCopy(dataJournal: DataJournal, newDefs: Partial<Def>[]): DataJournal {
+    static addDefs(dataJournal: DataJournal, newDefs: Partial<Def>[]): DataJournal {
         //make static - actually calling 'merge' later does this
         // const newJournal = JSON.parse(JSON.stringify(dataJournal)); //not needed
         const fullDefs = newDefs.map(newDef => DJ.makeDef(newDef));
@@ -316,7 +387,7 @@ export class DJ {
         return DJ.merge([tempDJ, dataJournal])
     }
 
-    static addEntriesToNewCopy(dataJournal: DataJournal, newEntries: Partial<Entry>[]): DataJournal {
+    static addEntries(dataJournal: DataJournal, newEntries: Partial<Entry>[]): DataJournal {
         //make static - actually calling 'merge' later does this
         // const newJournal = JSON.parse(JSON.stringify(dataJournal)); //not needed
         const fullEntries = newEntries.map(newEntry => DJ.makeEntry(newEntry));
@@ -345,9 +416,9 @@ export class DJ {
     static makeDef(partDef: Partial<Def>): Def {
         //make static
         const newDef = JSON.parse(JSON.stringify(partDef));
-        if (!Object.hasOwn(newDef, '_id')) throw new Error("makeDef was passed an object without an _id")
+        if (!Object.hasOwn(newDef, '_id')) newDef._id = 'Add_Lbl_' + DJ.makeRandomString(5);
         if (!Object.hasOwn(newDef, '_lbl')) newDef._lbl = newDef._id;
-        if (!Object.hasOwn(newDef, '_description')) newDef._description = 'Add Description';
+        if (!Object.hasOwn(newDef, '_desc')) newDef._desc = 'Add Description';
         if (!Object.hasOwn(newDef, '_emoji')) newDef._emoji = '🆕';
         if (!Object.hasOwn(newDef, '_range')) newDef._range = [];
         if (!Object.hasOwn(newDef, '_tags')) newDef._tags = [];
@@ -360,11 +431,22 @@ export class DJ {
         return entries.filter(e => e._deleted);
     }
 
-    static merge(dataJournalArray: DataJournal[]) {
+    static addOverview(dataJournal: DataJournal): DataJournal {
+        //make static
+        const newDataJournal = JSON.parse(JSON.stringify(dataJournal));
+        newDataJournal.overview = DJ.makeOverview(newDataJournal);
+        return newDataJournal
+    }
+
+    static merge(dataJournalArray: DataJournal[], andMakeOverview = true) {
+        //#TODO - #MAYBE - optimize this logic to utilize Indexes if they are present
         if (!Array.isArray(dataJournalArray) || !DJ.isValidDataJournal(dataJournalArray[0])) throw new Error('DF.merge expects an array of DataJournals');
         const returnDataJournal: DataJournal = {
             defs: DJ.mergeDefs(dataJournalArray.map(dj => dj.defs)),
             entries: DJ.mergeEntries(dataJournalArray.map(dj => dj.entries))
+        }
+        if (andMakeOverview) {
+            returnDataJournal.overview = DJ.makeOverview(returnDataJournal);
         }
         return returnDataJournal;
     }
@@ -397,6 +479,7 @@ export class DJ {
                 return
             }
             if (field === 'source') {
+                if(entry._source === undefined) return
                 if (!Object.hasOwn(returnMap, entry._source)) returnMap[entry._source] = [];
                 returnMap[entry._source].push(entry);
                 return
@@ -469,27 +552,27 @@ export class DJ {
                 entries = entries.filter(entry=>entry._deleted === queryObject.deleted);
             }
             if(Object.hasOwn(queryObject, 'from')){
-                //@ts-expect-error - its' saying queryObject may be undefined, and not letting me specify otherwise
+                //@ts-expect-error
                 entries = entries.filter(entry=>entry._period >= queryObject.from);
             }
             if(Object.hasOwn(queryObject, 'to')){
-                //@ts-expect-error - its' saying queryObject may be undefined, and not letting me specify otherwise
+                //@ts-expect-error
                 entries = entries.filter(entry=>entry._period <= queryObject.to);
             }
             if(Object.hasOwn(queryObject, 'to')){
-                //@ts-expect-error - its' saying queryObject may be undefined, and not letting me specify otherwise
+                //@ts-expect-error
                 entries = entries.filter(entry=>entry._period <= queryObject.to);
             }
             if(Object.hasOwn(queryObject, 'updatedBefore')){
-                //@ts-expect-error - its' saying queryObject may be undefined, and not letting me specify otherwise
+                //@ts-expect-error
                 entries = entries.filter(entry=>entry._updated < queryObject.updatedBefore);
             }
             if(Object.hasOwn(queryObject, 'updatedAfter')){
-                //@ts-expect-error - its' saying queryObject may be undefined, and not letting me specify otherwise
+                //@ts-expect-error
                 entries = entries.filter(entry=>entry._updated > queryObject.updatedAfter);
             }
             if(Object.hasOwn(queryObject, 'entryIds')){
-                //@ts-expect-error - its' saying queryObject may be undefined, and not letting me specify otherwise
+                //@ts-expect-error
                 entries = entries.filter(entry=>queryObject.entryIds.some(eid=>eid===entry._id));
             }
             if(Object.hasOwn(queryObject, 'defs')){
@@ -516,9 +599,21 @@ export class DJ {
      * - entries with no associated def (warning)
      * - timestamp is invalid? (Borrow Scope check regex)
      * - updated Epoch str is way off?
+     * - Overview counts wrong?
      */
     static qualityCheck(dataJournal: DataJournal, panicLevel: "logs only" | "some errors thrown" | "all errors thrown" = 'some errors thrown'): void {
-        
+        //overview check
+        if(dataJournal.overview && dataJournal.overview.counts){
+            //Def Count bad
+            if(dataJournal.overview.counts.defs !== dataJournal.defs.length)
+                logOrThrow(`Overview Def count is wrong! \n Overview says: ${dataJournal.overview.counts.defs} & should be ${dataJournal.defs.length}`);
+            const active =  dataJournal!.overview!.counts!.activeEntries ?? 0;
+            const deleted =  dataJournal.overview.counts.deletedEntries ?? 0;
+            //Entry Count bad
+            const overViewEntryCount = active + deleted;
+            if(overViewEntryCount !== dataJournal.entries.length)
+                logOrThrow(`Overview Entry count is wrong! \n Overview says: ${overViewEntryCount} & should be ${dataJournal.entries.length}`);
+        }
         //quality check defs
         dataJournal.defs.forEach(def=>{
             //Def missing id
@@ -619,6 +714,63 @@ export class DJ {
     }
 
     //#endregion
+
+    //#region --- private methods 
+    /**
+     * Creates a Data Journal Overview object - but does NOT append it to anything.
+     * To append to a copy of a Data Journal, used {@link addOverview}.
+     */
+    private static makeOverview(dataJournal: DataJournal): Overview {
+        if (!this.isValidDataJournal(dataJournal)) throw new Error("Invalid dataset found at fFWPIhaA");
+
+        let deletedEntryCount = 0;
+        let lastUpdated = '0'; //should be the Epoch itself
+
+        let indexObj = {
+            defMap: {},
+            entryMap: {},
+            defLblToIdMap: {}
+        }
+
+        /**
+         * Loop over entries once, capture what's necessary
+         */
+        dataJournal.entries.forEach((entry, index) => {
+            if (entry._deleted) deletedEntryCount += 1;
+            if (entry._updated > lastUpdated) lastUpdated = entry._updated;
+
+            const standardizedKey = DJ.standardizeKey(entry._id);
+            indexObj.entryMap[standardizedKey] = index;
+        })
+
+        /**
+         * Loop over defs once, capture what's necessary
+         */
+        dataJournal.defs.forEach((def, index) => {
+            if (def._updated > lastUpdated) lastUpdated = def._updated;
+
+            const standardizedKey = DJ.standardizeKey(def._id);
+            indexObj.defMap[standardizedKey] = index;
+            indexObj.defLblToIdMap[def._lbl] = def._id;
+        })
+
+        const lastUpdatedDate = DJ.parseDateFromEpochStr(lastUpdated);
+
+        const overview: Overview = {
+            updated: {
+                localeStr: lastUpdatedDate.toLocaleString(),
+                isoStr: lastUpdatedDate.toISOString(),
+                epochStr: lastUpdated,
+            },
+            counts: {
+                defs: dataJournal.defs.length,
+                activeEntries: dataJournal.entries.length - deletedEntryCount,
+                deletedEntries: deletedEntryCount
+            },
+            index: indexObj
+        }
+        return overview;
+    }
 
     /**
      * Both merges use the same logic, just a different key. This is called by the other merge techniques.

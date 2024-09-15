@@ -1,4 +1,149 @@
-//@ts-ignore
+import { Temporal } from "temporal-polyfill";
+import { QueryObject, Entry, Def, EpochStr } from "./DataJournal";
+import { PeriodSummary, PDW } from "./pdw";
+import { Period, PeriodStr, Scope } from "./Period";
+
+
+export interface QueryResponse {
+    success: boolean;
+    count: number;
+    msgs?: string[];
+    params: { paramsIn: object, asParsed: QueryObject };
+    entries: Entry[];
+    summary?: PeriodSummary[];
+    defs: Def[]; //maybe not needed? Entry contains Def
+}
+
+export interface ReducedQueryResponse {
+    success: boolean;
+    entries: EntryData[];
+    msgs?: string[];
+}
+
+/**
+ * Basic data filtering parameters, supported by the {@link PDW} methods for
+ * {@link getDefs} & the 2 other element "getters". The {@link DataStore} methods
+ * will get {@link ReducedParams} passed to them by the PDW methods, which will
+ * perform the sanitization.
+ * Not all parameters are considered for each getter, but it should make
+ * things a bit simpler to standardize the params
+ */
+export interface StandardParams {
+    /**
+     * Include things marked as deleted?
+     * no - default
+     * yes - include all
+     * only - only include deleted things
+     */
+    includeDeleted?: 'yes' | 'no' | 'only',
+    /**
+     * Lower-bound of Entry.period.
+     * Like all Periods, does not contain Time Zone info.
+     * Will be treated as the FIRST SECOND of the Period or PeriodStr provided.
+     * Example:
+     * "2023-Q2" would be synonymous with "2023-04-01T:00:00:00"
+     */
+    from?: Period | PeriodStr,
+    /**
+     * Upper-bound of Entry.period. 
+     * Like all Periods, does not contain Time Zone info.
+     * Will be treated as the LAST SECOND of the Period or PeriodStr provided.
+     * Example:
+     * "2023-Q2" would be synonymous with "2023-08-31T:23:59:59"
+     */
+    to?: Period | PeriodStr,
+    /**
+     * Entry period. Sets the Query.from and Query.to values internally.
+     */
+    inPeriod?: Period | string
+    /**
+     * The lower-bound of Element.created, represented as an {@link EpochStr}
+     * or Temporal.ZonedDateTime. 
+     */
+    createdAfter?: Temporal.ZonedDateTime | EpochStr,
+    /**
+     * The upper-bound of Element.created, represented as an {@link EpochStr}
+     * or Temporal.ZonedDateTime. 
+     */
+    createdBefore?: Temporal.ZonedDateTime | EpochStr,
+    /**
+     * The lower-bound of Element.updated, represented as an {@link EpochStr}
+     * or Temporal.ZonedDateTime. 
+     */
+    updatedAfter?: Temporal.ZonedDateTime | EpochStr,
+    /**
+     * The upper-bound of Element.updated, represented as an {@link EpochStr}
+     * or Temporal.ZonedDateTime. 
+     */
+    updatedBefore?: Temporal.ZonedDateTime | EpochStr,
+    /**
+     * A list of Element.uid. Will filter to Elements in the list.
+     */
+    uid?: UID[] | UID,
+    /**
+     * A list of {@link SmallID}.
+     * For Entry and Def elements, will return those with Element.did in the list.
+     */
+    did?: SmallID[] | SmallID,
+    /**
+     * A list of {@link UID}.
+     * Will return any Entry instance(s) whose Entry.eid is in the list.
+     */
+    eid?: UID[] | UID,
+    /**
+     * A list of strings for the associated with Def.lbl
+     * Internally, this is translated into a list of _did strings, and behaves like
+     * {@link StandardParams.did}
+     * For Entry and Def elements, will return those with Element.did in the list.
+     */
+    defLbl?: string[] | string,
+    //pointLbl?: string[] | string, do you want to support this
+    /**
+     * A list of strings.
+     * Will return any Tag(s) whose Tag.lbl is in the list.
+     */
+    tag?: string,
+    /**
+     * Reduces the resulting {@link Def} and {@link} Entry results to those whose
+     * scope is in the provided list.
+     */
+    scope?: Scope | Scope[];
+    /**
+     * A limit on the number of responses returned. Probably unsorted and therefore
+     * not super helpful, but this is something I'd like to support.
+     */
+    limit?: number,//#TODO
+    /**
+     * If an empty query is sent without this field, the query is rejected.
+     * This is prevent the error trap of accidentally asking for *everything*,
+     * which could be expensive in cloud-based datastores.
+     */
+    allOnPurpose?: boolean
+    /**
+     * If provdided, will query for the current day. Will ignore any provided values
+     */
+    today?: any;
+    /**
+     * If provdided, will query for the current week. Will ignore any provided values
+     */
+    thisWeek?: any;
+    /**
+     * If provdided, will query for the current month. Will ignore any provided values
+     */
+    thisMonth?: any;
+    /**
+     * If provdided, will query for the current quarter. Will ignore any provided values
+     */
+    thisQuarter?: any;
+    /**
+     * If provdided, will query for the current year. Will ignore any provided values
+     */
+    thisYear?: any;
+    /**
+     * If provided, the query response will include Period rollups
+     */
+    rollup?: Scope
+}
 
 export class Query {
     // private verbosity: 'terse' | 'normal' | 'verbose'
@@ -7,7 +152,6 @@ export class Query {
     private params: StandardParams
     private sortOrder: undefined | 'asc' | 'dsc'
     private sortBy: undefined | string
-    private _manifest: Manifest;
     
     constructor(pdwRef: PDW, paramsIn?: StandardParams) {
         // this.verbosity = 'normal';
