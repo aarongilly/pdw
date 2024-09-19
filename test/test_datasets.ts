@@ -1,4 +1,4 @@
-import * as dj from "../src/DataJournal.js"
+import * as dj from "../src/DJ.js"
 
 //#region --- DEFS
 export const bookDef: dj.Def = {
@@ -8,6 +8,7 @@ export const bookDef: dj.Def = {
     _desc: "The name of the book you read.",
     _updated: "m0ofg4dw",
     _scope: dj.DefScope.MINUTE,
+    _rollup: dj.Rollup.COUNTDISTINCT,
     _type: dj.DefType.TEXT,
     _tags: ['media'],
     _range: []
@@ -241,37 +242,36 @@ export const journalToOverviewAndIndex: dj.DataJournal = {
     entries: [readEntry, readAndWorkedOutWithName, lifted, deletedEntry]
 }
 
-//#TODO - fix this by importing Overview or whatever if you're still doing that
-// export const expectedOverview: dj.Overview = {
-//     updated: {
-//         epochStr: "m0zzzzzz", //from the deleted entry
-//         localeStr: "9/12/2024, 7:46:32 PM", //translated
-//         isoStr: "2024-09-13T00:46:32.447Z", //translated
-//     },
-//     counts: {
-//         defs: 3,
-//         activeEntries: 3,
-//         deletedEntries: 1
-//     },
-//     index: {
-//         defMap: {
-//             "BOOK_READ_NAME": 0,
-//             "WORKOUT_TYPE": 1,
-//             "WORKOUT_NAME": 2
-//         },
-//         entryMap: {
-//             "M0OFGFIO_GJLP": 0,
-//             "M0OGACOF_3FJK": 1,
-//             "M0OGDGGG_CA3T": 2,
-//             "M0OFACHO_POAX": 3,
-//         },
-//         defLblToIdMap: {
-//             "Book": "BOOK_READ_NAME",
-//             "Workout Name": "WORKOUT_NAME",
-//             "Workout Type": "WORKOUT_TYPE",
-//         }
-//     }
-// }
+export const expectedOverview: dj.Overview = {
+    updated: {
+        epochStr: "m0zzzzzz", //from the deleted entry
+        localeStr: "9/12/2024, 7:46:32 PM", //translated
+        isoStr: "2024-09-13T00:46:32.447Z", //translated
+    },
+    counts: {
+        defs: 3,
+        activeEntries: 3,
+        deletedEntries: 1
+    },
+    index: {
+        defMap: {
+            "BOOK_READ_NAME": 0,
+            "WORKOUT_TYPE": 1,
+            "WORKOUT_NAME": 2
+        },
+        entryMap: {
+            "M0OFGFIO_GJLP": 0,
+            "M0OGACOF_3FJK": 1,
+            "M0OGDGGG_CA3T": 2,
+            "M0OFACHO_POAX": 3,
+        },
+        defLblToIdMap: {
+            "Book": "BOOK_READ_NAME",
+            "Workout Name": "WORKOUT_NAME",
+            "Workout Type": "WORKOUT_TYPE",
+        }
+    }
+}
 //#endregion
 
 //#region --- EXPECTED GROUPING

@@ -20,6 +20,7 @@ docs/*
 out/*
 __notes_to_self.md
 test/localTestFileDir
+.archiveOfOutdated
 
 # Editor directories and files
 .vscode/*

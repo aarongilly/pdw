@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import {Period, Scope} from '../src/pdw';
+import {Period, Scope} from '../src/Period'
 // Edit an assertion and save to see HMR in action
 
 test('Period Contains', ()=>{

@@ -1,10 +1,11 @@
-// import * as pdw from './PDW.js'
-// import * as ie from './translators/fileTranslators.js'
+import * as pdw from './pdw.js'
+import * as ie from './translators/fileTranslators.js'
 // import * as obs from './translators/obsidianTranslator.js'
 // import * as XLSX from 'xlsx'
 // import * as fs from 'fs'
-import * as test from '../test/test_datasets.js'
-import * as dj from './DataJournal.js'
+import * as testdata from '../test/test_datasets.js'
+import { Def, DefType } from './DJ.js'
+ './DJ.js'
 
 // import { Query, Scope } from './pdw.js'
 // import { exportToFile, importFromFile } from './dataStores/fileAsyncDataStores.js';
@@ -12,8 +13,59 @@ import * as dj from './DataJournal.js'
 // import { importFirestore, importMongo, importOldV9, importOldest, importPreviousCSV } from './onetimeImports.js'
 // import * as test from '../../pdw-firestore-plugin/'
 
-const myDJ = test.journalToOverviewAndIndex
-console.log(dj.DJ.isValidDataJournal(myDJ)) //logs true
+// const myDJ = test.journalToOverviewAndIndex
+
+const config: pdw.Config = {
+    connectors: [
+        {
+            serviceName: 'Strawman In-Memory Database',
+        }
+    ]
+}
+
+let pdwRef = await pdw.PDW.newPDW(config);
+// expect(pdwRef.connectors.length).toBe(1);
+
+//adding a Def
+let myDef: Def = {
+    _id: 'defOne',
+    _updated: 'm0ofg4dw',
+    _type: DefType.NUMBER,
+}
+await pdwRef.setDefs([myDef])
+// expect(pdwRef.getDefs().length).toBe(1);
+let retreivedDef = pdwRef.getDefs()[0];
+//checking provided inputs
+// expect(retreivedDef._id).toBe('defOne');
+// expect(retreivedDef._updated).toBe('m0ofg4dw');
+// expect(retreivedDef._type).toEqual(DefType.NUMBER);
+//no non-required keys are spawned - this is desired?
+// expect(Object.keys(retreivedDef).length).toBe(3);
+
+//updating the Def
+let myUpdate: Def  = {
+    _id: 'defOne',
+    _updated: 'm0ofzzzz', //manually supplied newer update time
+    _type: DefType.NUMBER,
+    _desc: 'Now with a description'
+}
+await pdwRef.setDefs([],[myUpdate])
+// expect(pdwRef.getDefs().length).toBe(1);
+
+retreivedDef = pdwRef.getDefs()[0];
+console.log(retreivedDef);
+//@ts-expect-error
+let secondUpdate: pdw.TransactionUpdateMember = {
+    _id: 'defOne',
+    _lbl: 'Now with label',
+}
+await pdwRef.setDefs([],[secondUpdate])
+// expect(pdwRef.getDefs().length).toBe(1);
+
+retreivedDef = pdwRef.getDefs()[0];
+console.log(retreivedDef);
+// expect(retreivedDef._updated).toBe('m0ofzzzz');
+// expect(retreivedDef._desc).toEqual('Now with a description');
 
 //#region ---- WHERE YOU ARE GOING
 /* 

@@ -135,6 +135,7 @@ export interface Def {
     * to applications what type of input to use or methods to display the data.
     */
    _type: DefType
+   // #### OPTIONAL PROPS ####
     /**
      * A nice, human-readable description of the Def. Ideally is (but not required to be)
      * unique within any given Data Journal. Could cause issues if there's a conflict as...
@@ -144,8 +145,7 @@ export interface Def {
      * matches that key (when standardized -> {@link standardizeKey}).
      * @example Book Name
      */
-    _lbl: string
-    // #### OPTIONAL PROPS ####
+    _lbl?: string
     /**
      * An emoji to represent the Def. Not used for anything but UIs or whatever.
      */
@@ -369,10 +369,56 @@ export class DJ {
     }
 
     static isValidDataJournal(data: DataJournal) {
-        if (data.defs === undefined) return false
-        if (Array.isArray(data.defs) === false) return false
-        if (data.entries === undefined) return false
-        if (Array.isArray(data.entries) === false) return false
+        if (data.defs === undefined){
+            console.warn("Invalid DataJournal found - no 'defs' array")
+            return false
+        }
+        if (Array.isArray(data.defs) === false){
+            console.warn("Invalid DataJournal found - 'defs' is not array")
+            return false
+        }
+        if (data.defs.some(def=>!DJ.isValidDef(def))) return false
+        if (data.entries === undefined) {
+            console.warn("Invalid DataJournal found - no 'entries' array")
+            return false
+        }
+        if (Array.isArray(data.entries) === false) {
+            console.warn("Invalid DataJournal found - 'entries' is not array")
+            return false
+        }
+        if (data.entries.some(entry=>!DJ.isValidEntry(entry))) return false
+        return true
+    }
+
+    static isValidDef(def: Partial<Def>): boolean{
+        if(def._id === undefined){
+            console.warn('Invalid Def found - no _id prop: ', def)
+            return false
+        }
+        if(def._updated === undefined){
+            console.warn('Invalid Def found - no _updated prop: ', def)
+            return false
+        }
+        if(def._type === undefined){
+            console.warn('Invalid Def found - no _type prop: ', def)
+            return false
+        }
+        return true
+    }
+
+    static isValidEntry(entry: Partial<Entry>): boolean {
+        if(entry._id === undefined){
+            console.warn('Invalid Entry found - no _id prop: ', entry)
+            return false
+        }
+        if(entry._updated === undefined){
+            console.warn('Invalid Entry found - no _updated prop: ', entry)
+            return false
+        }
+        if(entry._period === undefined){
+            console.warn('Invalid Entry found - no _period prop: ', entry)
+            return false
+        }
         return true
     }
 
@@ -416,14 +462,14 @@ export class DJ {
     static makeDef(partDef: Partial<Def>): Def {
         //make static
         const newDef = JSON.parse(JSON.stringify(partDef));
-        if (!Object.hasOwn(newDef, '_id')) newDef._id = 'Add_Lbl_' + DJ.makeRandomString(5);
+        if (!Object.hasOwn(newDef, '_id')) throw new Error("Def has no _id and cannot be created")
         if (!Object.hasOwn(newDef, '_lbl')) newDef._lbl = newDef._id;
         if (!Object.hasOwn(newDef, '_desc')) newDef._desc = 'Add Description';
         if (!Object.hasOwn(newDef, '_emoji')) newDef._emoji = '🆕';
         if (!Object.hasOwn(newDef, '_range')) newDef._range = [];
         if (!Object.hasOwn(newDef, '_tags')) newDef._tags = [];
         if (!Object.hasOwn(newDef, '_type')) newDef._type = DefType.TEXT; // default
-        if (!Object.hasOwn(newDef, '_update')) newDef._updated = DJ.makeEpochStr();
+        if (!Object.hasOwn(newDef, '_updated')) newDef._updated = DJ.makeEpochStr();
 
         return newDef as Def
     }
@@ -452,10 +498,12 @@ export class DJ {
     }
 
     static mergeDefs(defs: Def[][]) {
+        if(defs.length === 0) return [] as Def[]
         return DJ.mergeArrayOfArraysOfDefsOrEntries(defs) as Def[];
     }
-
+    
     static mergeEntries(entries: Entry[][]) {
+        if(entries.length === 0) return [] as Entry[]
         return DJ.mergeArrayOfArraysOfDefsOrEntries(entries) as Entry[];
     }
 
@@ -643,7 +691,7 @@ export class DJ {
             //no associated def 
             const defKeys = Object.keys(entry).filter(key=>!key.startsWith('_'));
             defKeys.forEach(key=>{
-                if(!dataJournal.defs.some(def => DJ.standardizeKey(def._id) === key || DJ.standardizeKey(def._lbl) === key))
+                if(!dataJournal.defs.some(def => DJ.standardizeKey(def._id) === key || DJ.standardizeKey(def._lbl ?? def._id) === key))
                     logOrThrow(`No associated Def found for Entry! \n ${JSON.stringify(entry)}`);
             })
             
@@ -751,7 +799,7 @@ export class DJ {
 
             const standardizedKey = DJ.standardizeKey(def._id);
             indexObj.defMap[standardizedKey] = index;
-            indexObj.defLblToIdMap[def._lbl] = def._id;
+            indexObj.defLblToIdMap[def._lbl ?? def._id] = def._id;
         })
 
         const lastUpdatedDate = DJ.parseDateFromEpochStr(lastUpdated);

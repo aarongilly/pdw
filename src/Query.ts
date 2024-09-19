@@ -1,5 +1,5 @@
 import { Temporal } from "temporal-polyfill";
-import { QueryObject, Entry, Def, EpochStr } from "./DataJournal";
+import { QueryObject, Entry, Def, EpochStr } from "./DJ";
 import { PeriodSummary, PDW } from "./pdw";
 import { Period, PeriodStr, Scope } from "./Period";
 
@@ -16,7 +16,7 @@ export interface QueryResponse {
 
 export interface ReducedQueryResponse {
     success: boolean;
-    entries: EntryData[];
+    entries: Entry[];
     msgs?: string[];
 }
 
@@ -380,3 +380,96 @@ export class Query {
         })
     }
 }
+
+
+    /**
+     * Enforces defaults. Sanity check some types.
+     * Less variability in the output
+     * @param params rawParams in
+     * @returns santized params out
+     */
+    sanitizeParams(params: StandardParams): dj.QueryObject {
+        //ensure default
+        if (params.includeDeleted === undefined) params.includeDeleted = 'no';
+
+        if (params?.today !== undefined) params.inPeriod = Period.now(Scope.DAY);
+        if (params?.thisWeek !== undefined) params.inPeriod = Period.now(Scope.WEEK);
+        if (params?.thisMonth !== undefined) params.inPeriod = Period.now(Scope.MINUTE);
+        if (params?.thisQuarter !== undefined) params.inPeriod = Period.now(Scope.QUARTER);
+        if (params?.thisYear !== undefined) params.inPeriod = Period.now(Scope.YEAR);
+
+        if (params.hasOwnProperty("inPeriod")) {
+            let period = params.inPeriod as Period
+            if (typeof params.inPeriod === 'string') period = new Period(params.inPeriod);
+            params.from = new Period(period).getStart();
+            params.to = new Period(period).getEnd();
+        }
+
+        //make periods from period strings
+        if (params.from !== undefined) {
+            if (typeof params.from === 'string') {
+                params.from = new Period(params.from);
+            }
+            //otherwise I guess I'll assume it's okay
+        }
+        if (params.to !== undefined) {
+            if (typeof params.to === 'string') {
+                params.to = new Period(params.to);
+            }
+            //otherwise I guess I'll assume it's okay
+        }
+
+        //make Temporal & EpochStr options
+        if (params.createdAfter !== undefined) {
+            if (typeof params.createdAfter === 'string') {
+                params.createdAfter = parseTemporalFromEpochStr(params.createdAfter);
+                (<ReducedParams>params).createdAfterEpochStr = makeEpochStrFrom(params.createdAfter);
+            } else {
+                (<ReducedParams>params).createdAfterEpochStr = makeEpochStrFrom(params.createdAfter);
+                params.createdAfter = parseTemporalFromEpochStr((<ReducedParams>params).createdAfterEpochStr!);
+            }
+        }
+        if (params.createdBefore !== undefined) {
+            if (typeof params.createdBefore === 'string') {
+                params.createdBefore = parseTemporalFromEpochStr(params.createdBefore);
+                (<ReducedParams>params).createdBeforeEpochStr = makeEpochStrFrom(params.createdBefore);
+            } else {
+                (<ReducedParams>params).createdBeforeEpochStr = makeEpochStrFrom(params.createdBefore);
+                params.createdBefore = parseTemporalFromEpochStr((<ReducedParams>params).createdBeforeEpochStr!);
+            }
+        }
+        if (params.updatedAfter !== undefined) {
+            if (typeof params.updatedAfter === 'string') {
+                params.updatedAfter = parseTemporalFromEpochStr(params.updatedAfter);
+                (<ReducedParams>params).updatedAfterEpochStr = makeEpochStrFrom(params.updatedAfter);
+            } else {
+                (<ReducedParams>params).updatedAfterEpochStr = makeEpochStrFrom(params.updatedAfter);
+                params.updatedAfter = parseTemporalFromEpochStr((<ReducedParams>params).updatedAfterEpochStr!);
+            }
+        }
+        if (params.updatedBefore !== undefined) {
+            if (typeof params.updatedBefore === 'string') {
+                params.updatedBefore = parseTemporalFromEpochStr(params.updatedBefore);
+                (<ReducedParams>params).updatedBeforeEpochStr = makeEpochStrFrom(params.updatedBefore);
+            } else {
+                (<ReducedParams>params).updatedBeforeEpochStr = makeEpochStrFrom(params.updatedBefore);
+                params.updatedBefore = parseTemporalFromEpochStr((<ReducedParams>params).updatedBeforeEpochStr!);
+            }
+        }
+
+        //ensure arrays
+        if (params.uid !== undefined && typeof params.uid == 'string') params.uid = [params.uid]
+        if (params.eid !== undefined && typeof params.eid == 'string') params.eid = [params.eid]
+        if (params.defLbl !== undefined && typeof params.defLbl == 'string') params.did = this._manifest.filter(def => (<string[]>params.defLbl)!.some(dl => dl === def.lbl)).map(def => def.did);
+        if (params.did !== undefined && typeof params.did == 'string') params.did = [params.did]
+        if (params.scope !== undefined && typeof params.scope == 'string') params.scope = [params.scope];
+
+        if (params.tag !== undefined && typeof params.tag == 'string') params.did = this._manifest.filter(def => def.hasTag(params.tag!)).map(def => def.did);
+
+        if (params.limit !== undefined && typeof params.limit !== "number") {
+            console.error('Your params were: ', params)
+            throw new Error('You tried to supply a limit param with a non-number.')
+        }
+
+        return params as ReducedParams
+    }

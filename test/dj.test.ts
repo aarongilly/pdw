@@ -1,4 +1,4 @@
-import { DataJournal, DJ, Entry, Def } from "../src/DataJournal";
+import { DataJournal, DJ, Entry, Def, DefType, DefScope } from "../src/DJ";
 import { describe, test, expect } from "vitest";
 import * as testData from './test_datasets';
 import { Temporal } from "temporal-polyfill";
@@ -48,13 +48,13 @@ describe("Data Journal basics.", () => {
 });
 
 describe('Data Journal Entry & Def Adding', () => {
-  test('Adding Defs', () => {
+  test('Implications of No Mutation', () => {
     let localDataJournal = DJ.newBlankDataJournal();
     //Because Data Journal never mutates, calling up any DJ.whatever methods will
     //inevitably create copies of stuff and loop-to-merge, even if you *know* it's new.
     //Thus the fastest approach for adding new Defs and Entries is to make them then
     //directly mutate the Data Journal object itself.
-    const newMinimumDef: Partial<Def> = { } //Defs **can** be empty, but shouldn't usually be
+    const newMinimumDef: Partial<Def> = { _id: 'def1' } //Defs only NEED an "_id"
     const newFullDef = DJ.makeDef(newMinimumDef);
     localDataJournal.defs.push(newFullDef);
     //There's a big-ol' footgun here, though. Doing this will *not* update any attached
@@ -75,10 +75,9 @@ describe('Data Journal Entry & Def Adding', () => {
     //** INTENTIONALLY BAD CODE DON'T DO THIS **
     DJ.addDefs(localDataJournal, [testData.movieDef]);
     expect(localDataJournal.overview?.counts?.defs).toBe(2); //movieDef NOT present
-  })
 
-  test('Adding Entries', () => {
-    let localDataJournal = DJ.newBlankDataJournal([testData.bookDef]);
+    //same as above, but for entries.
+    localDataJournal = DJ.newBlankDataJournal([testData.bookDef]);
     //Because Data Journal never mutates, calling up any DJ.whatever methods will
     //inevitably create copies of stuff and loop-to-merge, even if you *know* it's new.
     //Thus the fastest approach for adding new Defs and Entries is to make them then
@@ -107,6 +106,77 @@ describe('Data Journal Entry & Def Adding', () => {
     //** INTENTIONALLY BAD CODE DON'T DO THIS **
     DJ.addEntries(localDataJournal, [testData.readAndWorkedOutEntry]);
     expect(localDataJournal.overview?.counts?.activeEntries).toBe(2); //movieDef NOT present 
+  })
+
+  test('makeDef Behaviors', () => {
+    //making this to point out it's actually not *needed*.
+    let localDataJournal = DJ.newBlankDataJournal();
+
+    //the Data Journal above never gets used below, for show.
+    let momentBefore = DJ.makeEpochStr();
+    const minimumDef = { _id: 'abc' }; //the only *required* property. Everything else will default
+    let momentAfter = DJ.makeEpochStr();
+    const defMadeFromMinimum = DJ.makeDef(minimumDef);
+    expect(defMadeFromMinimum._id).toEqual(minimumDef._id); //obviously
+    expect(defMadeFromMinimum._lbl).toEqual(minimumDef._id); //lbl from ID
+    //updated detaults to now
+    expect(parseInt(defMadeFromMinimum._updated, 36)).toBeGreaterThanOrEqual(parseInt(momentBefore, 36));
+    expect(parseInt(defMadeFromMinimum._updated, 36)).toBeLessThanOrEqual(parseInt(momentAfter, 36));
+    //DEFAULT GAUNTLET
+    expect(defMadeFromMinimum._type).toEqual(DefType.TEXT); //default
+    expect(defMadeFromMinimum._desc).toEqual('Add Description'); //default
+    expect(defMadeFromMinimum._emoji).toEqual('🆕'); //default
+    expect(defMadeFromMinimum._range).toEqual([]); //default
+    expect(defMadeFromMinimum._tags).toEqual([]); //default
+
+    const fullySpecifiedDef = {
+      _id: "MOVIE_WATCH_NAME",
+      _lbl: "Movie",
+      _emoji: "🎬",
+      _desc: "The name of the movie you watched.",
+      _updated: "m0ofg4dw",
+      _scope: DefScope.MINUTE,
+      _type: DefType.TEXT,
+      _tags: ['media'],
+      _range: []
+    }
+    const defMadeFromFullySpecifiedDef = DJ.makeDef(fullySpecifiedDef);
+    expect(defMadeFromFullySpecifiedDef).toEqual(fullySpecifiedDef);
+
+    momentBefore = DJ.makeEpochStr();
+    const minimumEntry = { _id: 'bcd', _period: '2024-08-18T19:09:38' }; //the only *required* properties. Everything else will default
+    momentAfter = DJ.makeEpochStr();
+    const entryFromMinimum = DJ.makeEntry(minimumEntry);
+    //assigments are taken
+    expect(entryFromMinimum._id).toEqual(minimumEntry._id);
+    expect(entryFromMinimum._period).toEqual(minimumEntry._period);
+    //updated defaults to now
+    expect(parseInt(entryFromMinimum._updated, 36)).toBeGreaterThanOrEqual(parseInt(momentBefore, 36));
+    expect(parseInt(entryFromMinimum._updated, 36)).toBeLessThanOrEqual(parseInt(momentAfter, 36));
+    //created defaults to updated
+    expect(entryFromMinimum._created).toEqual(entryFromMinimum._updated);
+    //deleted defaults to false
+    expect(entryFromMinimum._deleted).toEqual(false);
+    //everything else is blank
+    expect(entryFromMinimum._note).toEqual('')
+    expect(entryFromMinimum._source).toEqual('')
+
+    const fullySpecifiedEntry = {
+      _id: "m0ofgfio_gjlp",
+      _period: "2024-09-04T18:39:00",
+      _created: "m0ofgfio",
+      _updated: "m0ofgfio",
+      _deleted: false,
+      _note: "A very typical entry",
+      _source: "Test data",
+      BOOK_NAME: "Atomic Habits"
+    }
+    const entryMadeFromFullySpecified = DJ.makeEntry(fullySpecifiedEntry);
+    expect(entryMadeFromFullySpecified).toEqual(fullySpecifiedEntry);
+  })
+
+  test('makeEntry Behaviors', () => {
+
   })
 })
 
@@ -300,33 +370,33 @@ describe('Data Journal Filtering', () => {
     //baseline
     expect(dataJournal.entries.length).toBe(4);
     //remove the deleted entry
-    expect(DJ.filterTo({deleted: false}, dataJournal).entries.length).toBe(3);
+    expect(DJ.filterTo({ deleted: false }, dataJournal).entries.length).toBe(3);
     //removes two before that second
-    expect(DJ.filterTo({from: "2024-09-05T11:09:00"}, dataJournal).entries.length).toBe(2);
+    expect(DJ.filterTo({ from: "2024-09-05T11:09:00" }, dataJournal).entries.length).toBe(2);
     //includes the two from before that second AND the one that took place during that second
-    expect(DJ.filterTo({to: "2024-09-05T11:09:00"}, dataJournal).entries.length).toBe(3);
+    expect(DJ.filterTo({ to: "2024-09-05T11:09:00" }, dataJournal).entries.length).toBe(3);
     //includes only the earliest
-    expect(DJ.filterTo({updatedBefore: "m0ofgfiz"}, dataJournal).entries.length).toBe(1);
+    expect(DJ.filterTo({ updatedBefore: "m0ofgfiz" }, dataJournal).entries.length).toBe(1);
     //includes the other 3, but not the earliest
     //note this is the exact updated string from the one that is filtered OUT
     //whereas "from" and "to" are "or equal to" relationships, 
     //the updated ones are strictly "before" and "after" relationships
-    expect(DJ.filterTo({updatedAfter: "m0ofgfio"}, dataJournal).entries.length).toBe(3);
+    expect(DJ.filterTo({ updatedAfter: "m0ofgfio" }, dataJournal).entries.length).toBe(3);
     //grabbing two entries by id yeilds those two entries
-    expect(DJ.filterTo({entryIds: ['m0ofgfio_gjlp','m0ogdggg_ca3t']}, dataJournal).entries.length).toBe(2);
+    expect(DJ.filterTo({ entryIds: ['m0ofgfio_gjlp', 'm0ogdggg_ca3t'] }, dataJournal).entries.length).toBe(2);
     //grabbing two entries by id yeilds those two entries
-    expect(DJ.filterTo({entryIds: ['m0ofgfio_gjlp','m0ogdggg_ca3t']}, dataJournal).entries.length).toBe(2);
+    expect(DJ.filterTo({ entryIds: ['m0ofgfio_gjlp', 'm0ogdggg_ca3t'] }, dataJournal).entries.length).toBe(2);
     //small test dataset, so here's a couple of illustrations of defs filtering
-    expect(DJ.filterTo({defs: ['BOOK_NAME']}, dataJournal).entries.length).toBe(2);
-    expect(DJ.filterTo({defs: ['WORKOUT_TYPE']}, dataJournal).entries.length).toBe(2);
+    expect(DJ.filterTo({ defs: ['BOOK_NAME'] }, dataJournal).entries.length).toBe(2);
+    expect(DJ.filterTo({ defs: ['WORKOUT_TYPE'] }, dataJournal).entries.length).toBe(2);
     //one has one, one has the other, one has both, one has neither, so 3 of the 4 show up here
-    expect(DJ.filterTo({defs: ['WORKOUT_TYPE', 'BOOK_NAME']}, dataJournal).entries.length).toBe(3); 
+    expect(DJ.filterTo({ defs: ['WORKOUT_TYPE', 'BOOK_NAME'] }, dataJournal).entries.length).toBe(3);
     //not sure how useful this will be, but here it is working.
-    expect(DJ.filterTo({limit: 3}, dataJournal).entries.length).toBe(3); 
+    expect(DJ.filterTo({ limit: 3 }, dataJournal).entries.length).toBe(3);
 
     //you can also filter by entries, which will return only entries, but otherwise works the same
     const justTheEntries = dataJournal.entries;
-    expect(DJ.filterTo({from: "2024-09-05T11:09:00"}, dataJournal).entries).toEqual(DJ.filterTo({from: "2024-09-05T11:09:00"}, justTheEntries));
+    expect(DJ.filterTo({ from: "2024-09-05T11:09:00" }, dataJournal).entries).toEqual(DJ.filterTo({ from: "2024-09-05T11:09:00" }, justTheEntries));
   })
 
   test('Combining Filters', () => {
@@ -350,9 +420,9 @@ describe('Data Journal Filtering', () => {
 describe('Data Journal Quality Checks', () => {
   test('Absence of error on good data', () => {
     const properDataJournal = testData.journalToOverviewAndIndex;
-    expect(() => {DJ.qualityCheck(properDataJournal)}).not.toThrowError();
+    expect(() => { DJ.qualityCheck(properDataJournal) }).not.toThrowError();
     //empty data journals are high quality!
-    expect(() => {DJ.qualityCheck({defs:[], entries: []})}).not.toThrowError();
+    expect(() => { DJ.qualityCheck({ defs: [], entries: [] }) }).not.toThrowError();
   })
 
   test('Overview checks', () => {
@@ -366,9 +436,9 @@ describe('Data Journal Quality Checks', () => {
       }
     }
     //overview errors are not high priority, a warning is loged & nothing more
-    expect(() => {DJ.qualityCheck(faultyDataJournal)}).not.toThrowError()
-    expect(() => {DJ.qualityCheck(faultyDataJournal, 'all errors thrown')}).toThrowError();
-    faultyDataJournal= {
+    expect(() => { DJ.qualityCheck(faultyDataJournal) }).not.toThrowError()
+    expect(() => { DJ.qualityCheck(faultyDataJournal, 'all errors thrown') }).toThrowError();
+    faultyDataJournal = {
       defs: [],
       entries: [],
       overview: {
@@ -380,8 +450,8 @@ describe('Data Journal Quality Checks', () => {
       }
     }
     //overview errors are not high priority, a warning is loged & nothing more
-    expect(() => {DJ.qualityCheck(faultyDataJournal)}).not.toThrowError()
-    expect(() => {DJ.qualityCheck(faultyDataJournal, 'all errors thrown')}).toThrowError()
+    expect(() => { DJ.qualityCheck(faultyDataJournal) }).not.toThrowError()
+    expect(() => { DJ.qualityCheck(faultyDataJournal, 'all errors thrown') }).toThrowError()
   })
 
   test('Def checks', () => {
@@ -391,66 +461,66 @@ describe('Data Journal Quality Checks', () => {
       entries: [],
     }
     //def missing ID is a high-priority error
-    expect(() => {DJ.qualityCheck(faultyDataJournal)}).toThrowError()
+    expect(() => { DJ.qualityCheck(faultyDataJournal) }).toThrowError()
     //but COULD be silence for some reason
-    expect(() => {DJ.qualityCheck(faultyDataJournal, 'logs only')}).not.toThrowError()
-    
+    expect(() => { DJ.qualityCheck(faultyDataJournal, 'logs only') }).not.toThrowError()
+
     //mutating the def embedded in the test data journal
     badDef._id = 'now has an id, albeit a weird one'
     //an id is present, the def is now considered ok
-    expect(() => {DJ.qualityCheck(faultyDataJournal)}).not.toThrowError()
+    expect(() => { DJ.qualityCheck(faultyDataJournal) }).not.toThrowError()
     badDef._updated = 'this is invalid epochstr'
     //bad _updated values are low-priority issues
-    expect(() => {DJ.qualityCheck(faultyDataJournal)}).not.toThrowError()
+    expect(() => { DJ.qualityCheck(faultyDataJournal) }).not.toThrowError()
     //...but will be errors for all-error conditions
-    expect(() => {DJ.qualityCheck(faultyDataJournal, 'all errors thrown')}).toThrowError()
+    expect(() => { DJ.qualityCheck(faultyDataJournal, 'all errors thrown') }).toThrowError()
     //an epochstr way in the future is also an error
     badDef._updated = DJ.makeEpochStrFrom('2111-11-11T11:11:11')
-    expect(() => {DJ.qualityCheck(faultyDataJournal, 'all errors thrown')}).toThrowError();
+    expect(() => { DJ.qualityCheck(faultyDataJournal, 'all errors thrown') }).toThrowError();
     //as are ones way in the past
     badDef._updated = DJ.makeEpochStrFrom('1111-11-11T11:11:11')
-    expect(() => {DJ.qualityCheck(faultyDataJournal, 'all errors thrown')}).toThrowError();
+    expect(() => { DJ.qualityCheck(faultyDataJournal, 'all errors thrown') }).toThrowError();
     //fixing the epochstr value
     badDef._updated = DJ.makeEpochStr();
     //now we're good
-    expect(() => {DJ.qualityCheck(faultyDataJournal, 'all errors thrown')}).not.toThrowError();
-    
+    expect(() => { DJ.qualityCheck(faultyDataJournal, 'all errors thrown') }).not.toThrowError();
+
     //and extra props will behave like bad _updated values
     badDef.weirdPropThatShouldNotBeThere = "is a low-priority error"
-    expect(() => {DJ.qualityCheck(faultyDataJournal)}).not.toThrowError();
-    expect(() => {DJ.qualityCheck(faultyDataJournal, 'all errors thrown')}).toThrowError();
+    expect(() => { DJ.qualityCheck(faultyDataJournal) }).not.toThrowError();
+    expect(() => { DJ.qualityCheck(faultyDataJournal, 'all errors thrown') }).toThrowError();
   })
 
   test('Entry checks', () => {
-    let badEntry: any = {_period: '2024-09-10T20:42:20'}; //no id
+    let badEntry: any = { _period: '2024-09-10T20:42:20' }; //no id
     let faultyDataJournal: DataJournal = {
       defs: [],
       entries: [badEntry],
     }
     //entry missing ID is a high-priority error
-    expect(() => {DJ.qualityCheck(faultyDataJournal)}).toThrowError()
+    expect(() => { DJ.qualityCheck(faultyDataJournal) }).toThrowError()
     //entry missing period is a high-priority error
     delete badEntry._period;
     badEntry._id = 'now has an id but no period'
-    expect(() => {DJ.qualityCheck(faultyDataJournal)}).toThrowError()
+    expect(() => { DJ.qualityCheck(faultyDataJournal) }).toThrowError()
     //but just an _id and a _period is good enough
-    badEntry._period ='2024-09-10T20:42:20'
-    expect(() => {DJ.qualityCheck(faultyDataJournal)}).not.toThrowError()
+    badEntry._period = '2024-09-10T20:42:20'
+    expect(() => { DJ.qualityCheck(faultyDataJournal) }).not.toThrowError()
     //but if a period is mal-formed, that's error-worthy
-    badEntry._period ='20240910204220'
-    expect(() => {DJ.qualityCheck(faultyDataJournal)}).toThrowError()
+    badEntry._period = '20240910204220'
+    expect(() => { DJ.qualityCheck(faultyDataJournal) }).toThrowError()
     //fixed for future tests
-    badEntry._period ='2024-09-10T20:42:20'
+    badEntry._period = '2024-09-10T20:42:20'
     //same epoch logic is called as for Defs (tested in 'Def checks' above)
     badEntry._updated = 'this is invalid epochstr'
     //bad _updated values are low-priority issues
-    expect(() => {DJ.qualityCheck(faultyDataJournal, 'all errors thrown')}).toThrowError()
+    expect(() => { DJ.qualityCheck(faultyDataJournal, 'all errors thrown') }).toThrowError()
     badEntry._updated = DJ.makeEpochStr();
     badEntry.entryPointSansDef = 'There is no Def specifying what this key should be.'
     //and even if you fix that, there's no associated def for the entry,
     //which is a low-priority error
-    expect(() => {DJ.qualityCheck(faultyDataJournal)}).not.toThrowError()
-    expect(() => {DJ.qualityCheck(faultyDataJournal, 'all errors thrown')}).toThrowError()
-    
+    expect(() => { DJ.qualityCheck(faultyDataJournal) }).not.toThrowError()
+    expect(() => { DJ.qualityCheck(faultyDataJournal, 'all errors thrown') }).toThrowError()
+
   })
 })
