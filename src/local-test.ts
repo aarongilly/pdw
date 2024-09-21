@@ -24,7 +24,6 @@ const config: pdw.Config = {
 }
 
 let pdwRef = await pdw.PDW.newPDW(config);
-// expect(pdwRef.connectors.length).toBe(1);
 
 //adding a Def
 let myDef: Def = {
@@ -32,40 +31,40 @@ let myDef: Def = {
     _updated: 'm0ofg4dw',
     _type: DefType.NUMBER,
 }
-await pdwRef.setDefs([myDef])
-// expect(pdwRef.getDefs().length).toBe(1);
+await pdwRef.setDefs({create:[myDef]})
 let retreivedDef = pdwRef.getDefs()[0];
 //checking provided inputs
-// expect(retreivedDef._id).toBe('defOne');
-// expect(retreivedDef._updated).toBe('m0ofg4dw');
-// expect(retreivedDef._type).toEqual(DefType.NUMBER);
-//no non-required keys are spawned - this is desired?
-// expect(Object.keys(retreivedDef).length).toBe(3);
-
-//updating the Def
+//appending the Def
 let myUpdate: Def  = {
     _id: 'defOne',
     _updated: 'm0ofzzzz', //manually supplied newer update time
     _type: DefType.NUMBER,
     _desc: 'Now with a description'
 }
-await pdwRef.setDefs([],[myUpdate])
-// expect(pdwRef.getDefs().length).toBe(1);
+await pdwRef.setDefs({append: [myUpdate]});
 
-retreivedDef = pdwRef.getDefs()[0];
-console.log(retreivedDef);
-//@ts-expect-error
-let secondUpdate: pdw.TransactionUpdateMember = {
+//appending a new field doesn't delete existing ones
+let secondUpdate: Partial<pdw.TransactionUpdateMember> = {
     _id: 'defOne',
     _lbl: 'Now with label',
 }
-await pdwRef.setDefs([],[secondUpdate])
-// expect(pdwRef.getDefs().length).toBe(1);
-
+//@ts-expect-error - type barking
+await pdwRef.setDefs({append: [secondUpdate]})
+//overwriting DOES remove existing fields
+let thirdUpdate = {
+    _id: 'defOne',
+    _updated: 'm0og0000', //manually supplied newer update time
+    _type: DefType.NUMBER,
+    _emoji: '⭐️'
+}
+await pdwRef.setDefs({overwrite: [thirdUpdate]})
 retreivedDef = pdwRef.getDefs()[0];
+
+await pdwRef.setDefs({delete: ['defOne']})
 console.log(retreivedDef);
-// expect(retreivedDef._updated).toBe('m0ofzzzz');
-// expect(retreivedDef._desc).toEqual('Now with a description');
+
+
+
 
 //#region ---- WHERE YOU ARE GOING
 /* 

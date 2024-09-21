@@ -641,6 +641,7 @@ export class DJ {
     }
 
     /**
+     * //#TODO - add check for duplicate IDs
      * - any extra keys in DJ or Defs?
      * - Def missing id
      * - entry missing id or period
@@ -729,7 +730,7 @@ export class DJ {
 
     //#region --- public utility methods
 
-    static makeEpochStrFrom(stringOrDate: string | Date): EpochStr | undefined {
+    static makeEpochStrFrom(stringOrDate: string | Date): EpochStr {
         if (typeof stringOrDate === 'string' && DJ.isValidEpochStr(stringOrDate)) {
             console.warn('Tried making an epochStr from something that already looked like one.')
             return stringOrDate;
@@ -768,7 +769,7 @@ export class DJ {
      * Creates a Data Journal Overview object - but does NOT append it to anything.
      * To append to a copy of a Data Journal, used {@link addOverview}.
      */
-    private static makeOverview(dataJournal: DataJournal): Overview {
+    static makeOverview(dataJournal: DataJournal): Overview {
         if (!this.isValidDataJournal(dataJournal)) throw new Error("Invalid dataset found at fFWPIhaA");
 
         let deletedEntryCount = 0;
@@ -858,7 +859,7 @@ export class DJ {
     /**
      * Turns "my lbl  " turns into "MY_LBL"
      */
-    private static standardizeKey(lbl: string): string {
+    static standardizeKey(lbl: string): string {
         return lbl.toUpperCase().replaceAll(' ', '_').trim();
     }
 

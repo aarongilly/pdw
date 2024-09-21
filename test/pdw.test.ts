@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import * as pdw from '../src/pdw';
 import {InMemoryDb} from '../src/connectors/Strawman'
 import * as CandT from '../src/ConnectorsAndTranslators'
-import { Def, DefType, DJ } from '../src/DJ';
+import { Def, DefType, DJ, Entry } from '../src/DJ';
 // import { Temporal } from 'temporal-polyfill';
 
 const config: pdw.Config = {
@@ -79,30 +79,55 @@ describe('Basic PDW Creation', () => {
             .toEqual('The name of the book you read. WITH UPDATE') //updated def was used
         expect(pdwRef.localData.entries.length).toBe(5); //one entry was added
 
-
         //@ts-expect-error - hacking to allow for further testing
         pdwRef.clearForTest();
     })
 
-    test('Using Connectors', async () => {
-        const config: pdw.Config = {
+    test('Single Connector', async () => {
+        const singleConfig: pdw.Config = {
             connectors: [
                 {
                     serviceName: 'Strawman In-Memory Database',
                 }
             ]
         }
-        
-        pdwRef = await pdw.PDW.newPDW(config);
-        expect(pdwRef.connectors.length).toBe(1);
 
+        pdwRef = await pdw.PDW.newPDW(singleConfig);    
+        testTransactions(pdwRef,1); //reusing tests via functions, sweet.
+        //testQueries(pdwRef) //#TODO
+        //@ts-expect-error - hacking to allow for further testing
+        pdwRef.clearForTest();
+    })
+
+    test('Dual Connectors', async () => {
+        const dualConfig: pdw.Config = {
+            connectors: [
+                {
+                    serviceName: 'Strawman In-Memory Database',
+                },
+                {
+                    serviceName: 'Strawman In-Memory Database',
+                }
+            ]
+        }
+        pdwRef = await pdw.PDW.newPDW(dualConfig);
+        testTransactions(pdwRef,2) //reusing tests via functions, sweet.
+
+        //@ts-expect-error - hacking to allow for further testing
+        pdwRef.clearForTest();
+    })
+
+    async function testTransactions(pdwRef: pdw.PDW, expectedConnectionCount: number){
+        expect(pdwRef.connectors.length).toBe(expectedConnectionCount);
+
+        //### DEF things
         //adding a Def
         let myDef: Def = {
             _id: 'defOne',
             _updated: 'm0ofg4dw',
             _type: DefType.NUMBER,
         }
-        await pdwRef.setDefs([myDef])
+        await pdwRef.setDefs({create:[myDef]})
         expect(pdwRef.getDefs().length).toBe(1);
         let retreivedDef = pdwRef.getDefs()[0];
         //checking provided inputs
@@ -112,37 +137,83 @@ describe('Basic PDW Creation', () => {
         //no non-required keys are spawned - this is desired?
         expect(Object.keys(retreivedDef).length).toBe(3);
         
-        //updating the Def
+        //appending the Def
         let myUpdate: Def  = {
             _id: 'defOne',
             _updated: 'm0ofzzzz', //manually supplied newer update time
             _type: DefType.NUMBER,
             _desc: 'Now with a description'
         }
-        await pdwRef.setDefs([], [myUpdate]);
+        await pdwRef.setDefs({append: [myUpdate]});
         expect(pdwRef.getDefs().length).toBe(1);
-        
         retreivedDef = pdwRef.getDefs()[0];
         expect(retreivedDef._updated).toBe('m0ofzzzz');
         expect(retreivedDef._desc).toEqual('Now with a description');
         
+        //appending a new field doesn't delete existing ones
         let secondUpdate: Partial<pdw.TransactionUpdateMember> = {
             _id: 'defOne',
             _lbl: 'Now with label',
         }
         //@ts-expect-error - type barking
-        await pdwRef.setDefs([], [secondUpdate])
+        await pdwRef.setDefs({append: [secondUpdate]})
         expect(pdwRef.getDefs().length).toBe(1);
         retreivedDef = pdwRef.getDefs()[0];
         expect(retreivedDef._updated).not.toBe('m0ofzzzz');
-        expect(retreivedDef._desc).toEqual('Now with a description');
-        expect(retreivedDef._lbl).toEqual('Now with label');
+        expect(retreivedDef._lbl).toEqual('Now with label'); //is added
+        expect(retreivedDef._desc).toEqual('Now with a description'); //is NOT REMOVED!
         
-        // committing a transaction
-        
-        
+        //overwriting DOES remove existing fields
+        const oneSecondFromNow = DJ.makeEpochStrFrom(new Date(new Date().getTime() + 1000))
+        let thirdUpdate = {
+            _id: 'defOne',
+            _updated: oneSecondFromNow,
+            _type: DefType.NUMBER,
+            _emoji: '⭐️'
+        }
+        await pdwRef.setDefs({overwrite: [thirdUpdate]})
+        expect(pdwRef.getDefs().length).toBe(1);
+        retreivedDef = pdwRef.getDefs()[0];
+        expect(retreivedDef._updated).toBe(oneSecondFromNow);
+        expect(retreivedDef._emoji).toEqual('⭐️'); //is added
+        expect(retreivedDef._lbl).toBeUndefined(); //IS REMOVED
+        expect(retreivedDef._desc).toBeUndefined(); //IS REMOVED
 
-    })
+        //deletion literally removes defs
+        await pdwRef.setDefs({delete: ['defOne']})
+        expect(pdwRef.getDefs().length).toBe(0);
+        
+        //appending and updating both also will create if defs don't already exist
+        const newDefA: Def = {
+            _id: 'addedA',
+            _updated: 'm0ofspai',
+            _type: DefType.NUMBER
+        }
+        const newDefB: Def = {
+            _id: 'addedB',
+            _updated: 'm0ofspai',
+            _type: DefType.NUMBER
+        }
+        await pdwRef.setDefs({
+            append: [newDefA], //doesn't exist, so will be created
+            overwrite: [newDefB] //doesn't exist, so will be created
+        })
+        expect(pdwRef.getDefs().length).toBe(2);
+        
+        //### ENTRY things
+        const entryA: Entry = {
+            _id: 'whateverUniqueIDSchemaAFPEIAH',
+            _period: '2024-09-20T17:22:31',
+            _updated: 'm0ofg4dw',
+            nonExistingDef: 'Is not a problem!'
+        }
+        await pdwRef.setEntries({create: [entryA]});
+        let retreivedEntry = await pdwRef.query({})[0];
+
+        //@ts-expect-error - hacking to allow for further testing
+        pdwRef.clearForTest();
+    }
+
     test('Using Connectors AND Translators', () => {
         /**
          * A common use case in real world, I expect.

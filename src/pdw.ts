@@ -12,7 +12,7 @@ import { ConnectorListMember, getConnector, getTranslator, TranslatorListMember 
 
 export interface Connector {
 
-    commit(trans: Transaction): Promise<CommitResponse>;
+    commit(trans: TransactionObject): Promise<CommitResponse>;
 
     query(params: QueryObject): Promise<Entry[]>;
 
@@ -29,7 +29,7 @@ export interface Connector {
 }
 
 export interface CommitResponse {
-    
+
 }
 
 /**
@@ -44,50 +44,51 @@ export interface Translator {
     getServiceName(): string;
 }
 
-export interface Transaction {
+export interface HalfTransactionObject {
     /**
-     * Brand new Entries & Defs. Must have all minimum fields present.
-     * Checks for existing records with the same ID will not be done.
+     * Brand new elements. Must have all minimum fields present.
+     * No checks for existing records with the same ID.
      */
-    create: DataJournal;
+    create?: Def[] | Entry[];
     /**
-     * What MAY be an update or MAY be wholly new data points. 
-     * Each of `element._id` contained in here will be searched for by
-     * the connector - if the `_id` is found AND the `_updated` in the
-     * transaction is newer, the property values in the transaction 
-     * will overwrite existing property values. BUT existing property
-     * values not explicitly nullified in the data will not be removed
-     * from the data on the other side of the connector.
-     */
-    update: TransactionUpdates;
+     * In short: "L overwritten with F becomes F"
+     * 
+     * If the element doesn't exist, it's created.
+     * If the element does exist AND is older than the transaction copy,
+     * it is fully replaced by what's in the transaction copy.
+     * If the element does exist AND is newer than the transaction copy,
+     * the transaction copy is ignored.
+    */
+    overwrite?: Def[] | Entry[];
     /**
-     * These are assumed to already exist. These will ONLY change the 
-     * `_updated` & `_deleted` fields for the found data with the same
-     * `_id`. 
+     * In short: "F appended to L becomes E"
+     * 
+     * If the element doesn't exist, it's created.
+     * If the element does exist AND is older than the transaction copy,
+     * properties from the transaction copy will replace properties from
+     * the existing element, but existing element properties outside of
+     * those found in the transaction copy will not be removed.
+     * If the element does exist AND is newer than the transaction copy,
+     * the transaction copy is ignored.
      */
-    delete: TransactionDeletes;
+    append?: TransactionUpdateMember[];
+    /**
+     * If elements are found with these IDs they will be deleted.
+     * Definitions will be removed entirely.
+     * Entries will be retained but marked as `_deleted` = `TRUE`
+     */
+    delete?: string[];
 }
 
-export interface TransactionUpdates {
-    defs: TransactionUpdateMember[],
-    entries: TransactionUpdateMember[]
+export interface TransactionObject {
+    defs: HalfTransactionObject,
+    entries: HalfTransactionObject
 }
 
 export interface TransactionUpdateMember {
     _id: string,
-        _updated: EpochStr
-        [propsToSet: string]: any
-}
-
-export interface TransactionDeletes {
-    defs: TransactionDeleteMember[],
-    entries: TransactionDeleteMember[]
-}
-
-export interface TransactionDeleteMember{
-    _id: string,
-    _updated: EpochStr,
-    _deleted: boolean
+    _updated: EpochStr
+    [propsToSet: string]: any
 }
 
 export interface Config {
@@ -126,7 +127,7 @@ export interface ConfigConnector {
 export class PDW {
     connectors: Connector[];
     translators: Translator[];
-    localData: DataJournal;
+    localData: DataJournal; //#TODO - kill this & officially convert strawman
 
     /** Singleton */
     private static _instance: PDW;
@@ -147,7 +148,6 @@ export class PDW {
         //@ts-expect-error // for test, hacking.
         PDW._instance = undefined;
     }
-
 
     static async newPDW(config?: Config): Promise<PDW> {
         if (PDW._instance !== undefined) throw new Error('PDW Instance already exists. Do you you mean to getPDW?')
@@ -198,63 +198,37 @@ export class PDW {
     }
 
     /**
-     * Creates a {@link Transaction} from the passed in arrays of {@link Def}s, then 
+     * Creates a {@link TransactionObject} from the passed in arrays of {@link Def}s, then 
      * distributes the commit message out to each connected database.
      * @returns Array of responses from each connector's "commit" method.
      */
-    async setDefs(createDefs: Def[] = [], updateDefs: TransactionUpdateMember[] = [], deletionDefs: TransactionDeleteMember[] = []): Promise<any> {
-        //created must have all required fields
-        const sanitizedCreated = createDefs.map(def => this.ensureCreatableDef(def));
-        //updated must have _id and _updated
-        const sanitizedUpdated = updateDefs.map(def => this.ensureUpdateable(def) as Def);
-        //deleted must have _id, _updated, & _deleted
-        const sanitizedDeleted = deletionDefs.map(def => this.ensureDeleteable(def));
-
-        let trans: Transaction = {
-            create: {
-                defs: sanitizedCreated,
-                entries: []
-            },
-            update: {
-                defs: sanitizedUpdated,
-                entries: []
-            },
-            delete: {
-                defs: sanitizedDeleted,
-                entries: []
-            }
+    async setDefs(defTransaction: HalfTransactionObject): Promise<CommitResponse[]> {
+        //convert to full transaction object
+        const trans: TransactionObject = {
+            defs: defTransaction,
+            entries: {}
         }
-
-        const connectorPromiseArray = this.connectors.map(connector => connector.commit(trans));
-        return await Promise.all(connectorPromiseArray);
+        //pass to common setter
+        return await this.setAll(trans);
     }
 
-    async getEntries(rawParams?: StandardParams): Promise<Entry[]> {
-        if (rawParams === undefined) rawParams = {};
-        const params = this.sanitizeParams(rawParams);
-        let entriesQuery = await this.dataStore.getEntries(params);
-        return this.inflateEntriesFromData(entriesQuery.entries);
+    async getEntries(queryObject?: QueryObject): Promise<Entry[]> {
+        if(queryObject === undefined) queryObject = {}
+        let entries = this.localData.entries
+        const connectorPromiseArray = this.connectors.map(connector => connector.query(queryObject));
+        const connectedEntries = await Promise.all(connectorPromiseArray);
+        const mergedEntries = DJ.mergeEntries([entries, ...connectedEntries])
+        return mergedEntries
     }
 
-    async setEntries(createEntries: EntryData[] = [], updateEntries: EntryData[] = [], deletionEntries: DeletionMsg[] = []): Promise<any> {
-        // PDW.ensureValidAndUpdated()
-        let trans: Transaction = {
-            create: {
-                defs: [],
-                entries: this.inflateEntriesFromData(createEntries)
-            },
-            update: {
-                defs: [],
-                entries: this.inflateEntriesFromData(updateEntries)
-            },
-            delete: {
-                defs: [],
-                entries: deletionEntries
-            }
+    async setEntries(entryTransaction: HalfTransactionObject): Promise<CommitResponse[]> {
+        //convert to full transaction object
+        const trans: TransactionObject = {
+            defs: {},
+            entries: entryTransaction,
         }
-        const response = await this.dataStore.commit(trans);
-
-        return response
+        //pass to common setter
+        return await this.setAll(trans);
     }
 
     /**
@@ -262,55 +236,31 @@ export class PDW {
      * @param rawParams an object of any {@link StandardParams} to include
      * @returns a {@link CanonicalDataset} containing a {@link Def}s, {@link Entry}s
      */
-    async getAll(rawParams: StandardParams): Promise<CanonicalDataset> {
-        const params = this.sanitizeParams(rawParams);
-        const entries = await this.dataStore.getEntries(params);
-        const includeDeletedDefs = params.hasOwnProperty('includeDeleted') && params.includeDeleted != 'no';
-        const defs = (await this.dataStore.getDefs(includeDeletedDefs)) as DefData[];
-
-        const dataset: CanonicalDataset = {
+    async getAll(queryObject?: QueryObject, includeOverview = true): Promise<DataJournal> {
+        if(queryObject === undefined) queryObject = {}
+        const defs = this.getDefs();
+        const entries = await this.getEntries(queryObject);
+        const dataset: DataJournal = {
             defs: defs,
-            entries: entries.entries
+            entries: entries
         }
-        return PDW.addOverviewToCompleteDataset(dataset);
+        if(includeOverview){
+            dataset.overview = DJ.makeOverview(dataset);
+        }
+
+        return dataset;
     }
 
-    async setAll(completeDataset: ElementMap | CanonicalDataset): Promise<any> {
-        let defs: Def[] = [];
-        if (completeDataset.defs.length > 0) {
-            defs = completeDataset.defs.map(def => new Def(def as DefData, this))
-            this.pushDefsToManifest(defs);
-        }
-
-        let entries: Entry[] = [];
-        if (completeDataset.entries.length > 0) {
-            entries = this.inflateEntriesFromData(completeDataset.entries as EntryData[]);
-        }
-
-        const result = await this.dataStore.commit({
-            create: {
-                defs: [],
-                entries: []
-            },
-            update: {
-                defs: defs,
-                entries: entries,
-            },
-            delete: {
-                defs: [],
-                entries: []
-            },
-        })
-        if (result.success === false) {
-            console.error(result);
-            throw new Error('Setting Defs and Entries failed')
-        }
-        return result;
+    async setAll(transaction: TransactionObject): Promise<CommitResponse[]> {
+        if(transaction.defs) transaction.defs = this.ensureValidDefTransactionObject(transaction.defs);
+        if(transaction.entries) transaction.entries = this.ensureValidEntryTransactionObject(transaction.entries);
+        const connectorPromiseArray = this.connectors.map(connector => connector.commit(transaction));
+        return await Promise.all(connectorPromiseArray);
     }
 
-
-    query(params?: StandardParams): Query {
-        return new Query(this, params);
+    async query(queryObject?: QueryObject): Promise<Entry[]> {
+        
+        return 
     }
 
     async newDef(defInfo: DefLike): Promise<Def> {
@@ -362,7 +312,39 @@ export class PDW {
         return newEntry;
     }
 
-    ensureUpdateable(element: Partial<Entry> | Partial<Def>): TransactionUpdateMember {
+    ensureValidDefTransactionObject(defTransaction: HalfTransactionObject): HalfTransactionObject {
+        if (defTransaction.create) {
+            defTransaction.create = defTransaction.create.map(def => this.ensureSettableDef(def));
+        }
+        if (defTransaction.overwrite) {
+            defTransaction.overwrite = defTransaction.overwrite.map(def => this.ensureSettableDef(def));
+        }
+        if (defTransaction.append) {
+            defTransaction.append = defTransaction.append.map(def => this.ensureAppendable(def));
+        }
+        if (defTransaction.delete) {
+            if (!Array.isArray(defTransaction.delete)) throw new Error("The delete property of a transaction should be an array of strings")
+        }
+        return defTransaction
+    }
+
+    ensureValidEntryTransactionObject(defTransaction: HalfTransactionObject): HalfTransactionObject {
+        if (defTransaction.create) {
+            defTransaction.create = defTransaction.create.map(entry => this.ensureSettableEntry(entry));
+        }
+        if (defTransaction.overwrite) {
+            defTransaction.overwrite = defTransaction.overwrite.map(entry => this.ensureSettableEntry(entry));
+        }
+        if (defTransaction.append) {
+            defTransaction.append = defTransaction.append.map(entry => this.ensureAppendable(entry));
+        }
+        if (defTransaction.delete) {
+            if (!Array.isArray(defTransaction.delete)) throw new Error("The delete property of a transaction should be an array of strings")
+        }
+        return defTransaction
+    }
+
+    ensureAppendable(element: Partial<Entry> | Partial<Def>): TransactionUpdateMember {
         if (!Object.hasOwn(element, '_id')) {
             console.error('No ID element:', element);
             throw new Error("No _id found on element");
@@ -371,24 +353,13 @@ export class PDW {
         return element as TransactionUpdateMember
     }
 
-    ensureDeleteable(element: Partial<Entry> | Partial<Def>): TransactionDeleteMember {
-        if (!Object.hasOwn(element, '_id')) {
-            console.error('No ID element:', element);
-            throw new Error("No _id found on element");
-        }
-        if (element._updated === undefined) element._updated = DJ.makeEpochStr();
-        //@ts-expect-error - it doesn't like Partial Def having a `_deleted` key, which I want here
-        if (element._deleted === undefined) element._deleted = true;
-        return element as TransactionDeleteMember
-    }
-
-    ensureCreatableEntry(entry: Partial<Entry>): Entry {
+    ensureSettableEntry(entry: Partial<Entry>): Entry {
         if (entry._updated === undefined) entry._updated = DJ.makeEpochStr();
         if (!DJ.isValidEntry(entry)) throw new Error('Invalid entry found, see log around this');
         return entry as Entry
     }
 
-    ensureCreatableDef(def: Partial<Def>): Def {
+    ensureSettableDef(def: Partial<Def>): Def {
         if (def._updated === undefined) def._updated = DJ.makeEpochStr();
         if (!DJ.isValidDef(def)) throw new Error('Invalid def found, see log around this');
         return def as Def
