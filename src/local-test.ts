@@ -4,7 +4,7 @@ import * as ie from './translators/fileTranslators.js'
 // import * as XLSX from 'xlsx'
 // import * as fs from 'fs'
 import * as testdata from '../test/test_datasets.js'
-import { Def, DefType } from './DJ.js'
+import { Def, DefType, DJ } from './DJ.js'
  './DJ.js'
 
 // import { Query, Scope } from './pdw.js'
@@ -13,55 +13,10 @@ import { Def, DefType } from './DJ.js'
 // import { importFirestore, importMongo, importOldV9, importOldest, importPreviousCSV } from './onetimeImports.js'
 // import * as test from '../../pdw-firestore-plugin/'
 
-// const myDJ = test.journalToOverviewAndIndex
-
-const config: pdw.Config = {
-    connectors: [
-        {
-            serviceName: 'Strawman In-Memory Database',
-        }
-    ]
-}
-
-let pdwRef = await pdw.PDW.newPDW(config);
-
-//adding a Def
-let myDef: Def = {
-    _id: 'defOne',
-    _updated: 'm0ofg4dw',
-    _type: DefType.NUMBER,
-}
-await pdwRef.setDefs({create:[myDef]})
-let retreivedDef = pdwRef.getDefs()[0];
-//checking provided inputs
-//appending the Def
-let myUpdate: Def  = {
-    _id: 'defOne',
-    _updated: 'm0ofzzzz', //manually supplied newer update time
-    _type: DefType.NUMBER,
-    _desc: 'Now with a description'
-}
-await pdwRef.setDefs({append: [myUpdate]});
-
-//appending a new field doesn't delete existing ones
-let secondUpdate: Partial<pdw.TransactionUpdateMember> = {
-    _id: 'defOne',
-    _lbl: 'Now with label',
-}
-//@ts-expect-error - type barking
-await pdwRef.setDefs({append: [secondUpdate]})
-//overwriting DOES remove existing fields
-let thirdUpdate = {
-    _id: 'defOne',
-    _updated: 'm0og0000', //manually supplied newer update time
-    _type: DefType.NUMBER,
-    _emoji: '⭐️'
-}
-await pdwRef.setDefs({overwrite: [thirdUpdate]})
-retreivedDef = pdwRef.getDefs()[0];
-
-await pdwRef.setDefs({delete: ['defOne']})
-console.log(retreivedDef);
+const myDJ = testdata.biggerJournal;
+const myTrans = testdata.biggerJournalTransaction;
+const updatedDj = DJ.commit(myDJ, myTrans);
+console.log(updatedDj);
 
 
 

@@ -127,15 +127,15 @@ export interface Def {
     /**
     * An {@link EpochStr} that describes the last time the Def was saved.
     */
-   _updated: EpochStr
-   /**
-    * A {@link DefType} that describes what data type the Definition uses. This is 
-    * **NOT** checked or enforced anywhere in this code base - meaning any Entry
-    * property can technically have any type of data. This is mostly for signaling
-    * to applications what type of input to use or methods to display the data.
-    */
-   _type: DefType
-   // #### OPTIONAL PROPS ####
+    _updated: EpochStr
+    /**
+     * A {@link DefType} that describes what data type the Definition uses. This is 
+     * **NOT** checked or enforced anywhere in this code base - meaning any Entry
+     * property can technically have any type of data. This is mostly for signaling
+     * to applications what type of input to use or methods to display the data.
+     */
+    _type: DefType
+    // #### OPTIONAL PROPS ####
     /**
      * A nice, human-readable description of the Def. Ideally is (but not required to be)
      * unique within any given Data Journal. Could cause issues if there's a conflict as...
@@ -158,7 +158,7 @@ export interface Def {
     * A group of strings. Use common tags across related Defs to group them. 
     * @example exercise
     */
-   _tags?: string[]
+    _tags?: string[]
     // #### PROPS USED BY OTHER CODE BASES ####
     /**
      * A {@link DefScope} for what level of granularity this kind of Def uses. 
@@ -282,6 +282,84 @@ export interface QueryObject {
     limit?: number,
 }
 
+/**
+ * A plain, JSON-stringifyable object to interact with (insert, modify, delete) Data Journal data.
+ */
+export interface TransactionObject {
+    /**
+     * A {@link HalfTransaction} for Creating, Overwriting, Appending, Deleting {@link Def}s
+     */
+    defs: HalfTransaction,
+    /**
+     * A {@link HalfTransaction} for Creating, Overwriting, Appending, Deleting {@link Entry}s
+     */
+    entries: HalfTransaction
+}
+
+/**
+ * Map of functions you can perform on the stored type of data.
+ */
+export interface HalfTransaction {
+    /**
+     * Brand new elements. Must have all minimum fields present.
+     * No checks for existing records with the same ID.
+     */
+    create?: Def[] | Entry[];
+    /**
+     * In short: "L overwritten with F becomes F"
+     * 
+     * If the element doesn't exist, it's created.
+     * If the element does exist AND is older than the transaction copy,
+     * it is fully replaced by what's in the transaction copy.
+     * If the element does exist AND is newer than the transaction copy,
+     * the transaction copy is ignored.
+    */
+    replace?: Def[] | Entry[];
+    /**
+     * In short: "F appended to L becomes E"
+     * 
+     * If the element doesn't exist, it's created.
+     * If the element does exist AND is older than the transaction copy,
+     * properties from the transaction copy will replace properties from
+     * the existing element, but existing element properties outside of
+     * those found in the transaction copy will not be removed.
+     * If the element does exist AND is newer than the transaction copy,
+     * the transaction copy is ignored.
+     */
+    modify?: TransactionUpdateMember[];
+    /**
+     * If elements are found with these IDs they will be deleted.
+     * Definitions will be removed entirely.
+     * Entries will be retained but marked as `_deleted` = `TRUE`
+     */
+    delete?: string[];
+}
+
+/**
+ * A reduced level of data needed - for doing {@link TransactionObject} *modify* operations.
+ * Resulting objects will be set according to included keys, but will retain any other key/value
+ * pairs not being overwritten they originally had.
+ */
+export interface TransactionUpdateMember {
+    _id: string,
+    _updated: EpochStr
+    [propsToSet: string]: any
+}
+
+export interface CommitResponse {
+    success: boolean; //only required field
+    error?: string;
+    warnings?: string[];
+    createdDefs?: number
+    createdEntries?: number
+    replaceDefs?: number
+    replaceEntries?: number
+    modifyDefs?: number
+    modifyEntries?: number
+    deleteDefs?: number
+    deleteEntries?: number
+}
+
 //#endregion
 
 //#region --- ENUMS
@@ -369,15 +447,15 @@ export class DJ {
     }
 
     static isValidDataJournal(data: DataJournal) {
-        if (data.defs === undefined){
+        if (data.defs === undefined) {
             console.warn("Invalid DataJournal found - no 'defs' array")
             return false
         }
-        if (Array.isArray(data.defs) === false){
+        if (Array.isArray(data.defs) === false) {
             console.warn("Invalid DataJournal found - 'defs' is not array")
             return false
         }
-        if (data.defs.some(def=>!DJ.isValidDef(def))) return false
+        if (data.defs.some(def => !DJ.isValidDef(def))) return false
         if (data.entries === undefined) {
             console.warn("Invalid DataJournal found - no 'entries' array")
             return false
@@ -386,20 +464,20 @@ export class DJ {
             console.warn("Invalid DataJournal found - 'entries' is not array")
             return false
         }
-        if (data.entries.some(entry=>!DJ.isValidEntry(entry))) return false
+        if (data.entries.some(entry => !DJ.isValidEntry(entry))) return false
         return true
     }
 
-    static isValidDef(def: Partial<Def>): boolean{
-        if(def._id === undefined){
+    static isValidDef(def: Partial<Def>): boolean {
+        if (def._id === undefined) {
             console.warn('Invalid Def found - no _id prop: ', def)
             return false
         }
-        if(def._updated === undefined){
+        if (def._updated === undefined) {
             console.warn('Invalid Def found - no _updated prop: ', def)
             return false
         }
-        if(def._type === undefined){
+        if (def._type === undefined) {
             console.warn('Invalid Def found - no _type prop: ', def)
             return false
         }
@@ -407,19 +485,130 @@ export class DJ {
     }
 
     static isValidEntry(entry: Partial<Entry>): boolean {
-        if(entry._id === undefined){
+        if (entry._id === undefined) {
             console.warn('Invalid Entry found - no _id prop: ', entry)
             return false
         }
-        if(entry._updated === undefined){
+        if (entry._updated === undefined) {
             console.warn('Invalid Entry found - no _updated prop: ', entry)
             return false
         }
-        if(entry._period === undefined){
+        if (entry._period === undefined) {
             console.warn('Invalid Entry found - no _period prop: ', entry)
             return false
         }
         return true
+    }
+
+    static commit(dataJournal: DataJournal, trans: TransactionObject): DataJournal {
+        //#TODO - optimize using Overview index
+        //make static
+        const newJournal = JSON.parse(JSON.stringify(dataJournal)) as DataJournal;
+        
+        //creates
+        if (trans.defs.create) {
+            newJournal.defs.push(...trans.defs.create as Def[]);
+        }
+        if (trans.entries.create) {
+            newJournal.entries.push(...trans.entries.create as Entry[]);
+        }
+
+        //replaces
+        if (trans.defs.replace) {
+            trans.defs.replace.forEach(def => {
+                const standardizedID = DJ.standardizeKey(def._id)
+                let existing = newJournal.defs.find(prev => DJ.standardizeKey(prev._id) === standardizedID);
+                if (!existing) {
+                    newJournal.defs.push(DJ.makeDef(def));
+                    return;
+                }
+                if (existing._updated > def._updated) return;
+                //def and existing both exist, def is newer
+                //I added this filter later, don't fully grasp why I have to remove this
+                //rather than just mutate existing
+                newJournal.defs = newJournal.defs.filter(prev => prev !== existing);
+                newJournal.defs.push(def);
+            })
+        }
+        if (trans.entries.replace) {
+            trans.entries.replace.forEach(entry => {
+                const standardizedID = DJ.standardizeKey(entry._id)
+                let existing = newJournal.entries.find(prev => DJ.standardizeKey(prev._id) === standardizedID);
+                if (!existing) {
+                    newJournal.entries.push(DJ.makeEntry(entry));
+                    return;
+                }
+                if (existing._updated > entry._updated) return;
+                //def and existing both exist, def is newer
+                //I added this filter later, don't fully grasp why I have to remove this
+                //rather than just mutate existing
+                newJournal.entries = newJournal.entries.filter(prev => prev !== existing);
+                newJournal.entries.push(entry);
+            })
+        }
+
+        //modifys
+        if (trans.defs.modify) {
+            trans.defs.modify.forEach(def => {
+                const standardizedID = DJ.standardizeKey(def._id)
+                let existing = newJournal.defs.find(prev => DJ.standardizeKey(prev._id) === standardizedID);
+                if (!existing) {
+                    newJournal.defs.push(DJ.makeDef(def));
+                    return;
+                }
+                if (existing._updated > def._updated) return;
+                //entry and existing both exist, def is newer
+                //I added this filter later, don't fully grasp why I have to remove this
+                //rather than just mutate existing
+                newJournal.defs = newJournal.defs.filter(prev => prev !== existing);
+                //this spread notation will replace any existing props with what's in `def`,
+                //while not deleting any other props that may already exist
+                existing = { ...existing, ...def };
+                newJournal.defs.push(existing);
+            })
+        }
+        if (trans.entries.modify) {
+            trans.entries.modify.forEach(entry => {
+                const standardizedID = DJ.standardizeKey(entry._id)
+                let existing = newJournal.entries.find(prev => DJ.standardizeKey(prev._id) === standardizedID);
+                if (!existing) {
+                    newJournal.entries.push(DJ.makeEntry(entry));
+                    return;
+                }
+                if (existing._updated > entry._updated) return;
+                //entry and existing both exist, def is newer
+                //I added this filter later, don't fully grasp why I have to remove this
+                //rather than just mutate existing
+                newJournal.entries = newJournal.entries.filter(prev => prev !== existing);
+                //this spread notation will replace any existing props with what's in `def`,
+                //while not deleting any other props that may already exist
+                existing = { ...existing, ...entry };
+                newJournal.entries.push(existing);
+            })
+        }
+
+        //deletes
+        if (trans.defs.delete) {
+            trans.defs.delete.forEach(defID => {
+                const standardizedID = DJ.standardizeKey(defID)
+                const foundDefIndex = newJournal.defs.findIndex(def => DJ.standardizeKey(def._id) === standardizedID);
+                if (foundDefIndex !== -1) {
+                    newJournal.defs.splice(foundDefIndex, 1);
+                }
+            })
+        }
+        if (trans.entries.delete) {
+            trans.entries.delete.forEach(entryId => {
+                const standardizedID = DJ.standardizeKey(entryId)
+                let existing = newJournal.entries.find(prev => DJ.standardizeKey(prev._id) === standardizedID);
+                if (existing){
+                    existing._deleted = true; //mark as deleted
+                    existing._updated = DJ.makeEpochStr(); //set time of update
+                }
+            })
+        }
+
+        return newJournal;
     }
 
     static addDefs(dataJournal: DataJournal, newDefs: Partial<Def>[]): DataJournal {
@@ -443,13 +632,13 @@ export class DJ {
         }
         return DJ.merge([tempDJ, dataJournal])
     }
-    
+
     static makeEntry(partEntry: Partial<Entry>): Entry {
         //make static
         const newEntry = JSON.parse(JSON.stringify(partEntry));
         //don't include footguns
-        if(!Object.hasOwn(newEntry, '_id')) throw new Error('New Entries must provide their own _id')
-        if(!Object.hasOwn(newEntry, '_period')) throw new Error('New Entries must provide their own _period')
+        if (!Object.hasOwn(newEntry, '_id')) throw new Error('New Entries must provide their own _id')
+        if (!Object.hasOwn(newEntry, '_period')) throw new Error('New Entries must provide their own _period')
         //everything else can default
         if (!Object.hasOwn(newEntry, '_updated')) newEntry._updated = DJ.makeEpochStr();
         if (!Object.hasOwn(newEntry, '_created')) newEntry._created = newEntry._updated;
@@ -498,12 +687,12 @@ export class DJ {
     }
 
     static mergeDefs(defs: Def[][]) {
-        if(defs.length === 0) return [] as Def[]
+        if (defs.length === 0) return [] as Def[]
         return DJ.mergeArrayOfArraysOfDefsOrEntries(defs) as Def[];
     }
-    
+
     static mergeEntries(entries: Entry[][]) {
-        if(entries.length === 0) return [] as Entry[]
+        if (entries.length === 0) return [] as Entry[]
         return DJ.mergeArrayOfArraysOfDefsOrEntries(entries) as Entry[];
     }
 
@@ -527,7 +716,7 @@ export class DJ {
                 return
             }
             if (field === 'source') {
-                if(entry._source === undefined) return
+                if (entry._source === undefined) return
                 if (!Object.hasOwn(returnMap, entry._source)) returnMap[entry._source] = [];
                 returnMap[entry._source].push(entry);
                 return
@@ -580,9 +769,9 @@ export class DJ {
      * @returns a filtered version of either an array of entries or a full Data Journal
      */
     static filterTo(queryObject: QueryObject, entriesOrJournal: Entry[] | DataJournal): Entry[] | DataJournal {
-        const isFullJournal = Object.hasOwn(entriesOrJournal,'entries');
-        
-        if(isFullJournal){
+        const isFullJournal = Object.hasOwn(entriesOrJournal, 'entries');
+
+        if (isFullJournal) {
             //make static copy
             let newJournal = JSON.parse(JSON.stringify(entriesOrJournal)) as DataJournal;
             newJournal.entries = filterEntries(newJournal.entries);
@@ -594,39 +783,39 @@ export class DJ {
         return filterEntries(newEntryArray);
 
         //local function inside this method to make things a bit easier to read
-        function filterEntries(entries: Entry[]): Entry[]{
+        function filterEntries(entries: Entry[]): Entry[] {
             //pass through the phalanx/gauntlet of filters
-            if(Object.hasOwn(queryObject, 'deleted')){
-                entries = entries.filter(entry=>entry._deleted === queryObject.deleted);
+            if (Object.hasOwn(queryObject, 'deleted')) {
+                entries = entries.filter(entry => entry._deleted === queryObject.deleted);
             }
-            if(Object.hasOwn(queryObject, 'from')){
+            if (Object.hasOwn(queryObject, 'from')) {
                 //@ts-expect-error
-                entries = entries.filter(entry=>entry._period >= queryObject.from);
+                entries = entries.filter(entry => entry._period >= queryObject.from);
             }
-            if(Object.hasOwn(queryObject, 'to')){
+            if (Object.hasOwn(queryObject, 'to')) {
                 //@ts-expect-error
-                entries = entries.filter(entry=>entry._period <= queryObject.to);
+                entries = entries.filter(entry => entry._period <= queryObject.to);
             }
-            if(Object.hasOwn(queryObject, 'to')){
+            if (Object.hasOwn(queryObject, 'to')) {
                 //@ts-expect-error
-                entries = entries.filter(entry=>entry._period <= queryObject.to);
+                entries = entries.filter(entry => entry._period <= queryObject.to);
             }
-            if(Object.hasOwn(queryObject, 'updatedBefore')){
+            if (Object.hasOwn(queryObject, 'updatedBefore')) {
                 //@ts-expect-error
-                entries = entries.filter(entry=>entry._updated < queryObject.updatedBefore);
+                entries = entries.filter(entry => entry._updated < queryObject.updatedBefore);
             }
-            if(Object.hasOwn(queryObject, 'updatedAfter')){
+            if (Object.hasOwn(queryObject, 'updatedAfter')) {
                 //@ts-expect-error
-                entries = entries.filter(entry=>entry._updated > queryObject.updatedAfter);
+                entries = entries.filter(entry => entry._updated > queryObject.updatedAfter);
             }
-            if(Object.hasOwn(queryObject, 'entryIds')){
+            if (Object.hasOwn(queryObject, 'entryIds')) {
                 //@ts-expect-error
-                entries = entries.filter(entry=>queryObject.entryIds.some(eid=>eid===entry._id));
+                entries = entries.filter(entry => queryObject.entryIds.some(eid => eid === entry._id));
             }
-            if(Object.hasOwn(queryObject, 'defs')){
-                entries = entries.filter(entry=>arraysHaveCommonElement(Object.keys(entry),queryObject.defs));
+            if (Object.hasOwn(queryObject, 'defs')) {
+                entries = entries.filter(entry => arraysHaveCommonElement(Object.keys(entry), queryObject.defs));
             }
-            if(Object.hasOwn(queryObject, 'limit')){
+            if (Object.hasOwn(queryObject, 'limit')) {
                 entries = entries.slice(0, queryObject.limit);
             }
             return entries;
@@ -636,7 +825,7 @@ export class DJ {
                 const set1 = new Set(array1);
                 const set2 = new Set(array2);
                 return [...set1].some(item => set2.has(item));
-              }
+            }
         }
     }
 
@@ -652,75 +841,75 @@ export class DJ {
      */
     static qualityCheck(dataJournal: DataJournal, panicLevel: "logs only" | "some errors thrown" | "all errors thrown" = 'some errors thrown'): void {
         //overview check
-        if(dataJournal.overview && dataJournal.overview.counts){
+        if (dataJournal.overview && dataJournal.overview.counts) {
             //Def Count bad
-            if(dataJournal.overview.counts.defs !== dataJournal.defs.length)
+            if (dataJournal.overview.counts.defs !== dataJournal.defs.length)
                 logOrThrow(`Overview Def count is wrong! \n Overview says: ${dataJournal.overview.counts.defs} & should be ${dataJournal.defs.length}`);
-            const active =  dataJournal!.overview!.counts!.activeEntries ?? 0;
-            const deleted =  dataJournal.overview.counts.deletedEntries ?? 0;
+            const active = dataJournal!.overview!.counts!.activeEntries ?? 0;
+            const deleted = dataJournal.overview.counts.deletedEntries ?? 0;
             //Entry Count bad
             const overViewEntryCount = active + deleted;
-            if(overViewEntryCount !== dataJournal.entries.length)
+            if (overViewEntryCount !== dataJournal.entries.length)
                 logOrThrow(`Overview Entry count is wrong! \n Overview says: ${overViewEntryCount} & should be ${dataJournal.entries.length}`);
         }
         //quality check defs
-        dataJournal.defs.forEach(def=>{
+        dataJournal.defs.forEach(def => {
             //Def missing id
-            if(!Object.hasOwn(def,'_id')) 
+            if (!Object.hasOwn(def, '_id'))
                 logOrThrow(`No _id on Def! \n ${JSON.stringify(def)}`, true);
             //updated epochstr is bad
-            if(Object.hasOwn(def,'_updated') && epochStrIsImplausible(def._updated)) 
+            if (Object.hasOwn(def, '_updated') && epochStrIsImplausible(def._updated))
                 logOrThrow(`Def EpochStr is probably wrong! \n ${JSON.stringify(def)}`);
             //def contains extra properties (likely a bad sign)
-            if(Object.keys(def).some(key=>!key.startsWith('_'))) 
+            if (Object.keys(def).some(key => !key.startsWith('_')))
                 logOrThrow(`Def property found without an underscore prefix! \n ${JSON.stringify(def)}`);
         })
         //quality check entries
-        dataJournal.entries.forEach(entry=>{
+        dataJournal.entries.forEach(entry => {
             //Entry missing id
-            if(!Object.hasOwn(entry,'_id')) 
+            if (!Object.hasOwn(entry, '_id'))
                 logOrThrow(`No _id on Entry! \n ${JSON.stringify(entry)}`, true);
             //Entry missing _period
-            if(!Object.hasOwn(entry, '_period'))
+            if (!Object.hasOwn(entry, '_period'))
                 logOrThrow(`No _period on Entry! \n ${JSON.stringify(entry)}`, true);
             //Entry _period is wrong
-            if(!secondIsProperlyFormatted(entry._period))
+            if (!secondIsProperlyFormatted(entry._period))
                 logOrThrow(`_period on Entry looks wrong! \n ${JSON.stringify(entry)}`, true);
             //updated epochstr is bad
-            if(Object.hasOwn(entry,'_updated') && epochStrIsImplausible(entry._updated)) 
+            if (Object.hasOwn(entry, '_updated') && epochStrIsImplausible(entry._updated))
                 logOrThrow(`Entry EpochStr is probably wrong! \n ${JSON.stringify(entry)}`);
             //no associated def 
-            const defKeys = Object.keys(entry).filter(key=>!key.startsWith('_'));
-            defKeys.forEach(key=>{
-                if(!dataJournal.defs.some(def => DJ.standardizeKey(def._id) === key || DJ.standardizeKey(def._lbl ?? def._id) === key))
+            const defKeys = Object.keys(entry).filter(key => !key.startsWith('_'));
+            defKeys.forEach(key => {
+                if (!dataJournal.defs.some(def => DJ.standardizeKey(def._id) === key || DJ.standardizeKey(def._lbl ?? def._id) === key))
                     logOrThrow(`No associated Def found for Entry! \n ${JSON.stringify(entry)}`);
             })
-            
+
         })
 
-        function secondIsProperlyFormatted(secondStr: string): boolean{
+        function secondIsProperlyFormatted(secondStr: string): boolean {
             return /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d/i.test(secondStr)
         }
 
-        function epochStrIsImplausible(epochStr: string){
-            if(!DJ.isValidEpochStr(epochStr)) return true;
+        function epochStrIsImplausible(epochStr: string) {
+            if (!DJ.isValidEpochStr(epochStr)) return true;
             const date = DJ.parseDateFromEpochStr(epochStr);
             const year = date.getFullYear();
             //covering the span of years I'm unlikely to track beyond. This code will be so relevant in 76 years
-            if(year < 2000 || year > 2100) return true;
+            if (year < 2000 || year > 2100) return true;
             return false
         }
-        
+
         /**
          * local helper
          * @param errMessage message to write
          * @param isImportant if true, throws error for "some errors throw" case, otherwise just logs warning
          * @returns void
          */
-        function logOrThrow(errMessage: string, isImportant = false){
-            if(panicLevel === 'all errors thrown') throw new Error(errMessage);
-            if(panicLevel === 'logs only') return console.warn(errMessage);
-            if(isImportant) throw new Error(errMessage);
+        function logOrThrow(errMessage: string, isImportant = false) {
+            if (panicLevel === 'all errors thrown') throw new Error(errMessage);
+            if (panicLevel === 'logs only') return console.warn(errMessage);
+            if (isImportant) throw new Error(errMessage);
             console.warn(errMessage);
         }
 

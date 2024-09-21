@@ -47,68 +47,8 @@ describe("Data Journal basics.", () => {
   })
 });
 
-describe('Data Journal Entry & Def Adding', () => {
-  test('Implications of No Mutation', () => {
-    let localDataJournal = DJ.newBlankDataJournal();
-    //Because Data Journal never mutates, calling up any DJ.whatever methods will
-    //inevitably create copies of stuff and loop-to-merge, even if you *know* it's new.
-    //Thus the fastest approach for adding new Defs and Entries is to make them then
-    //directly mutate the Data Journal object itself.
-    const newMinimumDef: Partial<Def> = { _id: 'def1' } //Defs only NEED an "_id"
-    const newFullDef = DJ.makeDef(newMinimumDef);
-    localDataJournal.defs.push(newFullDef);
-    //There's a big-ol' footgun here, though. Doing this will *not* update any attached
-    //Overview (or index contained therein) - so you have to also null out the overview.
-    expect(localDataJournal.overview?.counts?.defs).toEqual(0); //doesn't reflect added def
-    expect(localDataJournal.overview).not.toEqual(DJ.addOverview(localDataJournal));
-    //best practice would be to manually nullify the overview property:
-    localDataJournal.overview = null;
-    //or just recreate a new overview
-    localDataJournal = DJ.addOverview(localDataJournal);
-    //but since dataJournals are just object shapes there's no way to enforce this
-    expect(localDataJournal.overview?.counts?.defs).toEqual(1); //now reflects the change
-
-    //all that can be handled by just using the build in "addDefs" function.
-    localDataJournal = DJ.addDefs(localDataJournal, [testData.bookDef]);
-    expect(localDataJournal.overview?.counts?.defs).toBe(2); //was added
-    //...however if you forget to use the assigment bit, there's still a footgun.
-    //** INTENTIONALLY BAD CODE DON'T DO THIS **
-    DJ.addDefs(localDataJournal, [testData.movieDef]);
-    expect(localDataJournal.overview?.counts?.defs).toBe(2); //movieDef NOT present
-
-    //same as above, but for entries.
-    localDataJournal = DJ.newBlankDataJournal([testData.bookDef]);
-    //Because Data Journal never mutates, calling up any DJ.whatever methods will
-    //inevitably create copies of stuff and loop-to-merge, even if you *know* it's new.
-    //Thus the fastest approach for adding new Defs and Entries is to make them then
-    //directly mutate the Data Journal object itself.
-    const newMinimumEntry: Partial<Entry> = {
-      _id: '86753090_plmn',
-      _period: '2024-09-07T20:58:22',
-    }
-    const newFullEntry = DJ.makeEntry(newMinimumEntry);
-    localDataJournal.entries.push(newFullEntry);
-    //There's a big-ol' footgun here, though. Doing this will *not* update any attached
-    //Overview (or index contained therein) - so you have to also null out the overview.
-    expect(localDataJournal.overview?.counts?.activeEntries).toEqual(0); //doesn't reflect added entry
-    expect(localDataJournal.overview).not.toEqual(DJ.addOverview(localDataJournal));
-    //best practice would be to manually nullify the overview property:
-    localDataJournal.overview = null;
-    //or just recreate a new overview
-    localDataJournal = DJ.addOverview(localDataJournal);
-    //but since dataJournals are just object shapes there's no way to enforce this
-    expect(localDataJournal.overview?.counts?.activeEntries).toEqual(1); //now reflects the change
-
-    //all that can be handled by just using the build in "addDefs" function.
-    localDataJournal = DJ.addEntries(localDataJournal, [testData.readEntry]);
-    expect(localDataJournal.overview?.counts?.activeEntries).toBe(2); //was added
-    //...however if you forget to use the assigment bit, there's still a footgun.
-    //** INTENTIONALLY BAD CODE DON'T DO THIS **
-    DJ.addEntries(localDataJournal, [testData.readAndWorkedOutEntry]);
-    expect(localDataJournal.overview?.counts?.activeEntries).toBe(2); //movieDef NOT present 
-  })
-
-  test('makeDef Behaviors', () => {
+describe('Adding & Modifying Data', () => {
+  test('Making Defs and Entries', () => {
     //making this to point out it's actually not *needed*.
     let localDataJournal = DJ.newBlankDataJournal();
 
@@ -174,15 +114,148 @@ describe('Data Journal Entry & Def Adding', () => {
     const entryMadeFromFullySpecified = DJ.makeEntry(fullySpecifiedEntry);
     expect(entryMadeFromFullySpecified).toEqual(fullySpecifiedEntry);
   })
+  
+  test('Simple addDefs and addEntries', () => {
+    let localDataJournal = DJ.newBlankDataJournal();
+    //Because Data Journal never mutates, calling up any DJ.whatever methods will
+    //inevitably create copies of stuff and loop-to-merge, even if you *know* it's new.
+    //Thus the fastest approach for adding new Defs and Entries is to make them then
+    //directly mutate the Data Journal object itself.
+    const newMinimumDef: Partial<Def> = { _id: 'def1' } //Defs only NEED an "_id"
+    const newFullDef = DJ.makeDef(newMinimumDef);
+    localDataJournal.defs.push(newFullDef);
+    //There's a big-ol' footgun here, though. Doing this will *not* update any attached
+    //Overview (or index contained therein) - so you have to also null out the overview.
+    expect(localDataJournal.overview?.counts?.defs).toEqual(0); //doesn't reflect added def
+    expect(localDataJournal.overview).not.toEqual(DJ.addOverview(localDataJournal));
+    //best practice would be to manually nullify the overview property:
+    localDataJournal.overview = null;
+    //or just recreate a new overview
+    localDataJournal = DJ.addOverview(localDataJournal);
+    //but since dataJournals are just object shapes there's no way to enforce this
+    expect(localDataJournal.overview?.counts?.defs).toEqual(1); //now reflects the change
 
-  test('makeEntry Behaviors', () => {
+    //all that can be handled by just using the build in "addDefs" function.
+    localDataJournal = DJ.addDefs(localDataJournal, [testData.bookDef]);
+    expect(localDataJournal.overview?.counts?.defs).toBe(2); //was added
+    //...however if you forget to use the assigment bit, there's still a footgun.
+    //** INTENTIONALLY BAD CODE DON'T DO THIS **
+    DJ.addDefs(localDataJournal, [testData.movieDef]);
+    expect(localDataJournal.overview?.counts?.defs).toBe(2); //movieDef NOT present
 
+    //same as above, but for entries.
+    localDataJournal = DJ.newBlankDataJournal([testData.bookDef]);
+    //Because Data Journal never mutates, calling up any DJ.whatever methods will
+    //inevitably create copies of stuff and loop-to-merge, even if you *know* it's new.
+    //Thus the fastest approach for adding new Defs and Entries is to make them then
+    //directly mutate the Data Journal object itself.
+    const newMinimumEntry: Partial<Entry> = {
+      _id: '86753090_plmn',
+      _period: '2024-09-07T20:58:22',
+    }
+    const newFullEntry = DJ.makeEntry(newMinimumEntry);
+    localDataJournal.entries.push(newFullEntry);
+    //There's a big-ol' footgun here, though. Doing this will *not* update any attached
+    //Overview (or index contained therein) - so you have to also null out the overview.
+    expect(localDataJournal.overview?.counts?.activeEntries).toEqual(0); //doesn't reflect added entry
+    expect(localDataJournal.overview).not.toEqual(DJ.addOverview(localDataJournal));
+    //best practice would be to manually nullify the overview property:
+    localDataJournal.overview = null;
+    //or just recreate a new overview
+    localDataJournal = DJ.addOverview(localDataJournal);
+    //but since dataJournals are just object shapes there's no way to enforce this
+    expect(localDataJournal.overview?.counts?.activeEntries).toEqual(1); //now reflects the change
+
+    //all that can be handled by just using the build in "addDefs" function.
+    localDataJournal = DJ.addEntries(localDataJournal, [testData.readEntry]);
+    expect(localDataJournal.overview?.counts?.activeEntries).toBe(2); //was added
+    //...however if you forget to use the assigment bit, there's still a footgun.
+    //** INTENTIONALLY BAD CODE DON'T DO THIS **
+    DJ.addEntries(localDataJournal, [testData.readAndWorkedOutEntry]);
+    expect(localDataJournal.overview?.counts?.activeEntries).toBe(2); //movieDef NOT present 
+  })
+
+  test('Full Transaction Handling', () => {
+    let localDataJournal = DJ.newBlankDataJournal();
+    //create
+    let newDataJournal = DJ.commit(localDataJournal, testData.createOnlyTransaction);
+    expect(newDataJournal.defs.length).toBe(1);
+    expect(newDataJournal.defs[0]._id).toBe('defOne'); //all fields were set
+    expect(newDataJournal.defs[0]._type).toBe(DefType.TEXT);
+    expect(newDataJournal.defs[0]._updated).toBe('m0a3fajl');
+    expect(newDataJournal.defs[0]._emoji).toBe('🧰');
+    expect(newDataJournal.entries.length).toBe(1);
+    expect(newDataJournal.entries[0]._id).toBe('m0a3faoe_oapl'); //all fields were set
+    expect(newDataJournal.entries[0]._period).toBe('2024-09-21T00:15:21'); //all fields were set
+    expect(newDataJournal.entries[0]._updated).toBe('m0a3faoe'); //all fields were set
+    expect(newDataJournal.entries[0].OTHERKEYS).toBe('Not a problem'); //all fields were set
+    //modify
+    newDataJournal = DJ.commit(newDataJournal, testData.modifyOnlyTransaction);
+    expect(newDataJournal.defs.length).toBe(1);
+    expect(newDataJournal.defs[0]._lbl).toBe('Modification added label')
+    expect(newDataJournal.defs[0]._emoji).toBe('🧰'); //but didn't remove existing key
+    expect(newDataJournal.entries.length).toBe(1);
+    expect(newDataJournal.entries[0]._note).toBe('Modification added note')
+    expect(newDataJournal.entries[0].OTHERKEYS).toBe('Not a problem'); //but didn't remove existing key
+    //replace
+    newDataJournal = DJ.commit(newDataJournal, testData.replaceOnlyTransaction);
+    expect(newDataJournal.defs.length).toBe(1);
+    expect(newDataJournal.defs[0]._desc).toBe('Replacement adding this description also removed label'); //added propery
+    expect(newDataJournal.defs[0]._lbl).toBeUndefined(); //DID remove existing key
+    expect(newDataJournal.entries.length).toBe(1);
+    expect(newDataJournal.entries[0]._source).toBe('Replacement added source & removed note'); //added property
+    expect(newDataJournal.entries[0]._note).toBeUndefined(); //DID remove existing key
+    //delete
+    newDataJournal = DJ.commit(newDataJournal, testData.deleteOnlyTransaction);
+    expect(newDataJournal.defs.length).toBe(0); //def is deleted for real
+    expect(newDataJournal.entries.length).toBe(1); //entry is marked deleted
+    expect(newDataJournal.entries[0]._deleted).toBe(true);
+    expect(newDataJournal.entries[0]._updated).not.toBe('m0a3haoe'); //_update reflects time of delete
+
+    //the original localDataJournal wasn't changed
+    expect(localDataJournal.defs.length).toBe(0)
+    expect(localDataJournal.entries.length).toBe(0)
+
+    //combo transaction, probably a common occurence
+    let starterDJ = testData.biggerJournal;
+    const staticCopyToProveNoSideEffects = JSON.parse(JSON.stringify(starterDJ));
+    newDataJournal = DJ.commit(starterDJ, testData.biggerJournalTransaction);
+    //lot of things happened there.
+    expect(starterDJ).toEqual(staticCopyToProveNoSideEffects);
+    
+    const defs = newDataJournal.defs;
+    const entries = newDataJournal.entries;
+
+    expect(defs.length).toBe(5); //3 original - 1 removed + 3 added
+    expect(entries.length).toBe(7); //4 original + 3 added, 1 MARKED deleted,
+
+    const modifiedDef = defs.find(def=>def._id=='WORKOUT_NAME')!;
+    expect(modifiedDef._lbl).toBe("Updated lbl, no more emoji");
+    expect(modifiedDef._emoji).toBeUndefined(); //was removed my replacement
+    
+    const replacedDef = defs.find(def=>def._id=='WORKOUT_TYPE')!;
+    expect(replacedDef._desc).toBe('Modified Description!'); //changed
+    expect(replacedDef._lbl).not.toBeUndefined(); //not deleted implicitly
+    expect(defs.find(def=>def._id==='BOOK_READ_NAME')).toBeUndefined(); //was deleted via delete
+
+    const modifiedEntry = entries.find(entry=>entry._id === "m0ofacho_poax");
+    expect(modifiedEntry?._note).toBe("Undeleted via modification, should retain '_source'");
+    expect(modifiedEntry?._deleted).toBe(false); //another modification I made
+    expect(modifiedEntry?._source).toBe('Test daaata') //existing property retained
+
+    const replacedEntry = entries.find(entry  => entry._id === "m0ogacof_3fjk");
+    expect(replacedEntry?._note).toBe("Replaced - with no more book BOOK prop");
+    expect(replacedEntry?.BOOK_NAME).toBeUndefined(); // was deleted by replacement
+
+    const deletedEntry = entries.find(entry => entry._id === 'm0ofgfio_gjlp');
+    expect(deletedEntry?._deleted).toBe(true); //was MARKED as deleted
+    expect(deletedEntry?._updated).not.toBe('m0ofgfio'); //will now reflect time of deletion
   })
 })
 
 describe('Data Journal Overviewing & Indexing', () => {
   test("DataJournal Overview Creation & Use", () => {
-    let dataJournalWithOverview = DJ.addOverview(testData.journalToOverviewAndIndex);
+    let dataJournalWithOverview = DJ.addOverview(testData.biggerJournal);
     expect(dataJournalWithOverview.overview).toEqual(testData.expectedOverview);
     //example of designed use:
     const A = DJ.addOverview(testData.smallJournalA);
@@ -196,7 +269,7 @@ describe('Data Journal Overviewing & Indexing', () => {
   });
 
   test("DataJournal Index Creation & Use", () => {
-    let dataJournalWithOverview = DJ.addOverview(testData.journalToOverviewAndIndex);
+    let dataJournalWithOverview = DJ.addOverview(testData.biggerJournal);
     const index = dataJournalWithOverview.overview!.index!;
     expect(index).toEqual(testData.expectedOverview.index);
 
@@ -213,14 +286,12 @@ describe('Data Journal Overviewing & Indexing', () => {
       WORKOUT_NAME: 'Starting Strength A'
     }
     //don't need to loop over the entry list
-    //@ts-expect-error - purposefully hacking into un-exposed member
     expect(dataJournalWithOverview.entries[index.entryMap[DJ.standardizeKey(anExistingEntry._id)]]).toEqual(anExistingEntry);
     const aNewEntry = {
       _id: '12345',
       _note: 'would be new to to the set',
       _updated: 'm0fepazz'
     }
-    //@ts-expect-error - purposefully hacking into un-exposed member
     expect(dataJournalWithOverview.entries[index.entryMap[DJ.standardizeKey(aNewEntry._id)]]).toBeUndefined();
   });
 })
@@ -354,7 +425,7 @@ describe('Data Journal Grouping with groupBy', () => {
   })
 
   test('Group By Deleted', () => {
-    const dataJournalToGroup = testData.journalToOverviewAndIndex;
+    const dataJournalToGroup = testData.biggerJournal;
     expect(DJ.groupBy('deleted', dataJournalToGroup)).toEqual(testData.expectedGroupingByDeleted);
   })
 
@@ -366,7 +437,7 @@ describe('Data Journal Grouping with groupBy', () => {
 
 describe('Data Journal Filtering', () => {
   test('Basic Filters', () => {
-    const dataJournal = testData.journalToOverviewAndIndex;
+    const dataJournal = testData.biggerJournal;
     //baseline
     expect(dataJournal.entries.length).toBe(4);
     //remove the deleted entry
@@ -400,7 +471,7 @@ describe('Data Journal Filtering', () => {
   })
 
   test('Combining Filters', () => {
-    const dataJournal = testData.journalToOverviewAndIndex;
+    const dataJournal = testData.biggerJournal;
     const filters = {
       from: '2024-09-05T00:00:00',
       to: '2024-09-05T23:59:59'
@@ -419,7 +490,7 @@ describe('Data Journal Filtering', () => {
 
 describe('Data Journal Quality Checks', () => {
   test('Absence of error on good data', () => {
-    const properDataJournal = testData.journalToOverviewAndIndex;
+    const properDataJournal = testData.biggerJournal;
     expect(() => { DJ.qualityCheck(properDataJournal) }).not.toThrowError();
     //empty data journals are high quality!
     expect(() => { DJ.qualityCheck({ defs: [], entries: [] }) }).not.toThrowError();

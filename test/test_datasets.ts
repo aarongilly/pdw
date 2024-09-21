@@ -237,7 +237,7 @@ export const smallJournalABC = {
 
 //#region --- JOURNALS FOR OVERVIEW & INDEX
 
-export const journalToOverviewAndIndex: dj.DataJournal = {
+export const biggerJournal: dj.DataJournal = {
     defs: [bookDef, workoutTypeDef, workoutNameDef],
     entries: [readEntry, readAndWorkedOutWithName, lifted, deletedEntry]
 }
@@ -272,6 +272,174 @@ export const expectedOverview: dj.Overview = {
         }
     }
 }
+//#endregion
+
+//#region --- TRANSACTIONS 
+
+export const createOnlyTransaction: dj.TransactionObject = {
+    defs: {
+        create: [
+            {
+                _id: 'defOne',
+                _type: dj.DefType.TEXT,
+                _updated: 'm0a3fajl',
+                _emoji: '🧰'
+            }
+        ]
+    },
+    entries: {
+        create: [
+            {
+                _id: 'm0a3faoe_oapl',
+                _period: '2024-09-21T00:15:21',
+                _updated: 'm0a3faoe',
+                OTHERKEYS: 'Not a problem'
+            }
+        ]
+    }
+}
+
+export const modifyOnlyTransaction: dj.TransactionObject = {
+    defs: {
+        modify: [
+            {
+                _id: 'defOne',
+                _type: dj.DefType.TEXT,
+                _updated: 'm0a3gajl',
+                _lbl: 'Modification added label'
+            }
+        ]
+    },
+    entries: {
+        modify: [
+            {
+                _id: 'm0a3faoe_oapl',
+                _period: '2024-09-21T00:15:21',
+                _updated: 'm0a3gaoe',
+                _note: 'Modification added note'
+            }
+        ]
+    }
+}
+
+export const replaceOnlyTransaction: dj.TransactionObject = {
+    defs: {
+        replace: [
+            {
+                _id: 'defOne',
+                _type: dj.DefType.TEXT,
+                _updated: 'm0a3hajl',
+                _desc: 'Replacement adding this description also removed label'
+            }
+        ]
+    },
+    entries: {
+        replace: [
+            {
+                _id: 'm0a3faoe_oapl',
+                _period: '2024-09-21T00:15:21',
+                _updated: 'm0a3haoe',
+                _source: 'Replacement added source & removed note'
+            }
+        ]
+    }
+}
+
+export const deleteOnlyTransaction: dj.TransactionObject = {
+    defs: {
+        delete: ['defOne']
+    },
+    entries: {
+        delete: ['m0a3faoe_oapl']
+    }
+}
+
+export const biggerJournalTransaction: dj.TransactionObject = {
+    defs: {
+        create: [
+            {
+                _id: 'addedDefWithCreate',
+                _updated: 'm1m1m1m1',
+                _type: dj.DefType.SELECT
+            }
+        ],
+        modify: [
+            {
+                _id: 'addedDefWithModify',
+                _updated: 'm1m1m1m1',
+                _type: dj.DefType.SELECT
+            },
+            {
+                _id: 'WORKOUT_TYPE',
+                _updated: 'm0ogg4dw', //newer
+                _desc: 'Modified Description!'
+            }
+        ],
+        replace: [
+            {
+                _id: 'addedDefWithReplace',
+                _updated: 'm1m1m1m1',
+                _type: dj.DefType.MULTISELECT
+            },
+            {
+                _id: "WORKOUT_NAME",
+                _lbl: "Updated lbl, no more emoji",
+                _updated: 'm0ogg4dw', //newer
+                _scope: dj.DefScope.HOUR,
+                _type: dj.DefType.TEXT,
+                _tags: ['health'],
+                _range: []
+            }
+        ] as dj.Def[],
+        delete: [
+            "BOOK_READ_NAME",
+        ]
+    },
+    entries: {
+        create: [
+            {
+                _id: "addedWithCreate",
+                _period: "2024-09-21T10:51:00",
+                _updated: "m0ohb000",
+            },
+        ],
+        modify: [
+            {
+                _id: "addedWithModify",
+                _period: "2024-09-20T12:01:00",
+                _updated: "m0ohb000",
+            },
+            {
+                _id: "m0ofacho_poax",
+                _updated: "m1003333",
+                _deleted: false,
+                _note: "Undeleted via modification, should retain '_source'",
+            }
+        ],
+        replace: [
+            {
+                _id: "addedWithReplace",
+                _period: "2024-09-20T11:09:00",
+                _updated: "m0ohb000",
+            },
+            {
+                _id: "m0ogacof_3fjk",
+                _period: "2024-09-05T11:09:00",
+                _created: "m0ogacof",
+                _updated: "m0ohb000",
+                _deleted: false,
+                _note: "Replaced - with no more book BOOK prop",
+                _source: "Test data, with edit!",
+                WORKOUT_TYPE: 'CARDIO',
+                WORKOUT_NAME: 'Biked',
+            }
+        ],
+        delete: [
+            'm0ofgfio_gjlp' //the readEntry
+        ]
+    }
+}
+
 //#endregion
 
 //#region --- EXPECTED GROUPING
@@ -407,6 +575,4 @@ export const expectedGroupingByDefs = {
         },
     ],
 }
-
-
 //#endregion
