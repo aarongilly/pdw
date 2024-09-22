@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import * as pdw from '../src/pdw';
 import {InMemoryDb} from '../src/connectors/Strawman'
 import * as CandT from '../src/ConnectorsAndTranslators'
-import { Def, DefType, DJ, Entry } from '../src/DJ';
+import { Def, DefType, DJ, Entry, TransactionUpdateMember } from '../src/DJ';
 // import { Temporal } from 'temporal-polyfill';
 
 const config: pdw.Config = {
@@ -23,18 +23,18 @@ let pdwRef: pdw.PDW | undefined;
 describe('Basic PDW Creation', () => {
     test('No Connectors or Translators', async () => {
         pdwRef = await pdw.PDW.newPDW();
-        expect(pdwRef.connectors.length).toBe(0);
         expect(pdwRef.translators.length).toBe(0);
-        expect(pdwRef.localData.entries.length).toBe(0);
+        expect(pdwRef.connectors.length).toBe(1);
+        expect((await pdwRef.query()).length).toBe(0);
         //@ts-expect-error - hacking to test my tester
         pdwRef.localData.defs.push({_id:'testing clear capability for test'})
-        expect(pdwRef.localData.defs.length).toBe(1);
+        expect(pdwRef.getDefs().length).toBe(1);
 
         //testing the tester suite, basically, here....
         expect(()=>{
-            pdw.PDW.getPDW(); // the instance has been destroyed
+            pdw.PDW.getPDW(); // the instance exists
         }).not.toThrowError()
-        //@ts-expect-error - hacking to test my tester
+        //@ts-expect-error - hacking to test my tester & kill the instance
         pdwRef.clearForTest();
         expect(()=>{
             pdw.PDW.getPDW(); // the instance has been destroyed
@@ -53,10 +53,10 @@ describe('Basic PDW Creation', () => {
         pdwRef = await pdw.PDW.newPDW(singleTranslatorConfig);
         expect(pdwRef.connectors.length).toBe(0);
         expect(pdwRef.translators.length).toBe(1);
-        expect(pdwRef.localData.defs.length).toBe(3);
+        expect(pdwRef.getDefs().length).toBe(3);
         expect(pdwRef.getDefs().find(def=>def._id==='BOOK_READ_NAME')?._desc)
             .toEqual('The name of the book you read.') //data is loaded
-        expect(pdwRef.localData.entries.length).toBe(4);
+        expect((await pdwRef.query()).length).toBe(4);
         //@ts-expect-error - hacking to test my tests
         pdwRef.clearForTest();
         const dualTranslatorConfig: pdw.Config = {
@@ -74,10 +74,10 @@ describe('Basic PDW Creation', () => {
         pdwRef = await pdw.PDW.newPDW(dualTranslatorConfig);
         expect(pdwRef.connectors.length).toBe(0);
         expect(pdwRef.translators.length).toBe(2);
-        expect(pdwRef.localData.defs.length).toBe(3); //one def was updated
+        expect(pdwRef.getDefs().length).toBe(3); //one def was updated
         expect(pdwRef.getDefs().find(def=>def._id==='BOOK_READ_NAME')?._desc)
             .toEqual('The name of the book you read. WITH UPDATE') //updated def was used
-        expect(pdwRef.localData.entries.length).toBe(5); //one entry was added
+        expect((await pdwRef.query()).length).toBe(5); //one entry was added
 
         //@ts-expect-error - hacking to allow for further testing
         pdwRef.clearForTest();
@@ -144,14 +144,14 @@ describe('Basic PDW Creation', () => {
             _type: DefType.NUMBER,
             _desc: 'Now with a description'
         }
-        await pdwRef.setDefs({append: [myUpdate]});
+        await pdwRef.setDefs({modify: [myUpdate]});
         expect(pdwRef.getDefs().length).toBe(1);
         retreivedDef = pdwRef.getDefs()[0];
         expect(retreivedDef._updated).toBe('m0ofzzzz');
         expect(retreivedDef._desc).toEqual('Now with a description');
         
         //appending a new field doesn't delete existing ones
-        let secondUpdate: Partial<pdw.TransactionUpdateMember> = {
+        let secondUpdate: Partial<TransactionUpdateMember> = {
             _id: 'defOne',
             _lbl: 'Now with label',
         }
@@ -171,7 +171,7 @@ describe('Basic PDW Creation', () => {
             _type: DefType.NUMBER,
             _emoji: '⭐️'
         }
-        await pdwRef.setDefs({overwrite: [thirdUpdate]})
+        await pdwRef.setDefs({replace: [thirdUpdate]})
         expect(pdwRef.getDefs().length).toBe(1);
         retreivedDef = pdwRef.getDefs()[0];
         expect(retreivedDef._updated).toBe(oneSecondFromNow);
@@ -195,8 +195,8 @@ describe('Basic PDW Creation', () => {
             _type: DefType.NUMBER
         }
         await pdwRef.setDefs({
-            append: [newDefA], //doesn't exist, so will be created
-            overwrite: [newDefB] //doesn't exist, so will be created
+            modify: [newDefA], //doesn't exist, so will be created
+            replace: [newDefB] //doesn't exist, so will be created
         })
         expect(pdwRef.getDefs().length).toBe(2);
         

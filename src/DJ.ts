@@ -346,20 +346,6 @@ export interface TransactionUpdateMember {
     [propsToSet: string]: any
 }
 
-export interface CommitResponse {
-    success: boolean; //only required field
-    error?: string;
-    warnings?: string[];
-    createdDefs?: number
-    createdEntries?: number
-    replaceDefs?: number
-    replaceEntries?: number
-    modifyDefs?: number
-    modifyEntries?: number
-    deleteDefs?: number
-    deleteEntries?: number
-}
-
 //#endregion
 
 //#region --- ENUMS

@@ -1,5 +1,5 @@
 import { Temporal } from "temporal-polyfill";
-import { QueryObject, Entry, Def, Overview, DataJournal, EpochStr, DJ } from "./DJ.js";
+import { QueryObject, Entry, Def, Overview, DataJournal, EpochStr, DJ, HalfTransaction, TransactionObject, TransactionUpdateMember } from "./DJ.js";
 import { ConnectorListMember, getConnector, getTranslator, TranslatorListMember } from "./ConnectorsAndTranslators.js";
 
 //#region ### TYPES ###
@@ -28,9 +28,21 @@ export interface Connector {
     getServiceName(): string;
 }
 
-export interface CommitResponse {
 
+export interface CommitResponse {
+    success: boolean; //only required field
+    error?: string;
+    warnings?: string[];
+    createdDefs?: number
+    createdEntries?: number
+    replaceDefs?: number
+    replaceEntries?: number
+    modifyDefs?: number
+    modifyEntries?: number
+    deleteDefs?: number
+    deleteEntries?: number
 }
+
 
 /**
  * The means to convert {@link CanonicalDataset}s to and from other formats
@@ -42,53 +54,6 @@ export interface Translator {
      * The name of the translator.
     */
     getServiceName(): string;
-}
-
-export interface HalfTransactionObject {
-    /**
-     * Brand new elements. Must have all minimum fields present.
-     * No checks for existing records with the same ID.
-     */
-    create?: Def[] | Entry[];
-    /**
-     * In short: "L overwritten with F becomes F"
-     * 
-     * If the element doesn't exist, it's created.
-     * If the element does exist AND is older than the transaction copy,
-     * it is fully replaced by what's in the transaction copy.
-     * If the element does exist AND is newer than the transaction copy,
-     * the transaction copy is ignored.
-    */
-    overwrite?: Def[] | Entry[];
-    /**
-     * In short: "F appended to L becomes E"
-     * 
-     * If the element doesn't exist, it's created.
-     * If the element does exist AND is older than the transaction copy,
-     * properties from the transaction copy will replace properties from
-     * the existing element, but existing element properties outside of
-     * those found in the transaction copy will not be removed.
-     * If the element does exist AND is newer than the transaction copy,
-     * the transaction copy is ignored.
-     */
-    append?: TransactionUpdateMember[];
-    /**
-     * If elements are found with these IDs they will be deleted.
-     * Definitions will be removed entirely.
-     * Entries will be retained but marked as `_deleted` = `TRUE`
-     */
-    delete?: string[];
-}
-
-export interface TransactionObject {
-    defs: HalfTransactionObject,
-    entries: HalfTransactionObject
-}
-
-export interface TransactionUpdateMember {
-    _id: string,
-    _updated: EpochStr
-    [propsToSet: string]: any
 }
 
 export interface Config {
@@ -127,19 +92,13 @@ export interface ConfigConnector {
 export class PDW {
     connectors: Connector[];
     translators: Translator[];
-    localData: DataJournal; //#TODO - kill this & officially convert strawman
 
     /** Singleton */
     private static _instance: PDW;
 
-    private constructor(config: Config) {
-        this.localData = {
-            defs: config.defs ?? [],
-            entries: config.entries ?? []
-        };
+    private constructor() {
         this.connectors = [];
         this.translators = [];
-
         PDW._instance = this;
     }
 
@@ -152,7 +111,7 @@ export class PDW {
     static async newPDW(config?: Config): Promise<PDW> {
         if (PDW._instance !== undefined) throw new Error('PDW Instance already exists. Do you you mean to getPDW?')
         if (config === undefined) config = {};
-        const pdwRef = new PDW(config);
+        const pdwRef = new PDW();
         let connectorPromiseArray: Promise<Def[]>[] = [];
         let translatorPromiseArray: Promise<DataJournal>[] = [];
         if (config.connectors !== undefined) {
@@ -162,8 +121,6 @@ export class PDW {
                 return connectorInstance.connect(connectorConfig.params);
             })
         }
-        const defsFromConnectors = await Promise.all([...connectorPromiseArray]);
-        pdwRef.localData.defs = DJ.mergeDefs(defsFromConnectors);
 
         if (config.translators !== undefined) {
             translatorPromiseArray = config.translators?.map(transConfig => {
@@ -172,9 +129,7 @@ export class PDW {
                 return transInstance.toDataJournal(transConfig.filePath)
             })
         }
-        const results = await Promise.all([...translatorPromiseArray])//, ...connectorPromiseArray]);
 
-        pdwRef.localData = DJ.merge([pdwRef.localData, ...results])
         console.log('New PDW created with ' + pdwRef.connectors.length + ' connectors, with data imported from ' + pdwRef.translators.length + ' translators');
 
         return pdwRef
@@ -191,9 +146,8 @@ export class PDW {
      * PDW local database and all attached Connectors
      */
     getDefs(): Def[] {
-        let defs = this.localData.defs
         let connectedDefs = this.connectors.map(connector => connector.getDefs());
-        const mergedDefs = DJ.mergeDefs([defs, ...connectedDefs])
+        const mergedDefs = DJ.mergeDefs(connectedDefs)
         return mergedDefs
     }
 
@@ -202,7 +156,7 @@ export class PDW {
      * distributes the commit message out to each connected database.
      * @returns Array of responses from each connector's "commit" method.
      */
-    async setDefs(defTransaction: HalfTransactionObject): Promise<CommitResponse[]> {
+    async setDefs(defTransaction: HalfTransaction): Promise<CommitResponse[]> {
         //convert to full transaction object
         const trans: TransactionObject = {
             defs: defTransaction,
@@ -214,14 +168,13 @@ export class PDW {
 
     async getEntries(queryObject?: QueryObject): Promise<Entry[]> {
         if(queryObject === undefined) queryObject = {}
-        let entries = this.localData.entries
         const connectorPromiseArray = this.connectors.map(connector => connector.query(queryObject));
         const connectedEntries = await Promise.all(connectorPromiseArray);
-        const mergedEntries = DJ.mergeEntries([entries, ...connectedEntries])
+        const mergedEntries = DJ.mergeEntries(connectedEntries)
         return mergedEntries
     }
 
-    async setEntries(entryTransaction: HalfTransactionObject): Promise<CommitResponse[]> {
+    async setEntries(entryTransaction: HalfTransaction): Promise<CommitResponse[]> {
         //convert to full transaction object
         const trans: TransactionObject = {
             defs: {},
@@ -259,8 +212,7 @@ export class PDW {
     }
 
     async query(queryObject?: QueryObject): Promise<Entry[]> {
-        
-        return 
+        return this.getEntries(queryObject);
     }
 
     async newDef(defInfo: DefLike): Promise<Def> {
@@ -312,7 +264,7 @@ export class PDW {
         return newEntry;
     }
 
-    ensureValidDefTransactionObject(defTransaction: HalfTransactionObject): HalfTransactionObject {
+    ensureValidDefTransactionObject(defTransaction: HalfTransaction): HalfTransaction {
         if (defTransaction.create) {
             defTransaction.create = defTransaction.create.map(def => this.ensureSettableDef(def));
         }
@@ -328,7 +280,7 @@ export class PDW {
         return defTransaction
     }
 
-    ensureValidEntryTransactionObject(defTransaction: HalfTransactionObject): HalfTransactionObject {
+    ensureValidEntryTransactionObject(defTransaction: HalfTransaction): HalfTransaction {
         if (defTransaction.create) {
             defTransaction.create = defTransaction.create.map(entry => this.ensureSettableEntry(entry));
         }
