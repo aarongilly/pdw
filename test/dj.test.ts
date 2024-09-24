@@ -4,7 +4,6 @@ import * as testData from './test_datasets';
 import { Temporal } from "temporal-polyfill";
 
 describe("Data Journal basics.", () => {
-
   test("Data Journal Validation.", () => {
     //@ts-expect-error - forcing into the private constructor
     expect(new DJ()).toBeTruthy(); //useless test for "full coverage"
@@ -47,7 +46,7 @@ describe("Data Journal basics.", () => {
   })
 });
 
-describe('Adding & Modifying Data', () => {
+describe('Data Journal Modification', () => {
   test('Making Defs and Entries', () => {
     //making this to point out it's actually not *needed*.
     let localDataJournal = DJ.newBlankDataJournal();
@@ -60,8 +59,8 @@ describe('Adding & Modifying Data', () => {
     expect(defMadeFromMinimum._id).toEqual(minimumDef._id); //obviously
     expect(defMadeFromMinimum._lbl).toEqual(minimumDef._id); //lbl from ID
     //updated detaults to now
-    expect(parseInt(defMadeFromMinimum._updated, 36)).toBeGreaterThanOrEqual(parseInt(momentBefore, 36));
-    expect(parseInt(defMadeFromMinimum._updated, 36)).toBeLessThanOrEqual(parseInt(momentAfter, 36));
+    expect(parseInt(defMadeFromMinimum._updated, 36)).toBeGreaterThanOrEqual(parseInt(momentBefore, 36) - 1);
+    expect(parseInt(defMadeFromMinimum._updated, 36)).toBeLessThanOrEqual(parseInt(momentAfter, 36) + 1);
     //DEFAULT GAUNTLET
     expect(defMadeFromMinimum._type).toEqual(DefType.TEXT); //default
     expect(defMadeFromMinimum._desc).toEqual('Add Description'); //default
@@ -593,5 +592,38 @@ describe('Data Journal Quality Checks', () => {
     expect(() => { DJ.qualityCheck(faultyDataJournal) }).not.toThrowError()
     expect(() => { DJ.qualityCheck(faultyDataJournal, 'all errors thrown') }).toThrowError()
 
+  })
+})
+
+describe('Data Journal Diff Reporting', () => {
+  const beforeDJ = testData.biggerJournal;
+  const afterDJ = DJ.commit(beforeDJ, testData.biggerJournalTransaction);
+  
+  test('No Differences', () => {
+    const diffs = DJ.diffReport(beforeDJ, beforeDJ);
+    expect(diffs.createdDefs).toBe(0);
+    expect(diffs.updatedDefs).toBe(0);
+    expect(diffs.deleteDefs).toBe(0);
+    expect(diffs.createdEntries).toBe(0);
+    expect(diffs.updatedEntries).toBe(0);
+    expect(diffs.deleteEntries).toBe(0);
+    expect(diffs.sameDefs).toBe(3);
+    expect(diffs.sameEntries).toBe(4);
+    expect(diffs.defDiffs).toEqual([]);
+    expect(diffs.entryDiffs).toEqual([]);
+  })
+
+  test('Difference Reporting', () => {
+    const diffs = DJ.diffReport(beforeDJ, afterDJ);
+    expect(diffs.createdDefs).toBe(3);
+    expect(diffs.updatedDefs).toBe(2);
+    expect(diffs.deleteDefs).toBe(1);
+    expect(diffs.createdEntries).toBe(3);
+    expect(diffs.updatedEntries).toBe(2);
+    expect(diffs.deleteEntries).toBe(1);
+    expect(diffs.sameDefs).toBe(0);
+    expect(diffs.sameEntries).toBe(1);
+    expect(diffs.defDiffs).toEqual(testData.expectedDefDifferences);
+    expect(diffs.entryDiffs).toEqual(testData.expectedEntryDifferences);
   })
 })

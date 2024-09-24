@@ -1,6 +1,6 @@
-import { Temporal } from "temporal-polyfill";
-import { QueryObject, Entry, Def, Overview, DataJournal, EpochStr, DJ, HalfTransaction, TransactionObject, TransactionUpdateMember } from "./DJ.js";
+import { QueryObject, Entry, Def, Overview, DataJournal, DJ, HalfTransaction, TransactionObject, DiffReport } from "./DJ.js";
 import { ConnectorListMember, getConnector, getTranslator, TranslatorListMember } from "./ConnectorsAndTranslators.js";
+import { InMemoryDb } from "./connectors/inMemoryConnector.js";
 
 //#region ### TYPES ###
 
@@ -28,21 +28,11 @@ export interface Connector {
     getServiceName(): string;
 }
 
-
-export interface CommitResponse {
+export interface CommitResponse extends DiffReport {
     success: boolean; //only required field
     error?: string;
     warnings?: string[];
-    createdDefs?: number
-    createdEntries?: number
-    replaceDefs?: number
-    replaceEntries?: number
-    modifyDefs?: number
-    modifyEntries?: number
-    deleteDefs?: number
-    deleteEntries?: number
 }
-
 
 /**
  * The means to convert {@link CanonicalDataset}s to and from other formats
@@ -122,11 +112,32 @@ export class PDW {
             })
         }
 
+        //ensure there's at least one connection - the Default in-memory connection
+        if (pdwRef.connectors.length === 0) {
+            // const defaultConnector = 
+            pdwRef.connectors.push(new InMemoryDb())
+        }
+
         if (config.translators !== undefined) {
             translatorPromiseArray = config.translators?.map(transConfig => {
                 const transInstance = getTranslator(transConfig.serviceName);
                 pdwRef.translators.push(transInstance);
                 return transInstance.toDataJournal(transConfig.filePath)
+            })
+
+            //merge DataJournals from all translators
+            const translatorArr = await Promise.all(translatorPromiseArray);
+            const allDJ = DJ.merge(translatorArr, false);
+
+            //push to connectors?
+            await Promise.all(connectorPromiseArray);
+            pdwRef.setAll({
+                defs: {
+                    modify: allDJ.defs
+                },
+                entries: {
+                    modify: allDJ.entries
+                }
             })
         }
 
@@ -167,7 +178,7 @@ export class PDW {
     }
 
     async getEntries(queryObject?: QueryObject): Promise<Entry[]> {
-        if(queryObject === undefined) queryObject = {}
+        if (queryObject === undefined) queryObject = {}
         const connectorPromiseArray = this.connectors.map(connector => connector.query(queryObject));
         const connectedEntries = await Promise.all(connectorPromiseArray);
         const mergedEntries = DJ.mergeEntries(connectedEntries)
@@ -190,14 +201,14 @@ export class PDW {
      * @returns a {@link CanonicalDataset} containing a {@link Def}s, {@link Entry}s
      */
     async getAll(queryObject?: QueryObject, includeOverview = true): Promise<DataJournal> {
-        if(queryObject === undefined) queryObject = {}
+        if (queryObject === undefined) queryObject = {}
         const defs = this.getDefs();
         const entries = await this.getEntries(queryObject);
         const dataset: DataJournal = {
             defs: defs,
             entries: entries
         }
-        if(includeOverview){
+        if (includeOverview) {
             dataset.overview = DJ.makeOverview(dataset);
         }
 
@@ -205,8 +216,8 @@ export class PDW {
     }
 
     async setAll(transaction: TransactionObject): Promise<CommitResponse[]> {
-        if(transaction.defs) transaction.defs = this.ensureValidDefTransactionObject(transaction.defs);
-        if(transaction.entries) transaction.entries = this.ensureValidEntryTransactionObject(transaction.entries);
+        if (transaction.defs) transaction.defs = DJ.ensureValidDefTransactionObject(transaction.defs);
+        if (transaction.entries) transaction.entries = DJ.ensureValidEntryTransactionObject(transaction.entries);
         const connectorPromiseArray = this.connectors.map(connector => connector.commit(transaction));
         return await Promise.all(connectorPromiseArray);
     }
@@ -215,118 +226,30 @@ export class PDW {
         return this.getEntries(queryObject);
     }
 
-    async newDef(defInfo: DefLike): Promise<Def> {
-        let newDef = new Def(defInfo, this);
-        const storeCopy = newDef.makeStaticCopy() as Def;
-        const result = await this.dataStore.commit({
-            create: {
-                defs: [storeCopy],
-                entries: []
+    async newDef(def: Partial<Def>): Promise<CommitResponse[]> {
+        let newDef = DJ.makeDef(def);
+        const transaction: TransactionObject = {
+            defs: {
+                create: [newDef]
             },
-            update: {
-                defs: [],
-                entries: []
+            entries: {}
+        }
+        const connectorPromiseArray = this.connectors.map(connector => connector.commit(transaction));
+        return await Promise.all(connectorPromiseArray);
+    }
+
+    async newEntry(entry: Partial<Entry>): Promise<CommitResponse[]> {
+        let newEntry = DJ.makeEntry(entry)
+        const transaction: TransactionObject = {
+            defs: {
             },
-            delete: {
-                defs: [],
-                entries: []
-            },
-        })
-        if (result.success === false) {
-            console.error(result);
-            throw new Error('Def Creation failed')
+            entries: {
+                create: [newEntry]
+            }
         }
-        this.manifest.push(storeCopy);
-        return newDef;
+        const connectorPromiseArray = this.connectors.map(connector => connector.commit(transaction));
+        return await Promise.all(connectorPromiseArray);
     }
-
-    async newEntry(entryInfo: EntryLike): Promise<Entry> {
-        let newEntry = new Entry(entryInfo, this);
-        const storeCopy = newEntry.makeStaticCopy() as Entry;
-        const result = await this.dataStore.commit({
-            create: {
-                defs: [],
-                entries: [storeCopy]
-            },
-            update: {
-                defs: [],
-                entries: []
-            },
-            delete: {
-                defs: [],
-                entries: []
-            },
-        })
-        if (result.success === false) {
-            console.error(result);
-            throw new Error('Entry Creation failed')
-        }
-        return newEntry;
-    }
-
-    ensureValidDefTransactionObject(defTransaction: HalfTransaction): HalfTransaction {
-        if (defTransaction.create) {
-            defTransaction.create = defTransaction.create.map(def => this.ensureSettableDef(def));
-        }
-        if (defTransaction.overwrite) {
-            defTransaction.overwrite = defTransaction.overwrite.map(def => this.ensureSettableDef(def));
-        }
-        if (defTransaction.append) {
-            defTransaction.append = defTransaction.append.map(def => this.ensureAppendable(def));
-        }
-        if (defTransaction.delete) {
-            if (!Array.isArray(defTransaction.delete)) throw new Error("The delete property of a transaction should be an array of strings")
-        }
-        return defTransaction
-    }
-
-    ensureValidEntryTransactionObject(defTransaction: HalfTransaction): HalfTransaction {
-        if (defTransaction.create) {
-            defTransaction.create = defTransaction.create.map(entry => this.ensureSettableEntry(entry));
-        }
-        if (defTransaction.overwrite) {
-            defTransaction.overwrite = defTransaction.overwrite.map(entry => this.ensureSettableEntry(entry));
-        }
-        if (defTransaction.append) {
-            defTransaction.append = defTransaction.append.map(entry => this.ensureAppendable(entry));
-        }
-        if (defTransaction.delete) {
-            if (!Array.isArray(defTransaction.delete)) throw new Error("The delete property of a transaction should be an array of strings")
-        }
-        return defTransaction
-    }
-
-    ensureAppendable(element: Partial<Entry> | Partial<Def>): TransactionUpdateMember {
-        if (!Object.hasOwn(element, '_id')) {
-            console.error('No ID element:', element);
-            throw new Error("No _id found on element");
-        }
-        if (element._updated === undefined) element._updated = DJ.makeEpochStr();
-        return element as TransactionUpdateMember
-    }
-
-    ensureSettableEntry(entry: Partial<Entry>): Entry {
-        if (entry._updated === undefined) entry._updated = DJ.makeEpochStr();
-        if (!DJ.isValidEntry(entry)) throw new Error('Invalid entry found, see log around this');
-        return entry as Entry
-    }
-
-    ensureSettableDef(def: Partial<Def>): Def {
-        if (def._updated === undefined) def._updated = DJ.makeEpochStr();
-        if (!DJ.isValidDef(def)) throw new Error('Invalid def found, see log around this');
-        return def as Def
-    }
-}
-
-//#endregion
-
-//#region ### UTILITIES ###
-
-export function parseTemporalFromEpochStr(epochStr: EpochStr): Temporal.ZonedDateTime {
-    const epochMillis = parseInt(epochStr, 36)
-    const parsedTemporal = Temporal.Instant.fromEpochMilliseconds(epochMillis).toZonedDateTimeISO(Temporal.Now.timeZone());
-    if (parsedTemporal.epochSeconds == 0) throw new Error('Unable to parse temporal from ' + epochStr)
-    return parsedTemporal
 }
 
 //#endregion

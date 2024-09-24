@@ -380,11 +380,12 @@ export const biggerJournalTransaction: dj.TransactionObject = {
                 _id: 'addedDefWithReplace',
                 _updated: 'm1m1m1m1',
                 _type: dj.DefType.MULTISELECT
-            },
+            }, 
             {
                 _id: "WORKOUT_NAME",
                 _lbl: "Updated lbl, no more emoji",
                 _updated: 'm0ogg4dw', //newer
+                _desc: "The name of the routine, or brief description of it.", //unmodifed
                 _scope: dj.DefScope.HOUR,
                 _type: dj.DefType.TEXT,
                 _tags: ['health'],
@@ -432,6 +433,17 @@ export const biggerJournalTransaction: dj.TransactionObject = {
                 _source: "Test data, with edit!",
                 WORKOUT_TYPE: 'CARDIO',
                 WORKOUT_NAME: 'Biked',
+            }, //bonus test - this entry is verbatim the same as what already exists & should have no effect
+            {
+                _id: "m0ogdggg_ca3t",
+                _period: "2024-09-05T11:05:00",
+                _created: "m0ogdggg",
+                _updated: "m0ogdggg",
+                _deleted: false,
+                _note: "Got so swole",
+                _source: "Test data",
+                WORKOUT_TYPE: 'STRENGTH',
+                WORKOUT_NAME: 'Starting Strength A'
             }
         ],
         delete: [
@@ -575,4 +587,98 @@ export const expectedGroupingByDefs = {
         },
     ],
 }
+//#endregion
+
+//#region --- Expected Differences
+
+//these two are for the biggerJournal and the DJ created when applying biggerJournalTransaction
+export const expectedDefDifferences = [
+    {
+      _id: "addedDefWithCreate",
+      _updated: "m1m1m1m1",
+      _type: "SELECT",
+    },
+    {
+      _id: "addedDefWithReplace",
+      _updated: "m1m1m1m1",
+      _type: "MULTISELECT",
+      _lbl: "addedDefWithReplace",
+      _desc: "Add Description",
+      _emoji: "🆕",
+      _range: [
+      ],
+      _tags: [
+      ],
+    },
+    {
+      _lbl: "Updated lbl, no more emoji",
+      _updated: "m0ogg4dw",
+      _tags: [
+        "health",
+      ],
+      _range: [
+      ],
+      _emoji: "- REMOVED: 💪",
+    },
+    {
+      _id: "addedDefWithModify",
+      _updated: "m1m1m1m1",
+      _type: "SELECT",
+      _lbl: "addedDefWithModify",
+      _desc: "Add Description",
+      _emoji: "🆕",
+      _range: [
+      ],
+      _tags: [
+      ],
+    },
+    {
+      _desc: "Modified Description!",
+      _updated: "m0ogg4dw",
+      _tags: [
+        "health",
+      ],
+      _range: [
+        "CARDIO",
+        "STRENGTH",
+        "MOBILITY",
+      ],
+    },
+  ]
+
+export const expectedEntryDifferences = [
+    {
+      _id: "addedWithCreate",
+      _period: "2024-09-21T10:51:00",
+      _updated: "m0ohb000",
+    },
+    {
+      _id: "addedWithReplace",
+      _period: "2024-09-20T11:09:00",
+      _updated: "m0ohb000",
+      _created: "m0ohb000",
+      _note: "",
+      _source: "",
+      _deleted: false,
+    },
+    {
+      _updated: "m0ohb000",
+      _note: "Replaced - with no more book BOOK prop",
+      BOOK_NAME: "- REMOVED: Atomic Habits",
+    },
+    {
+      _id: "addedWithModify",
+      _period: "2024-09-20T12:01:00",
+      _updated: "m0ohb000",
+      _created: "m0ohb000",
+      _note: "",
+      _source: "",
+      _deleted: false,
+    },
+    {
+      _updated: "m1003333",
+      _deleted: false,
+      _note: "Undeleted via modification, should retain '_source'",
+    },
+  ]
 //#endregion

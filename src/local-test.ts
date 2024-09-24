@@ -13,13 +13,19 @@ import { Def, DefType, DJ } from './DJ.js'
 // import { importFirestore, importMongo, importOldV9, importOldest, importPreviousCSV } from './onetimeImports.js'
 // import * as test from '../../pdw-firestore-plugin/'
 
-const myDJ = testdata.biggerJournal;
-const myTrans = testdata.biggerJournalTransaction;
-const updatedDj = DJ.commit(myDJ, myTrans);
-console.log(updatedDj);
+// const singleTranslatorConfig: pdw.Config = {
+//     translators: [
+//         {
+//             serviceName: 'JSON',
+//             filePath: 'test/localTestFileDir/dataset.json'
+//         }
+//     ]
+// } 
+let pdwRef = await pdw.PDW.newPDW();
 
 
 
+console.log('HELLO WORLD');
 
 //#region ---- WHERE YOU ARE GOING
 /* 

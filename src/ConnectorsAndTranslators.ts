@@ -1,4 +1,4 @@
-import { InMemoryDb } from './connectors/Strawman.js';
+import { InMemoryDb } from './connectors/inMemoryConnector.js';
 import { Connector, Translator } from './pdw.js';
 import * as file from './translators/fileTranslators.js';
 
@@ -17,12 +17,13 @@ export function getTranslator(serviceName: TranslatorListMember): Translator {
 }
 
 export type ConnectorListMember = 
-"Strawman In-Memory Database" |
+"In-Memory Database" |
 "SQLite" // todo |
-//"Firestore"
+//"Firestore" |
+//"Google Sheets"
 
 export function getConnector(serviceName: ConnectorListMember): Connector {
-    if(serviceName === 'Strawman In-Memory Database') return new InMemoryDb();
+    if(serviceName === 'In-Memory Database') return new InMemoryDb();
     if(serviceName === 'SQLite') throw new Error("Not implmeented");
     throw new Error('Invalid Connector Service Name: ' + serviceName);
 }

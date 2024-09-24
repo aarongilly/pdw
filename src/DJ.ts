@@ -342,8 +342,24 @@ export interface HalfTransaction {
  */
 export interface TransactionUpdateMember {
     _id: string,
-    _updated: EpochStr
+    _updated?: EpochStr
     [propsToSet: string]: any
+}
+
+/**
+ * For reporting the difference between two comparison datasets.
+ */
+export interface DiffReport {
+    createdDefs?: number
+    createdEntries?: number
+    updatedDefs?: number
+    updatedEntries?: number
+    sameDefs?: number
+    sameEntries?: number
+    deleteDefs?: number
+    deleteEntries?: number
+    defDiffs?: Partial<Def>[]
+    entryDiffs?: Partial<Entry>[]
 }
 
 //#endregion
@@ -486,10 +502,21 @@ export class DJ {
         return true
     }
 
+    /**
+     * The primary method to bulk-modify a {@link DataJournal}, utilizing a {@link TransactionObject}.
+     * The Transaction is applied to the original DataJournal creating a new DataJournal object with
+     * the committed changes.
+     * @param dataJournal the data journal to update
+     * @param trans the {@link TransactionObject} to apply to the passed-in {@link DataJournal}
+     * @returns a new {@link DataJournal} with the new data
+     */
     static commit(dataJournal: DataJournal, trans: TransactionObject): DataJournal {
-        //#TODO - optimize using Overview index
+        //#TODO - optimize using Overview index... maybe
         //make static
         const newJournal = JSON.parse(JSON.stringify(dataJournal)) as DataJournal;
+
+        if (trans.defs) trans.defs = DJ.ensureValidDefTransactionObject(trans.defs);
+        if (trans.entries) trans.entries = DJ.ensureValidEntryTransactionObject(trans.entries);
         
         //creates
         if (trans.defs.create) {
@@ -542,7 +569,7 @@ export class DJ {
                     newJournal.defs.push(DJ.makeDef(def));
                     return;
                 }
-                if (existing._updated > def._updated) return;
+                if (existing._updated > def._updated!) return;
                 //entry and existing both exist, def is newer
                 //I added this filter later, don't fully grasp why I have to remove this
                 //rather than just mutate existing
@@ -550,6 +577,7 @@ export class DJ {
                 //this spread notation will replace any existing props with what's in `def`,
                 //while not deleting any other props that may already exist
                 existing = { ...existing, ...def };
+                if(def._updated === undefined) existing._updated = DJ.makeEpochStr(); //force updated change
                 newJournal.defs.push(existing);
             })
         }
@@ -561,7 +589,7 @@ export class DJ {
                     newJournal.entries.push(DJ.makeEntry(entry));
                     return;
                 }
-                if (existing._updated > entry._updated) return;
+                if (existing._updated > entry._updated!) return;
                 //entry and existing both exist, def is newer
                 //I added this filter later, don't fully grasp why I have to remove this
                 //rather than just mutate existing
@@ -898,7 +926,151 @@ export class DJ {
             if (isImportant) throw new Error(errMessage);
             console.warn(errMessage);
         }
+    }
 
+    static diffReport(from: DataJournal, to: DataJournal): DiffReport {
+
+        let returnObj: DiffReport = {
+            createdDefs: 0,
+            createdEntries: 0,
+            updatedDefs:  0,
+            updatedEntries:  0,
+            sameDefs:  0,
+            sameEntries:  0,
+            deleteDefs:  0,
+            deleteEntries:  0,
+            defDiffs: [],
+            entryDiffs: []
+        };
+
+        //deletd defs have to be handled differently & also dont' show up in defDiffs
+        from.defs.forEach(fromDef=>{
+            if(to.defs.some(toDef=> toDef._id === fromDef._id)) return;
+            returnObj.deleteDefs! += 1;
+        })
+        
+        to.defs.forEach(toDef=>{
+            const existingFromDef = from.defs.find(fromDef=>fromDef._id === toDef._id);
+            if(existingFromDef === undefined){
+                returnObj.createdDefs! += 1;
+                returnObj.defDiffs?.push(toDef);
+                return
+            }
+            const defIsSame = existingFromDef._updated === toDef._updated;
+            if(defIsSame){
+                returnObj.sameDefs! += 1;
+                return
+            }
+            //def was modified
+            returnObj.updatedDefs! += 1;
+            const objectDiff = compareShallowObjects(toDef, existingFromDef);
+            returnObj.defDiffs?.push(objectDiff);
+        })
+
+        to.entries.forEach(toEntry=>{
+            const existingFromEntry = from.entries.find(fromEntry=>fromEntry._id === toEntry._id);
+            if(existingFromEntry === undefined){
+                returnObj.createdEntries! += 1;
+                returnObj.entryDiffs?.push(toEntry);
+                return
+            }
+            const entryIsSame = existingFromEntry._updated === toEntry._updated;
+            if(entryIsSame){
+                returnObj.sameEntries! += 1;
+                return
+            }
+            //check if entry was deleted
+            if(toEntry._deleted && (existingFromEntry._deleted === undefined || existingFromEntry._deleted == false)){
+                returnObj.deleteEntries! += 1;
+                return
+            }
+            //entry was modified
+            returnObj.updatedEntries! += 1;
+            const objectDiff = compareShallowObjects(toEntry, existingFromEntry);
+            returnObj.entryDiffs?.push(objectDiff);
+        })
+
+        return returnObj
+
+        //local helper function - thanks to AI for this.
+        function compareShallowObjects(A: object, B: object): object {
+            const differences: { [key: string]: any } = {};
+          
+            for (const key in A) {
+              if (A.hasOwnProperty(key)) {
+                if (B.hasOwnProperty(key)) {
+                  if (A[key] !== B[key]) {
+                    differences[key] = A[key];
+                  }
+                } else {
+                  differences[key] = A[key];
+                }
+              }
+            }
+          
+            for (const key in B) {
+              if (B.hasOwnProperty(key)) {
+                if (!A.hasOwnProperty(key)) {
+                  differences[key] = "- REMOVED: " + B[key] ;
+                }
+              }
+            }
+          
+            return differences;
+          }
+    }
+
+    static ensureValidDefTransactionObject(defTransaction: HalfTransaction): HalfTransaction {
+        if (defTransaction.create) {
+            defTransaction.create = defTransaction.create.map(def => DJ.ensureSettableDef(def));
+        }
+        if (defTransaction.replace) {
+            defTransaction.replace = defTransaction.replace.map(def => DJ.ensureSettableDef(def));
+        }
+        if (defTransaction.modify) {
+            defTransaction.modify = defTransaction.modify.map(def => DJ.ensureAppendable(def));
+        }
+        if (defTransaction.delete) {
+            if (!Array.isArray(defTransaction.delete)) throw new Error("The delete property of a transaction should be an array of strings")
+        }
+        return defTransaction
+    }
+
+    static ensureValidEntryTransactionObject(defTransaction: HalfTransaction): HalfTransaction {
+        if (defTransaction.create) {
+            defTransaction.create = defTransaction.create.map(entry => DJ.ensureSettableEntry(entry));
+        }
+        if (defTransaction.replace) {
+            defTransaction.replace = defTransaction.replace.map(entry => DJ.ensureSettableEntry(entry));
+        }
+        if (defTransaction.modify) {
+            defTransaction.modify = defTransaction.modify.map(entry => DJ.ensureAppendable(entry));
+        }
+        if (defTransaction.delete) {
+            if (!Array.isArray(defTransaction.delete)) throw new Error("The delete property of a transaction should be an array of strings")
+        }
+        return defTransaction
+    }
+
+    static ensureAppendable(element: Partial<Entry> | Partial<Def>): TransactionUpdateMember {
+        if (!Object.hasOwn(element, '_id')) {
+            console.error('No ID element:', element);
+            throw new Error("No _id found on element");
+        }
+        if (element._updated === undefined) element._updated = DJ.makeEpochStr();
+        return element as TransactionUpdateMember
+    }
+
+    static ensureSettableEntry(entry: Partial<Entry>): Entry {
+        if (entry._updated === undefined) entry._updated = DJ.makeEpochStr();
+        if (!DJ.isValidEntry(entry)) throw new Error('Invalid entry found, see log around this');
+        return entry as Entry
+    }
+
+    static ensureSettableDef(def: Partial<Def>): Def {
+        if (def._updated === undefined) def._updated = DJ.makeEpochStr();
+        if (!DJ.isValidDef(def)) throw new Error('Invalid def found, see log around this');
+        return def as Def
     }
 
     //#region 

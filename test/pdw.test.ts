@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import * as pdw from '../src/pdw';
-import {InMemoryDb} from '../src/connectors/Strawman'
+import {InMemoryDb} from '../src/connectors/inMemoryConnector'
 import * as CandT from '../src/ConnectorsAndTranslators'
 import { Def, DefType, DJ, Entry, TransactionUpdateMember } from '../src/DJ';
 // import { Temporal } from 'temporal-polyfill';
@@ -26,8 +26,8 @@ describe('Basic PDW Creation', () => {
         expect(pdwRef.translators.length).toBe(0);
         expect(pdwRef.connectors.length).toBe(1);
         expect((await pdwRef.query()).length).toBe(0);
-        //@ts-expect-error - hacking to test my tester
-        pdwRef.localData.defs.push({_id:'testing clear capability for test'})
+        //@ts-expect-error bit of a shortcut here is ok
+        pdwRef.connectors[0].commit({defs: {create: [{_id:'tobedeleted',_type:'TEXT',_updated:'m0a3fajl'}]},entries:{}})
         expect(pdwRef.getDefs().length).toBe(1);
 
         //testing the tester suite, basically, here....
@@ -51,8 +51,10 @@ describe('Basic PDW Creation', () => {
             ]
         } 
         pdwRef = await pdw.PDW.newPDW(singleTranslatorConfig);
-        expect(pdwRef.connectors.length).toBe(0);
+        expect(pdwRef.connectors.length).toBe(1); //default in-memory connector
         expect(pdwRef.translators.length).toBe(1);
+        //#THINK - how should this be handled
+        // await pdwRef.
         expect(pdwRef.getDefs().length).toBe(3);
         expect(pdwRef.getDefs().find(def=>def._id==='BOOK_READ_NAME')?._desc)
             .toEqual('The name of the book you read.') //data is loaded
@@ -72,7 +74,7 @@ describe('Basic PDW Creation', () => {
             ]
         }
         pdwRef = await pdw.PDW.newPDW(dualTranslatorConfig);
-        expect(pdwRef.connectors.length).toBe(0);
+        expect(pdwRef.connectors.length).toBe(1); //default in-memory connector
         expect(pdwRef.translators.length).toBe(2);
         expect(pdwRef.getDefs().length).toBe(3); //one def was updated
         expect(pdwRef.getDefs().find(def=>def._id==='BOOK_READ_NAME')?._desc)
@@ -87,7 +89,7 @@ describe('Basic PDW Creation', () => {
         const singleConfig: pdw.Config = {
             connectors: [
                 {
-                    serviceName: 'Strawman In-Memory Database',
+                    serviceName: 'In-Memory Database',
                 }
             ]
         }
@@ -103,10 +105,10 @@ describe('Basic PDW Creation', () => {
         const dualConfig: pdw.Config = {
             connectors: [
                 {
-                    serviceName: 'Strawman In-Memory Database',
+                    serviceName: 'In-Memory Database',
                 },
                 {
-                    serviceName: 'Strawman In-Memory Database',
+                    serviceName: 'In-Memory Database',
                 }
             ]
         }
@@ -137,7 +139,7 @@ describe('Basic PDW Creation', () => {
         //no non-required keys are spawned - this is desired?
         expect(Object.keys(retreivedDef).length).toBe(3);
         
-        //appending the Def
+        //modifying the Def
         let myUpdate: Def  = {
             _id: 'defOne',
             _updated: 'm0ofzzzz', //manually supplied newer update time
@@ -150,16 +152,15 @@ describe('Basic PDW Creation', () => {
         expect(retreivedDef._updated).toBe('m0ofzzzz');
         expect(retreivedDef._desc).toEqual('Now with a description');
         
-        //appending a new field doesn't delete existing ones
-        let secondUpdate: Partial<TransactionUpdateMember> = {
+        //modifying a new field doesn't delete existing ones
+        let secondUpdate: TransactionUpdateMember = { 
             _id: 'defOne',
             _lbl: 'Now with label',
         }
-        //@ts-expect-error - type barking
-        await pdwRef.setDefs({append: [secondUpdate]})
+        await pdwRef.setDefs({modify: [secondUpdate]})
         expect(pdwRef.getDefs().length).toBe(1);
         retreivedDef = pdwRef.getDefs()[0];
-        expect(retreivedDef._updated).not.toBe('m0ofzzzz');
+        expect(retreivedDef._updated).not.toBe('m0ofzzzz'); //was changed during update
         expect(retreivedDef._lbl).toEqual('Now with label'); //is added
         expect(retreivedDef._desc).toEqual('Now with a description'); //is NOT REMOVED!
         
@@ -214,13 +215,123 @@ describe('Basic PDW Creation', () => {
         pdwRef.clearForTest();
     }
 
-    test('Using Connectors AND Translators', () => {
+    test('Using Connectors AND Translators', async () => {
         /**
          * A common use case in real world, I expect.
          * Load data from static files to memory, and
          * make connections to database(s). Capability
          * to effectively query **all** of it.
          */
+        const config: pdw.Config = {
+            translators: [
+                {
+                    serviceName: 'JSON',
+                    filePath: 'test/localTestFileDir/dataset.json'
+                },
+            ],
+            connectors: [{
+                serviceName: 'In-Memory Database'
+            }]
+        };
+        pdwRef = await pdw.PDW.newPDW(config);
+        expect(pdwRef.connectors.length).toBe(1);
+        expect(pdwRef.translators.length).toBe(1);
+        //wouldn't typically grab the connector directly, but 
+        //the test is seeing if the translator JSON file was
+        //imported to the connector, so this is the only way
+        const connector = pdwRef.connectors[0];
+        const connectorDefs = connector.getDefs();
+        expect(connectorDefs).toEqual([
+            {
+                "_id": "BOOK_READ_NAME",
+                "_lbl": "Book",
+                "_emoji": "📖",
+                "_desc": "The name of the book you read.",
+                "_updated": "m0ofg4dw",
+                "_scope": "MINUTE",
+                "_rollup": "COUNTDISTINCT",
+                "_type": "TEXT",
+                "_tags": [
+                    "media"
+                ],
+                "_range": []
+            },
+            {
+                "_id": "WORKOUT_TYPE",
+                "_lbl": "Workout Type",
+                "_emoji": "🏋️",
+                "_desc": "You did a broad workout of this type",
+                "_updated": "m0ofg4dw",
+                "_scope": "HOUR",
+                "_type": "SELECT",
+                "_tags": [
+                    "health"
+                ],
+                "_range": [
+                    "CARDIO",
+                    "STRENGTH",
+                    "MOBILITY"
+                ]
+            },
+            {
+                "_id": "WORKOUT_NAME",
+                "_lbl": "Workout Name",
+                "_emoji": "💪",
+                "_desc": "The name of the routine, or brief description of it.",
+                "_updated": "m0ofg4dw",
+                "_scope": "HOUR",
+                "_type": "TEXT",
+                "_tags": [
+                    "health"
+                ],
+                "_range": []
+            }
+        ],)
+        const connectorEntries = await connector.query({});
+        expect(connectorEntries).toEqual([
+            {
+                "_id": "m0ofgfio_gjlp",
+                "_period": "2024-09-04T18:39:00",
+                "_created": "m0ofgfio",
+                "_updated": "m0ofgfio",
+                "_deleted": false,
+                "_note": "A very typical entry",
+                "_source": "Test data",
+                "BOOK_NAME": "Atomic Habits"
+            },
+            {
+                "_id": "m0ogacof_3fjk",
+                "_period": "2024-09-05T11:09:00",
+                "_created": "m0ogacof",
+                "_updated": "m0ogbzzz",
+                "_deleted": false,
+                "_note": "An *updated* entry, now with 3 points",
+                "_source": "Test data, with edit!",
+                "BOOK_NAME": "Atomic Habits",
+                "WORKOUT_TYPE": "CARDIO",
+                "WORKOUT_NAME": "Biked"
+            },
+            {
+                "_id": "m0ogdggg_ca3t",
+                "_period": "2024-09-05T11:05:00",
+                "_created": "m0ogdggg",
+                "_updated": "m0ogdggg",
+                "_deleted": false,
+                "_note": "Got so swole",
+                "_source": "Test data",
+                "WORKOUT_TYPE": "STRENGTH",
+                "WORKOUT_NAME": "Starting Strength A"
+            },
+            {
+                "_id": "m0ofacho_poax",
+                "_period": "2024-09-06T10:38:00",
+                "_created": "m0ofacho",
+                "_updated": "m0zzzzzz",
+                "_deleted": true,
+                "_note": "Demo a deleted entry",
+                "_source": "Test daaata"
+            }
+        ])
     })
     
 })
