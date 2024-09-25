@@ -1,34 +1,15 @@
+//#TODO
+
 import { Temporal } from "temporal-polyfill";
 import { QueryObject, Entry, Def, EpochStr } from "./DJ";
-import { PeriodSummary, PDW } from "./pdw";
+import { PDW } from "./pdw";
 import { Period, PeriodStr, Scope } from "./Period";
 
-
-export interface QueryResponse {
-    success: boolean;
-    count: number;
-    msgs?: string[];
-    params: { paramsIn: object, asParsed: QueryObject };
-    entries: Entry[];
-    summary?: PeriodSummary[];
-    defs: Def[]; //maybe not needed? Entry contains Def
-}
-
-export interface ReducedQueryResponse {
-    success: boolean;
-    entries: Entry[];
-    msgs?: string[];
-}
-
 /**
- * Basic data filtering parameters, supported by the {@link PDW} methods for
- * {@link getDefs} & the 2 other element "getters". The {@link DataStore} methods
- * will get {@link ReducedParams} passed to them by the PDW methods, which will
- * perform the sanitization.
- * Not all parameters are considered for each getter, but it should make
- * things a bit simpler to standardize the params
+ * The full set of parameters that can be used for building a Query.
+ * This is a superset of {@link QueryObject}
  */
-export interface StandardParams {
+export interface StandardParams extends QueryObject {
     /**
      * Include things marked as deleted?
      * no - default
@@ -77,19 +58,13 @@ export interface StandardParams {
      */
     updatedBefore?: Temporal.ZonedDateTime | EpochStr,
     /**
-     * A list of Element.uid. Will filter to Elements in the list.
+     * A list of Entry._id. Will filter to Elements in the list.
      */
-    uid?: UID[] | UID,
+    entryId?: string[] | string,
     /**
-     * A list of {@link SmallID}.
-     * For Entry and Def elements, will return those with Element.did in the list.
+     * A list of Def._id. Will filter to Elements in the list.
      */
-    did?: SmallID[] | SmallID,
-    /**
-     * A list of {@link UID}.
-     * Will return any Entry instance(s) whose Entry.eid is in the list.
-     */
-    eid?: UID[] | UID,
+    defId?: string[] | string,
     /**
      * A list of strings for the associated with Def.lbl
      * Internally, this is translated into a list of _did strings, and behaves like
@@ -380,7 +355,6 @@ export class Query {
         })
     }
 }
-
 
     /**
      * Enforces defaults. Sanity check some types.

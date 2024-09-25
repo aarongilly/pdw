@@ -10,7 +10,7 @@ import { InMemoryDb } from "./connectors/inMemoryConnector.js";
 
 //#region ### INTERFACES ###
 
-export interface Connector {
+export interface Connector { 
 
     commit(trans: TransactionObject): Promise<CommitResponse>;
 
@@ -92,7 +92,7 @@ export class PDW {
         PDW._instance = this;
     }
 
-    /** Probably only for testing? */
+    //@ts-ignore --- For testing
     private clearForTest() {
         //@ts-expect-error // for test, hacking.
         PDW._instance = undefined;

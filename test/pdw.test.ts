@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import * as pdw from '../src/pdw';
 import {InMemoryDb} from '../src/connectors/inMemoryConnector'
-import * as CandT from '../src/ConnectorsAndTranslators'
 import { Def, DefType, DJ, Entry, TransactionUpdateMember } from '../src/DJ';
 // import { Temporal } from 'temporal-polyfill';
 
@@ -39,7 +38,7 @@ describe('Basic PDW Creation', () => {
         expect(()=>{
             pdw.PDW.getPDW(); // the instance has been destroyed
         }).toThrowError()
-    })
+    }) 
 
     test('Using Translators', async () => {
         const singleTranslatorConfig: pdw.Config = {
@@ -56,7 +55,7 @@ describe('Basic PDW Creation', () => {
         //#THINK - how should this be handled
         // await pdwRef.
         expect(pdwRef.getDefs().length).toBe(3);
-        expect(pdwRef.getDefs().find(def=>def._id==='BOOK_READ_NAME')?._desc)
+        expect(pdwRef.getDefs().find(def=>def._id==='BOOK_NAME')?._desc)
             .toEqual('The name of the book you read.') //data is loaded
         expect((await pdwRef.query()).length).toBe(4);
         //@ts-expect-error - hacking to test my tests
@@ -77,7 +76,7 @@ describe('Basic PDW Creation', () => {
         expect(pdwRef.connectors.length).toBe(1); //default in-memory connector
         expect(pdwRef.translators.length).toBe(2);
         expect(pdwRef.getDefs().length).toBe(3); //one def was updated
-        expect(pdwRef.getDefs().find(def=>def._id==='BOOK_READ_NAME')?._desc)
+        expect(pdwRef.getDefs().find(def=>def._id==='BOOK_NAME')?._desc)
             .toEqual('The name of the book you read. WITH UPDATE') //updated def was used
         expect((await pdwRef.query()).length).toBe(5); //one entry was added
 
@@ -243,7 +242,7 @@ describe('Basic PDW Creation', () => {
         const connectorDefs = connector.getDefs();
         expect(connectorDefs).toEqual([
             {
-                "_id": "BOOK_READ_NAME",
+                "_id": "BOOK_NAME",
                 "_lbl": "Book",
                 "_emoji": "📖",
                 "_desc": "The name of the book you read.",

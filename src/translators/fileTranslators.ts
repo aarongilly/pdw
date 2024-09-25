@@ -1,8 +1,9 @@
 import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as YAML from 'yaml';
-import * as dj from '../DJ.js'
+import * as dj from '../DJ.js';
 import { Translator } from '../pdw.js';
+import { AliasKeyer, AliasKeyes } from '../AliasKeyer.js';
 
 //#region ### EXPORTED FUNCTIONS ###
 export function dataJournalToFile(filepath: string, data: dj.DataJournal) {
@@ -12,7 +13,7 @@ export function dataJournalToFile(filepath: string, data: dj.DataJournal) {
     if (fileType === 'yaml') return new YamlTranslator().fromDataJournal(data, filepath);
     if (fileType === 'csv') return new CsvTranslator().fromDataJournal(data, filepath);
     if (fileType === 'markdown') return new MarkdownTranslator().fromDataJournal(data, filepath);
-    throw new Error('Unimplemented export type: ' + fileType)
+    throw new Error('Unimplemented export type: ' + fileType);
 }
 
 export async function fileToDataJournal(filepath: string) {
@@ -22,18 +23,22 @@ export async function fileToDataJournal(filepath: string) {
     if (fileType === 'yaml') return await new YamlTranslator().toDataJournal(filepath);
     if (fileType === 'csv') return await new CsvTranslator().toDataJournal(filepath);
     if (fileType === 'markdown') return new MarkdownTranslator().toDataJournal(filepath);
-    throw new Error('Unimplemented import type: ' + fileType)
+    throw new Error('Unimplemented import type: ' + fileType);
 }
 
 //#endregion
 
 //#region #### DONE ####
 
+/**
+ * Raw Data Journals output to and input from JSON. 
+ * The Data Journal native format. Nothing changed at all.
+ */
 export class JsonTranslator implements Translator {
     getServiceName(): string {
         return 'JSON Translator'
     }
-    
+
     async fromDataJournal(data: dj.DataJournal, filepath: string) {
         // data = pdw.PDW.flattenCompleteDataset(data); //remove circular references and stuff
         let json = JSON.stringify(data);
@@ -51,155 +56,78 @@ export class JsonTranslator implements Translator {
 }
 
 /**
- * This was crazy easy.
- * I made it harder just to prove that I could simultaneusly read
- * & write from different datafiles with different source formats.
- * json -> dates stored as EpochStr
- * yaml -> dates stored as ISO Strings (native YAML dates)
- * excel -> dates stored as Local Strings AND native Excel dates! 
+ * The Data Journal with minor modifications, output to and input from YAML.
+ * Including minor modifications:
+ * 1. using {@link AliasKeyer} to standardize prop
+ * length to make visually parsing Defs & Entries easier.
+ * 2. changing the _created & _updated keys (called "cre" and "upd") to use
+ * ISO strings.
  */
 export class YamlTranslator implements Translator {
     getServiceName(): string {
         return 'YAML Translator'
     }
-    
+
     async fromDataJournal(data: dj.DataJournal, filepath: string) {
+
+        const aliasedDJ = AliasKeyer.applyAliases(data,YamlTranslator.aliasKeys);
         //crazy simple implementation
-        const newData = this.translateToYamlFormat(data);
+        const newData = this.translateToYamlFormat(aliasedDJ);
         const yaml = YAML.stringify(newData);
         fs.writeFileSync(filepath, yaml, 'utf8');
     }
 
     async toDataJournal(filepath: string): Promise<dj.DataJournal> {
         const file = YAML.parse(fs.readFileSync(filepath).toString());
-        let returnData: dj.DataJournal = {
+        const aliasedDJ: dj.DataJournal = {
             defs: file.defs,
             entries: file.entries
         }
-        this.translateFromYamlFormat(returnData);
-
-        return dj.DJ.addOverview(returnData);
-    }
-
-    translateFromYamlFormat(data: dj.DataJournal) {
-        data.defs = data.defs.map(def => this.translateElementFromYaml(def)) as unknown as dj.Def[];
-        data.entries = data.entries.map(element => this.translateElementFromYaml(element)) as unknown as dj.Entry[];
-        return data;
-    }
-
-    translateElementFromYaml(element: pdw.ElementLike): pdw.ElementLike {
-        let returnObj: pdw.ElementLike = {
-            _uid: element.uid,
-            _created: this.makeEpochStrFromISO(element.cre),
-            _updated: this.makeEpochStrFromISO(element.upd),
-            _deleted: element.del,
-            _did: element.did
-        }
-        if (element.dsc !== undefined) returnObj._desc = element.dsc
-        if (element.eid !== undefined) returnObj._eid = element.eid
-        if (element.pid !== undefined) returnObj._pid = element.pid
-        if (element.lbl !== undefined) returnObj._lbl = element.lbl
-        if (element.tag !== undefined) returnObj._tags = element.tag
-        if (element.emo !== undefined) returnObj._emoji = element.emo
-        if (element.scp !== undefined) returnObj._scope = element.scp
-        if (element.typ !== undefined) returnObj._type = element.typ
-        if (element.rlp !== undefined) returnObj._rollup = element.rlp
-        if (element.per !== undefined) returnObj._period = element.per
-        if (element.nte !== undefined) returnObj._note = element.nte
-        if (element.src !== undefined) returnObj._source = element.src
-        if (element.dids !== undefined) returnObj._dids = element.dids
-        if (element.pts !== undefined) returnObj._pts = readPointDefMap(element.pts)//.map((pt: any) => translatePointDefFromYaml(pt))
-        if (element.ep !== undefined) {
-            Object.keys(element.ep).forEach(key => {
-                returnObj[key] = element.ep[key];
-            })
-        }
-
-        return returnObj
-
-        function readPointDefMap(pdMap: any): any {
-            const keys = Object.keys(pdMap);
-            return keys.map(key => {
-                let pd = pdMap[key];
-                let returnObj: any = {};
-                if (pd.dsc !== undefined) returnObj._desc = pd.dsc
-                if (pd.pid !== undefined) returnObj._pid = pd.pid
-                if (pd.lbl !== undefined) returnObj._lbl = pd.lbl
-                if (pd.emo !== undefined) returnObj._emoji = pd.emo
-                if (pd.typ !== undefined) returnObj._type = pd.typ;
-                if (pd.rlp !== undefined) returnObj._rollup = pd.rlp
-                if (pd.opts !== undefined) returnObj._opts = pd.opts
-                return returnObj;
-            })
-        }
+        const translated = this.translateFromYamlFormat(aliasedDJ);
+        const returnDJ = AliasKeyer.unapplyAliases(translated,YamlTranslator.aliasKeys);
+        return dj.DJ.addOverview(returnDJ);
     }
 
     translateToYamlFormat(data: dj.DataJournal) {
-
-        let staticCopy = JSON.parse(JSON.stringify(data));
-        if (staticCopy.overview !== undefined) {
-            let temporal = pdw.parseTemporalFromEpochStr(staticCopy.overview.lastUpdated);
-            staticCopy.overview.lastUpdated = temporal.toString().split('[')[0]
-        }
-        staticCopy.defs = staticCopy.defs.map((def: any) => this.translateElementToYaml(def)) as unknown as pdw.DefData[];
-        staticCopy.entries = staticCopy.entries.map((entry: any) => this.translateElementToYaml(entry)) as unknown as pdw.EntryData[];
-        return staticCopy;
+        //make static
+        const newData = JSON.parse(JSON.stringify(data))
+        newData.defs.forEach(def => {
+            if (def.upd) def.upd = dj.DJ.parseDateFromEpochStr(def.upd).toISOString();
+        })
+        newData.entries.forEach(entry => {
+            if (entry.upd) entry.upd = dj.DJ.parseDateFromEpochStr(entry.upd).toISOString();
+            if (entry.cre) entry.cre = dj.DJ.parseDateFromEpochStr(entry.cre).toISOString();
+        })
+        return newData
     }
 
-    /**
-     * Translates any kind of Element into a Yaml-approved format.
-     * @param element tag, def, or entry
-     * @returns an object with Yaml-expeted formatting
-     */
-    translateElementToYaml(element: any): any {
-        if (element._tempCreated !== undefined) delete element._tempCreated
-        if (element._tempUpdated !== undefined) delete element._tempUpdated
-        let returnObj: any = {
-            uid: element._uid,
-            cre: pdw.parseTemporalFromEpochStr(element._created).toString().split('[')[0],
-            upd: pdw.parseTemporalFromEpochStr(element._updated).toString().split('[')[0],
-            del: element._deleted,
-        }
-        if (element._desc !== undefined) returnObj.dsc = element._desc
-        if (element._did !== undefined) returnObj.did = element._did
-        if (element._pid !== undefined) returnObj.pid = element._pid
-        if (element._lbl !== undefined) returnObj.lbl = element._lbl
-        if (element._emoji !== undefined) returnObj.emo = element._emoji
-        if (element._scope !== undefined) returnObj.scp = element._scope
-        if (element._tags !== undefined) returnObj.tag = element._tags;
-        if (element._pts !== undefined) returnObj.pts = makeYamlPointDefMap(element._pts)//.map((pt: any) => translatePointDefToYaml(pt));
-        if (element._eid !== undefined) returnObj.eid = element._eid
-        if (element._period !== undefined) returnObj.per = element._period
-        if (element._source !== undefined) returnObj.src = element._source
-        if (element._note !== undefined) returnObj.nte = element._note
-        if (element._dids !== undefined) returnObj.dids = element._dids;
+    translateFromYamlFormat(data: any) {
+        data.defs.forEach(def => {
+            if (def.upd) def.upd = dj.DJ.makeEpochStrFrom(def.upd);
+        })
+        data.entries.forEach(entry => {
+            if (entry.upd) entry.upd = dj.DJ.makeEpochStrFrom(entry.upd);
+            if (entry.cre) entry.cre = dj.DJ.makeEpochStrFrom(entry.cre);
+        })
+        return data
+    }
 
-        let entryPoints: any = Object.keys(element).filter(key => key.substring(0, 1) !== '_')
-        if (entryPoints.length > 0) {
-            returnObj.ep = {};
-            entryPoints.forEach((key: any) => {
-                returnObj.ep[key] = element[key];
-            })
-        }
-
-        return returnObj
-
-        function makeYamlPointDefMap(pdArr: pdw.PointDefLike[]): any {
-            let returnObj: any = {};
-            pdArr.forEach(pd => {
-                //@ts-ignore
-                if (pd.__def !== undefined) delete pd.__def;
-                returnObj[pd._pid!] = {} as any;
-                if (pd._desc !== undefined) returnObj[pd._pid!].dsc = pd._desc
-                if (pd._pid !== undefined) returnObj[pd._pid!].pid = pd._pid
-                if (pd._lbl !== undefined) returnObj[pd._pid!].lbl = pd._lbl
-                if (pd._emoji !== undefined) returnObj[pd._pid!].emo = pd._emoji
-                if (pd._type !== undefined) returnObj[pd._pid!].typ = pd._type;
-                if (pd._rollup !== undefined) returnObj[pd._pid!].rlp = pd._rollup
-                if (pd._opts !== undefined) returnObj[pd._pid!].opts = pd._opts
-            })
-            return returnObj;
-        }
+    static aliasKeys = {
+        "id": "_id",
+        "per": "_period",
+        "lbl": "_lbl",
+        "typ": "_type",
+        "dsc": "_desc",
+        "emo": "_emoji",
+        "rlp": "_rollup",
+        "tag": "_tags",
+        "rng": "_range",
+        "scp": "_scope",
+        "cre": "_created",
+        "upd": "_updated",
+        "del": "_deleted",
+        "src": "_source",
+        "nte": "_note",
     }
 }
 
@@ -234,6 +162,11 @@ export class MarkdownTranslator implements Translator {
 }
 
 export class CsvTranslator implements Translator {
+    //#TODO - all of this.
+    getServiceName(): string {
+        return 'CSV Translator'
+    }
+
     async fromDataJournal(allData: dj.DataJournal, filename: string, useFs = true) {
         if (useFs) XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();
@@ -410,6 +343,22 @@ export class CsvTranslator implements Translator {
             }
             throw new Error('Unhandled period val...')
         }
+    }
+
+    async fromEntries(entries: dj.Entry[], filename: string, useFs = true) {
+        
+    }
+
+    async toEntries(filepath: string, useFs = true) {
+
+    }
+
+    async loadAliasKeysFromCSV(filepath: string, useFs = true): Promise<AliasKeyes> {
+
+    }
+
+    loadAliasKeys(aliasKeys: AliasKeyes) {
+        
     }
 }
 

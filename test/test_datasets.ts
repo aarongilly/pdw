@@ -2,7 +2,7 @@ import * as dj from "../src/DJ.js"
 
 //#region --- DEFS
 export const bookDef: dj.Def = {
-    _id: "BOOK_READ_NAME",
+    _id: "BOOK_NAME",
     _lbl: "Book",
     _emoji: "📖",
     _desc: "The name of the book you read.",
@@ -255,7 +255,7 @@ export const expectedOverview: dj.Overview = {
     },
     index: {
         defMap: {
-            "BOOK_READ_NAME": 0,
+            "BOOK_NAME": 0,
             "WORKOUT_TYPE": 1,
             "WORKOUT_NAME": 2
         },
@@ -266,7 +266,7 @@ export const expectedOverview: dj.Overview = {
             "M0OFACHO_POAX": 3,
         },
         defLblToIdMap: {
-            "Book": "BOOK_READ_NAME",
+            "Book": "BOOK_NAME",
             "Workout Name": "WORKOUT_NAME",
             "Workout Type": "WORKOUT_TYPE",
         }
@@ -393,7 +393,7 @@ export const biggerJournalTransaction: dj.TransactionObject = {
             }
         ] as dj.Def[],
         delete: [
-            "BOOK_READ_NAME",
+            "BOOK_NAME",
         ]
     },
     entries: {

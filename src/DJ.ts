@@ -33,7 +33,7 @@ export type Markdown = string
  * 
  * @default COUNT
  * 
- * Note - Rollups are not handled in this codebase.
+ * Note - Rollups are not handled in this codebase. 
  */
 export enum Rollup {
     COUNT = 'COUNT',

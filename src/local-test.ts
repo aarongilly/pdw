@@ -3,9 +3,9 @@ import * as ie from './translators/fileTranslators.js'
 // import * as obs from './translators/obsidianTranslator.js'
 // import * as XLSX from 'xlsx'
 // import * as fs from 'fs'
-import * as testdata from '../test/test_datasets.js'
+import * as testData from '../test/test_datasets.js'
 import { Def, DefType, DJ } from './DJ.js'
- './DJ.js'
+import { AliasKeyer, AliasKeyes } from './AliasKeyer.js';
 
 // import { Query, Scope } from './pdw.js'
 // import { exportToFile, importFromFile } from './dataStores/fileAsyncDataStores.js';
@@ -21,9 +21,30 @@ import { Def, DefType, DJ } from './DJ.js'
 //         }
 //     ]
 // } 
-let pdwRef = await pdw.PDW.newPDW();
 
-
+const aliasKeys: AliasKeyes = {
+    "id": "_id",
+    "per": "_period",
+    "lbl": "_lbl",
+    "typ": "_type",
+    "dsc": "_desc",
+    "emo": "_emoji",
+    "rlp": "_rollup",
+    "tag": "_tags",
+    "rng": "_range",
+    "scp": "_scope",
+    "cre": "_created",
+    "upd": "_updated",
+    "del": "_deleted",
+    "src": "_source",
+    "nte": "_note",
+    "workout name": "WORKOUT_NAME",
+    "workout type": "WORKOUT_TYPE",
+    "book": "BOOK_NAME",
+};
+const normalDJ = testData.biggerJournal;
+const aliasedDJ = AliasKeyer.applyAliases(normalDJ,aliasKeys);
+const reconstitutedDJ = AliasKeyer.unapplyAliases(aliasedDJ,aliasKeys);
 
 console.log('HELLO WORLD');
 

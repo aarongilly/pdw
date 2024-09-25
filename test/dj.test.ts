@@ -235,7 +235,7 @@ describe('Data Journal Modification', () => {
     const replacedDef = defs.find(def=>def._id=='WORKOUT_TYPE')!;
     expect(replacedDef._desc).toBe('Modified Description!'); //changed
     expect(replacedDef._lbl).not.toBeUndefined(); //not deleted implicitly
-    expect(defs.find(def=>def._id==='BOOK_READ_NAME')).toBeUndefined(); //was deleted via delete
+    expect(defs.find(def=>def._id==='BOOK_NAME')).toBeUndefined(); //was deleted via delete
 
     const modifiedEntry = entries.find(entry=>entry._id === "m0ofacho_poax");
     expect(modifiedEntry?._note).toBe("Undeleted via modification, should retain '_source'");
