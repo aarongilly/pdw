@@ -29,18 +29,37 @@ describe('Round Tripping File Types', () => {
         expect(dataset).toEqual(comparisonDataset);
     })
 
-    // test('Roundtrip CSV', async () => {
-    //     /* Pull the data out */
-    //     const dataset = testData.biggerJournal;
-    //     /* Write it to file */
-    //     let yamlTranslator = new ie.CsvTranslator();
-    //     await yamlTranslator.fromDataJournal(dataset, 'test/localTestFileDir/roundtrip.csv');
-    //     /* Load data from the file */
-    //     const comparisonDataset = await yamlTranslator.toDataJournal('test/localTestFileDir/roundtrip.csv');
-    //     //The store name only comes with the imported data
-    //     delete comparisonDataset.overview;
-    //     expect(dataset).toEqual(comparisonDataset);
-    // })
+    test('Roundtrip CSV', async () => {
+        /* Pull the data out */
+        const dataset = testData.biggerJournal;
+        /* Write it to file */
+        let csvTranslator = new ie.CsvTranslator();
+        await csvTranslator.fromDataJournal(dataset, 'test/localTestFileDir/roundtrip.csv');
+        /* Load data from the file */
+        const comparisonDataset = await csvTranslator.toDataJournal('test/localTestFileDir/roundtrip.csv');
+        //The store name only comes with the imported data
+        delete comparisonDataset.overview;
+        expect(removeEmptyArraysAndUndefined(dataset)).toEqual(removeEmptyArraysAndUndefined(comparisonDataset));
+        
+        //entries and defs only variants
+        await csvTranslator.fromDefs(dataset.defs,'test/localTestFileDir/defsOnly.csv')
+        await csvTranslator.fromEntries(dataset.entries,'test/localTestFileDir/entriesOnly.csv')
+        const parsedDefs = await csvTranslator.toDefs('test/localTestFileDir/defsOnly.csv');
+        const parsedEntries = await csvTranslator.toEntries('test/localTestFileDir/entriesOnly.csv')
+
+        expect(parsedDefs).toEqual(dataset.defs)
+        expect(parsedEntries).toEqual(dataset.entries)
+
+        //So right now there's no way to reconstitute an empty Array roundtrip, comes back as undefined. Also empty
+        //keys are showing up despite having an undefined value. So removing all that for the sake of test.
+        function removeEmptyArraysAndUndefined(dataset){
+            dataset.defs.forEach(def=>{
+                Object.keys(def).forEach(key=>{
+                    if(def[key]===undefined || (Array.isArray(def[key]) && def[key].length === 0)) delete def[key];
+                })
+            })
+        }
+    })
 
     // test('Roundtrip Excel', async () => {
     //     /* Load up fresh PDW instance */

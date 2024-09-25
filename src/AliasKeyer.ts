@@ -13,7 +13,7 @@ export class AliasKeyer {
             defs: [],
             entries: []
         };
-        const keyAliases = flipToKeyAlias(aliasKeys);
+        const keyAliases = AliasKeyer.flipToKeyAlias(aliasKeys);
         dataJournal.defs.forEach(def => {
             let newDef = Object.fromEntries(
                 Object
@@ -40,40 +40,15 @@ export class AliasKeyer {
     }
 
     static unapplyAliases(dataJournal: DataJournal, aliasKeys: AliasKeyes) {
-        const returnObj = {
-            defs: [],
-            entries: []
-        };
-        dataJournal.defs.forEach(def => {
-            let newDef = Object.fromEntries(
-                Object
-                    .entries(def)
-                    .map(([key, value]) => {
-                        if (aliasKeys[key] === undefined) return [key, value]
-                        return [aliasKeys[key], value]
-                    }))
-                    //@ts-expect-error
-                returnObj.defs.push(newDef);
-        })
-        dataJournal.entries.forEach(entry => {
-            let newEntry = Object.fromEntries(
-                Object
-                    .entries(entry)
-                    .map(([key, value]) => {
-                        if (aliasKeys[key] === undefined) return [key, value]
-                        return [aliasKeys[key], value]
-                    }))
-                    //@ts-expect-error
-                returnObj.entries.push(newEntry);
-        })
-        return returnObj;
+        //huh, turns out this was pretty simple
+        return AliasKeyer.applyAliases(dataJournal,AliasKeyer.flipToKeyAlias(aliasKeys));
     }
-}
-
-function flipToKeyAlias(aliasKey: AliasKeyes): AliasKeyes /* inverted */ {
-    return Object.fromEntries(
-        Object
+    
+    static flipToKeyAlias(aliasKey: AliasKeyes): AliasKeyes /* inverted */ {
+        return Object.fromEntries(
+            Object
             .entries(aliasKey)
             .map(([key, value]) => [value, key])
-    );
+        );
+    }
 }

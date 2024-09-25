@@ -70,7 +70,7 @@ export class YamlTranslator implements Translator {
 
     async fromDataJournal(data: dj.DataJournal, filepath: string) {
 
-        const aliasedDJ = AliasKeyer.applyAliases(data,YamlTranslator.aliasKeys);
+        const aliasedDJ = AliasKeyer.applyAliases(data, YamlTranslator.aliasKeys);
         //crazy simple implementation
         const newData = this.translateToYamlFormat(aliasedDJ);
         const yaml = YAML.stringify(newData);
@@ -84,7 +84,7 @@ export class YamlTranslator implements Translator {
             entries: file.entries
         }
         const translated = this.translateFromYamlFormat(aliasedDJ);
-        const returnDJ = AliasKeyer.unapplyAliases(translated,YamlTranslator.aliasKeys);
+        const returnDJ = AliasKeyer.unapplyAliases(translated, YamlTranslator.aliasKeys);
         return dj.DJ.addOverview(returnDJ);
     }
 
@@ -133,232 +133,261 @@ export class YamlTranslator implements Translator {
 
 //#endregion
 
-export class MarkdownTranslator implements Translator {
-    async fromDataJournal(data: dj.DataJournal, filepath: string) {
-        throw new Error("Method not implemented")
-        // // data = pdw.PDW.flattenCompleteDataset(data); //remove circular references and stuff
-        // let json = JSON.stringify(data);
-        // fs.writeFileSync(filepath, json, 'utf8');
-    }
-
-    async toDataJournal(filepath: string): Promise<dj.DJ> {
-        throw new Error("Method not implemented")
-        // const file = JSON.parse(fs.readFileSync(filepath).toString());
-        // const returnData: dj.DataJournal = {
-        //     defs: file.defs,
-        //     entries: file.entries
-        // }
-        // return dj.DJ.addOverview(returnData);
-    }
-
-    /**
-    * Update the .md files, look for entries, for found entries update them with current values
-    * //#THINK This a good idea? Maybe not.  
-    */
-    async updateInPlace(data: dj.DataJournal, filepath: string) {
-
-        throw new Error("Method not implemented")
-    }
-}
-
 export class CsvTranslator implements Translator {
-    //#TODO - all of this.
     getServiceName(): string {
         return 'CSV Translator'
     }
 
-    async fromDataJournal(allData: dj.DataJournal, filename: string, useFs = true) {
+    /**
+     * Builds a csv file representing an entire data journal. 
+     * Does this by include ALL Def information transposed above the header for
+     * each Def column. Defs are stacked horizontally, whereas entries are 
+     * stacked vertically like a standard csv.
+     */
+    async fromDataJournal(dataJournal: dj.DataJournal, filename: string, useFs = true) {
         if (useFs) XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();
-        const data: string[][] = []
-        data.push(['Row Type', ...combinedTabularHeaders])
-        //@ts-ignore - i'm being lazy here
-        if (allData.defs !== undefined) allData.defs.forEach(def => makeDefAndPointDefsRows(def))
-        //@ts-ignore - not worth the effort
-        if (allData.entries !== undefined) allData.entries.forEach(entry => makeEntryRow(entry))
-        //@ts-ignore - unless you read this again and get mad at yourself
-        if (allData.tags !== undefined) allData.tags.forEach(tag => makeTagRow(tag))
+        const data: string[][] = CsvTranslator.build2DArrayFor(dataJournal);
 
         let exportSht = XLSX.utils.aoa_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, exportSht, 'PDW Export');
+
+        XLSX.utils.book_append_sheet(wb, exportSht, 'Data Journal');
 
         XLSX.writeFile(wb, filename);
-
         return
-
-        function makeDefAndPointDefsRows(def: pdw.DefData) {
-            // console.log(data);
-            data.push([
-                'Def',
-                def._uid, //'_uid',     //entry, tag, def
-                def._created, //'_created', //entry, tag, def
-                def._updated, //'_updated', //entry, tag, def
-                def._deleted.toString().toUpperCase(), //'_deleted', //entry, tag, def
-                def._did, //'_did',     //entry,    , def, pointDef
-                def._lbl, //'_lbl',     //     , tag, def, pointDef
-                def._emoji, //'_emoji',   //     ,    , def, pointDef
-                def._desc, //'_desc',    //     ,    , def, pointDef
-                def._scope, //'_scope',   //     ,    , def
-                JSON.stringify(def._tags),//def._tags, //'_scope',   //     ,    , def
-                '',//'_pid',     //     ,    ,    , pointDef
-                '',//'_type',    //     ,    ,    , pointDef
-                '',//'_rollup',  //     ,    ,    , pointDef
-                '',//'_opts',    //     ,    ,    , pointDef
-                '',//'_eid',     //entry
-                '',//'_period',  //entry
-                '',//'_note',    //entry
-                '',//'_source',  //entry
-                '',//'_vals',    //entry
-            ])
-            def._pts.forEach(pd => {
-                data.push([
-                    'PointDef',
-                    def._uid, //'_uid',     //entry, tag, def
-                    '', //def._created, //'_created', //entry, tag, def
-                    '', //def._updated, //'_updated', //entry, tag, def
-                    '', //def._deleted.toString().toUpperCase(), //'_deleted', //entry, tag, def
-                    def._did, //'_did',     //entry,    , def, pointDef
-                    pd._lbl, //'_lbl',     //     , tag, def, pointDef
-                    pd._emoji, //'_emoji',   //     ,    , def, pointDef
-                    pd._desc, //'_desc',    //     ,    , def, pointDef
-                    '', //pd._scope, //'_scope',   //     ,    , def
-                    '',//def._tags, //'_scope',   //     ,    , def
-                    pd._pid,//'_pid',     //     ,    ,    , pointDef
-                    pd._type, //'',//'_type',    //     ,    ,    , pointDef
-                    pd._rollup, //'',//'_rollup',  //     ,    ,    , pointDef
-
-                    JSON.stringify(pd._opts, null, 2),//.replaceAll('"','""') + '"',//'_opts',    //     ,    ,    , pointDef
-
-                    '',//'_eid',     //entryß
-                    '',//'_period',  //entry
-                    '',//'_note',    //entry
-                    '',//'_source',  //entry
-                    // '',//'_vals',    //entry
-                ])
-            })
-        }
-
-        function makeEntryRow(entry: pdw.EntryData) {
-            let vals: any = {};
-            Object.keys(entry).forEach(key => {
-                if (key.substring(0, 1) === '_') return;
-                let val = entry[key];
-                if (typeof val === 'boolean') return vals[key] = val.toString().toUpperCase();
-                if (typeof val === 'number') return vals[key] = val;
-                if (typeof val === 'string') return vals[key] = val;
-                vals[key] = JSON.stringify(val, null, 2);
-                return vals[key]
-            })
-            data.push([
-                'Entry',
-                entry._uid, //'_uid',     //entry, tag, def
-                entry._created, //'_created', //entry, tag, def
-                entry._updated, //'_updated', //entry, tag, def
-                entry._deleted.toString().toUpperCase(), //'_deleted', //entry, tag, def
-                entry._did, //'_did',     //entry,    , def, pointDef
-                '',//def._lbl, //'_lbl',     //     , tag, def, pointDef
-                '',//def._emoji, //'_emoji',   //     ,    , def, pointDef
-                '',//def._desc, //'_desc',    //     ,    , def, pointDef
-                '',//def._scope, //'_scope',   //     ,    , def
-                '',//def._tags, //'_scope',   //     ,    , def
-                '',//'_pid',     //     ,    ,    , pointDef
-                '',//'_type',    //     ,    ,    , pointDef
-                '',//'_rollup',  //     ,    ,    , pointDef
-                '',//_opts
-                entry._eid,//'_eid',     //entry
-                entry._period,//'',//'_period',  //entry
-                entry._note, //'',//'_note',    //entry
-                entry._source, //'',//'_source',  //entry
-                JSON.stringify(vals, null, 2), //'',//'_vals',    //entry
-            ])
-        }
     }
 
     async toDataJournal(filepath: string, useFs = true): Promise<dj.DataJournal> {
         console.log('loading...');
         if (useFs) XLSX.set_fs(fs);
-        let loadedWb = XLSX.readFile(filepath);
+        let loadedWb = XLSX.readFile(filepath, { dense: true });
         const shts = loadedWb.SheetNames;
-        const sht = loadedWb.Sheets[shts[0]];
-        let elements = XLSX.utils.sheet_to_json(sht, { raw: false }) as any;
+        if (shts.length !== 1) throw new Error("Wrong number of sheets found");
+        const shtData = loadedWb.Sheets[shts[0]]['!data']!;
 
-        let rawDefs: pdw.DefData[] = elements.filter((e: any) => e['Row Type'] === 'Def') as pdw.DefData[];
-        let rawPointDefs: pdw.PointDefData[] = elements.filter((e: any) => e['Row Type'] === 'PointDef') as pdw.PointDefData[];
-        let rawEntries: pdw.EntryData[] = elements.filter((e: any) => e['Row Type'] === 'Entry') as pdw.EntryData[];
+        const defsTransposed: any[] = [];
 
-        let defs = rawDefs.map(rd => makeDef(rd));
-        let entries = rawEntries.map(re => makeEntry(re));
-        rawPointDefs.forEach((rpd: pdw.PointDefData) => {
-            delete rpd['Row Type'];
-            //@ts-expect-error
-            let def = defs.find(d => d._uid === rpd._uid);
-            //@ts-expect-error
-            rpd._opts = rpd._opts === undefined ? undefined : JSON.parse(rpd._opts)
-            def!._pts.push(rpd);
+        //middle slice section
+        const sliceSpot = findSecondNonUndefinedIndex(shtData[0]);
+
+        //this begins a nightmare of complexity and terribleness... 
+        //If you start to have to debug this reconsider your life choices
+        while (shtData[0][0].v !== '---') {
+            const potentialRow = shtData.shift()?.map(cell => cell.v);
+            const header = potentialRow![0];
+            potentialRow?.splice(0, sliceSpot - 1)
+            potentialRow![0] = header;
+            if (potentialRow?.some(val => val !== undefined)) defsTransposed.push(potentialRow);
+        }
+        //remove delimiter separating defs from entries
+        shtData.shift();
+
+        //jam it into an indecipherable mess. 
+        const defs = convert2DArrayToObjects(transposeMatrix(defsTransposed));
+        defs.forEach((def: any) => {
+            if (def._range !== undefined && typeof def._range === 'string') def._range = def._range.split(', ');
+            if (def._tags !== undefined && typeof def._tags === 'string') def._tags = def._tags.split(', ');
+
         })
 
-        /* Trying to clean up some of the junk xlsx adds on there easily */
-        const tempPDW = await pdw.PDW.newPDW([]);
-        await tempPDW.setDefs([], (<pdw.DefData[]>defs));
-        await tempPDW.setEntries([], (<pdw.EntryData[]>entries));
-        let returnData = await tempPDW.getAll({ includeDeleted: 'yes' });
-        //turned out that ⬆️ was the easiest way, huh.
-        return returnData
+        const entryTextValues = shtData.map(row => row.map(cell => cell.w));
+        const entries = convert2DArrayToObjects(entryTextValues);
+        //fix _deleted key - force boolean, and other keys
+        entries.forEach((entry: any) => {
+            if (entry._deleted !== undefined && typeof entry._deleted === 'string') entry._deleted = entry._deleted.toUpperCase().trim() == "TRUE";
+        })
+        //@ts-expect-error
+        return {
+            defs: defs,
+            entries: entries
+        } as dj.DataJournal;
 
-        function makeDef(data: pdw.DefData): pdw.DefData {
-            delete data['Row Type'];
-            //@ts-expect-error
-            data._deleted = data._deleted === "TRUE";
-            data._tags = JSON.parse(data._tags.toString());
-            data._pts = [];
-            return data
-        }
-        function makeEntry(data: pdw.EntryData): pdw.EntryData {
-            delete data['Row Type']
-            //@ts-expect-error
-            data._deleted = data._deleted === "TRUE";
-            data._period = parsePeriod(data._period);
-            data = addVals(data);
-            return data
-        }
-        function addVals(data: any): any {
-            let parsed = JSON.parse(data._vals);
-            //cool object merging syntax
-            return {
-                ...data,
-                ...parsed
-            }
-        }
-
-        function parsePeriod(period: any): string {
-            if (typeof period === 'string') return period
-            if (typeof period === 'number') {
-                period = Math.round(period * 10000) / 10000
-                try {
-                    return Temporal.Instant.fromEpochMilliseconds(Math.round((period - (25567 + 1)) * 86400 * 1000)).toZonedDateTimeISO(Temporal.Now.timeZone()).toPlainDate().toString();
-                } catch (e) {
-                    console.log('did not work');
-
+        //helper functions
+        function findSecondNonUndefinedIndex(array) {
+            let count = 0;
+            for (let i = 0; i < array.length; i++) {
+                if (array[i] !== undefined) {
+                    count++;
+                    if (count === 2) {
+                        return i;
+                    }
                 }
             }
-            throw new Error('Unhandled period val...')
+            return -1; // If no second non-undefined element is found
+        }
+        function transposeMatrix<T>(matrix: T[][]): T[][] {
+            const numRows = matrix.length;
+            const numCols = matrix[0].length;
+
+            const transposedMatrix: T[][] = [];
+
+            for (let i = 0; i < numCols; i++) {
+                transposedMatrix.push([]);
+                for (let j = 0; j < numRows; j++) {
+                    transposedMatrix[i].push(matrix[j][i]);
+                }
+            }
+
+            return transposedMatrix;
+        }
+        function convert2DArrayToObjects<T>(array: T[][]): T[] {
+            const keys = array[0];
+            const objects: T[] = [];
+
+            for (let i = 1; i < array.length; i++) {
+                const object: T = {} as T;
+                for (let j = 0; j < keys.length; j++) {
+                    //@ts-ignore
+                    object[keys[j] as keyof T] = array[i][j];
+                }
+                objects.push(object);
+            }
+
+            return objects;
         }
     }
 
     async fromEntries(entries: dj.Entry[], filename: string, useFs = true) {
-        
+        if (useFs) XLSX.set_fs(fs);
+        const wb = XLSX.utils.book_new();
+
+        const tempDJ = {
+            defs: [],
+            entries: entries
+        }
+        const data: string[][] = CsvTranslator.build2DArrayFor(tempDJ, true);
+
+        let exportSht = XLSX.utils.aoa_to_sheet(data);
+
+        XLSX.utils.book_append_sheet(wb, exportSht, 'Data Journal');
+
+        XLSX.writeFile(wb, filename);
+        return
     }
 
-    async toEntries(filepath: string, useFs = true) {
+    async fromDefs(defs: dj.Def[], filename: string, useFs = true) {
+        if (useFs) XLSX.set_fs(fs);
+        const wb = XLSX.utils.book_new();
 
+        //flatten arrays
+        defs.forEach(def => {
+            //@ts-expect-error
+            if (def._range !== undefined) def._range = def._range.join(', ')
+            //@ts-expect-error
+            if (def._tags !== undefined) def._tags = def._tags.join(', ')
+        })
+
+        let exportSht = XLSX.utils.json_to_sheet(defs);
+
+        XLSX.utils.book_append_sheet(wb, exportSht, 'Data Journal');
+
+        XLSX.writeFile(wb, filename);
+        return
     }
 
-    async loadAliasKeysFromCSV(filepath: string, useFs = true): Promise<AliasKeyes> {
+    async toEntries(filepath: string, useFs = true): Promise<dj.Entry[]> {
+        if (useFs) XLSX.set_fs(fs);
+        const loadedWb = XLSX.readFile(filepath, { raw: true });
+        const shts = loadedWb.SheetNames;
+        if (shts.length !== 1) throw new Error("Wrong number of sheets found");
+        const arrayOfEntries = XLSX.utils.sheet_to_json(loadedWb.Sheets[shts[0]])
 
+        //clean sanity check results
+        arrayOfEntries.forEach((entry: any) => {
+            //since we're reading *everything* as text, need to convert the deleted key
+            if (entry._deleted !== undefined && typeof entry._deleted === 'string') entry._deleted = entry._deleted.toUpperCase().trim() === "TRUE"
+
+            //probably need some sort of method here to sanity check other entry properties for things like arrays & numbers.
+
+            if (!dj.DJ.isValidEntry(entry as Partial<dj.Entry>)) {
+                console.error("INVALID Entry PARSING FOUND 👇")
+                console.error(entry);
+                throw new Error('Entry Parsing resulted in an invalid Entry. See logs above this.');
+            }
+        })
+        return arrayOfEntries as dj.Entry[];
     }
 
-    loadAliasKeys(aliasKeys: AliasKeyes) {
-        
+    async toDefs(filepath: string, useFs = true): Promise<dj.Def[]> {
+        if (useFs) XLSX.set_fs(fs);
+        const loadedWb = XLSX.readFile(filepath);
+        const shts = loadedWb.SheetNames;
+        if (shts.length !== 1) throw new Error("Wrong number of sheets found");
+        const arrayOfDefs = XLSX.utils.sheet_to_json(loadedWb.Sheets[shts[0]]);
+
+        //sanity check results
+        arrayOfDefs.forEach((def: any) => {
+            // if (def.__rowNum__ !== undefined) delete def.__rowNum__;
+            if (!dj.DJ.isValidDef(def as Partial<dj.Def>)) {
+                console.error("INVALID DEF PARSING FOUND 👇")
+                console.error(def);
+                throw new Error('Def Parsing resulted in an invalid Def. See logs above this.');
+            }
+        })
+        return arrayOfDefs as dj.Def[];
+    }
+
+    // async loadAliasKeysFromCSV(filepath: string, useFs = true): Promise<AliasKeyes> {
+    //#TODO maybe eventually, support AliasKeying
+    // }
+
+    private static build2DArrayFor(dataJournal: dj.DataJournal, entriesOnly = false): string[][] {
+        const data: string[][] = [];
+        //establish header arrays (for both Defs and Entries)
+        const defHeaders: string[] = []
+        const defHeaderMap: { [key: string]: any } = {}
+        const defIds: string[] = [];
+        const defIdMap: { [key: string]: any } = {}
+        dataJournal.defs.forEach(def => {
+            Object.keys(def).forEach(key => {
+                if (defHeaderMap[key] !== undefined) return;
+                defHeaders.push(key);
+                defHeaderMap[key] = defHeaders.length;
+            })
+            if (defIdMap[def._id] !== undefined) return;
+            defIdMap[def._id] = true; // just need key to exist
+            defIds.push(def._id);
+        })
+
+        const entryHeaders: string[] = []
+        const entryHeaderMap: { [key: string]: any } = {}
+        dataJournal.entries.forEach(entry => {
+            Object.keys(entry).forEach(key => {
+                if (entryHeaderMap[key] !== undefined) return;
+                entryHeaderMap[key] = entryHeaders.length;
+                entryHeaders.push(key);
+            })
+        })
+        if (!entriesOnly) {
+            //Create Def Rows
+            defHeaders.forEach(header => {
+                const newRow: any[] = [];
+                newRow[0] = header
+                dataJournal.defs.forEach(def => {
+                    let value = def[header];
+                    if (Array.isArray(value)) value = value.join(', ');
+                    newRow[entryHeaderMap[def._id]] = value;
+                })
+                data.push(newRow)
+            });
+            //add entry / def delimiter header
+            data.push(['---']);
+
+        }
+        //add entry headers
+        data.push(entryHeaders);
+        //create entry rows
+        dataJournal.entries.forEach(entry => {
+            const newRow: any[] = [];
+            entryHeaders.forEach(header => {
+                if (entry[header] === undefined) return;
+                let value = entry[header];
+                if (Array.isArray(value)) value = value.join(', ');
+                newRow[entryHeaderMap[header]] = value; //not sure why I'm needing to subtract one
+            })
+            data.push(newRow);
+        })
+        return data;
     }
 }
 
@@ -815,6 +844,36 @@ export class ExcelTranslator implements Translator {
 // }
 
 //#endregion
+
+
+export class MarkdownTranslator implements Translator {
+    async fromDataJournal(data: dj.DataJournal, filepath: string) {
+        throw new Error("Method not implemented")
+        // // data = pdw.PDW.flattenCompleteDataset(data); //remove circular references and stuff
+        // let json = JSON.stringify(data);
+        // fs.writeFileSync(filepath, json, 'utf8');
+    }
+
+    async toDataJournal(filepath: string): Promise<dj.DJ> {
+        throw new Error("Method not implemented")
+        // const file = JSON.parse(fs.readFileSync(filepath).toString());
+        // const returnData: dj.DataJournal = {
+        //     defs: file.defs,
+        //     entries: file.entries
+        // }
+        // return dj.DJ.addOverview(returnData);
+    }
+
+    /**
+    * Update the .md files, look for entries, for found entries update them with current values
+    * //#THINK This a good idea? Maybe not.  
+    */
+    async updateInPlace(data: dj.DataJournal, filepath: string) {
+
+        throw new Error("Method not implemented")
+    }
+}
+
 
 //#region ### SHARED  ###
 export const tabularHeaders = {

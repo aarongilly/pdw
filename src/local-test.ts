@@ -20,32 +20,15 @@ import { AliasKeyer, AliasKeyes } from './AliasKeyer.js';
 //             filePath: 'test/localTestFileDir/dataset.json'
 //         }
 //     ]
-// } 
+// }
 
-const aliasKeys: AliasKeyes = {
-    "id": "_id",
-    "per": "_period",
-    "lbl": "_lbl",
-    "typ": "_type",
-    "dsc": "_desc",
-    "emo": "_emoji",
-    "rlp": "_rollup",
-    "tag": "_tags",
-    "rng": "_range",
-    "scp": "_scope",
-    "cre": "_created",
-    "upd": "_updated",
-    "del": "_deleted",
-    "src": "_source",
-    "nte": "_note",
-    "workout name": "WORKOUT_NAME",
-    "workout type": "WORKOUT_TYPE",
-    "book": "BOOK_NAME",
-};
 const normalDJ = testData.biggerJournal;
-const aliasedDJ = AliasKeyer.applyAliases(normalDJ,aliasKeys);
-const reconstitutedDJ = AliasKeyer.unapplyAliases(aliasedDJ,aliasKeys);
-
+// await new ie.CsvTranslator().fromDataJournal(normalDJ,'test/localTestFileDir/roundtrip.csv')
+// await new ie.CsvTranslator().fromDefs(normalDJ.defs,'test/localTestFileDir/defsOnly.csv')
+// await new ie.CsvTranslator().fromEntries(normalDJ.entries,'test/localTestFileDir/entriesOnly.csv')
+// const defs = await new ie.CsvTranslator().toDefs('test/localTestFileDir/defsOnly.csv')
+// const entries = await new ie.CsvTranslator().toEntries('test/localTestFileDir/entriesOnly.csv')
+const parsedDJ = await new ie.CsvTranslator().toDataJournal('test/localTestFileDir/roundtrip.csv')
 console.log('HELLO WORLD');
 
 //#region ---- WHERE YOU ARE GOING
