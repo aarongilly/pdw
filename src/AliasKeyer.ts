@@ -1,6 +1,11 @@
-import { DataJournal } from "./DJ";
+import { DataJournal } from "./DataJournal";
 
 export type AliasKeyes = { [alias: string]: string };
+
+export type AliasedDataJournal = {
+    defs: any[],
+    entries: any[]
+}
 
 export class AliasKeyer {
     /**
@@ -39,7 +44,7 @@ export class AliasKeyer {
         return returnObj;
     }
 
-    static unapplyAliases(dataJournal: DataJournal, aliasKeys: AliasKeyes) {
+    static unapplyAliases(dataJournal: AliasedDataJournal, aliasKeys: AliasKeyes): DataJournal {
         //huh, turns out this was pretty simple
         return AliasKeyer.applyAliases(dataJournal,AliasKeyer.flipToKeyAlias(aliasKeys));
     }

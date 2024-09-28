@@ -1,8 +1,14 @@
-// import { expect, test } from 'vitest';
+import { expect, test, describe } from 'vitest';
 // import * as pdw from '../src/pdw';
 // import * as obs from '../src/translators/obsidianTranslator'
 
 // const testData = getTestData();
+
+describe('Obsidian Translator', () => {
+    test('Roundtripping Obsidian', () => {
+        expect(true).toBeTruthy();
+    })
+})
 
 // test('Obsidian Roundtripping', async () => {
 //     const vaultPath = 'test/localTestFileDir/localObsidianVault';

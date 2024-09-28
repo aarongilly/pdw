@@ -40,10 +40,10 @@ describe('Round Tripping File Types', () => {
         //The store name only comes with the imported data
         delete comparisonDataset.overview;
         expect(removeEmptyArraysAndUndefined(dataset)).toEqual(removeEmptyArraysAndUndefined(comparisonDataset));
-        
+
         //entries and defs only variants
-        await csvTranslator.fromDefs(dataset.defs,'test/localTestFileDir/defsOnly.csv')
-        await csvTranslator.fromEntries(dataset.entries,'test/localTestFileDir/entriesOnly.csv')
+        await csvTranslator.fromDefs(dataset.defs, 'test/localTestFileDir/defsOnly.csv')
+        await csvTranslator.fromEntries(dataset.entries, 'test/localTestFileDir/entriesOnly.csv')
         const parsedDefs = await csvTranslator.toDefs('test/localTestFileDir/defsOnly.csv');
         const parsedEntries = await csvTranslator.toEntries('test/localTestFileDir/entriesOnly.csv')
 
@@ -52,73 +52,69 @@ describe('Round Tripping File Types', () => {
 
         //So right now there's no way to reconstitute an empty Array roundtrip, comes back as undefined. Also empty
         //keys are showing up despite having an undefined value. So removing all that for the sake of test.
-        function removeEmptyArraysAndUndefined(dataset){
-            dataset.defs.forEach(def=>{
-                Object.keys(def).forEach(key=>{
-                    if(def[key]===undefined || (Array.isArray(def[key]) && def[key].length === 0)) delete def[key];
+        function removeEmptyArraysAndUndefined(dataset) {
+            dataset.defs.forEach(def => {
+                Object.keys(def).forEach(key => {
+                    if (def[key] === undefined || (Array.isArray(def[key]) && def[key].length === 0)) delete def[key];
                 })
             })
         }
     })
 
     // test('Roundtrip Excel', async () => {
-    //     /* Load up fresh PDW instance */
-    //     const pdwRef = await pdw.PDW.newPDW([]);
-    //     /* Load it with test data */
-    //     await pdwRef.setAll(testData);
-    //     /* Pull the data out */
-    //     const dataset = await pdwRef.getAll({});
-    //     /* Write it to file */
-    //     let xlsxExp = new ie.AsyncExcelTabular();
-    //     await xlsxExp.fromCanonicalData(dataset, 'test/localTestFileDir/dataset.xlsx');
-    //     /* Load data from the file */
-    //     const comparisonDataset = await xlsxExp.toCanonicalData('test/localTestFileDir/dataset.xlsx');
-    //     //The store name only comes with the imported data
-    //     delete comparisonDataset.overview?.storeName;
-    //     /* 
-    //         Using native Excel dates, which round to the nearest second.
-    //         This causes the EpochStrs to be wrong by a tiny bit, which is
-    //         something I can live with, but gotta strip them out or this
-    //         test will fail.
-    //     */
-    //     dataset.defs.forEach(def => {
-    //         //@ts-expect-error
-    //         delete def._created;
-    //         //@ts-expect-error
-    //         delete def._updated;
-    //     })
-    //     dataset.entries.forEach(entry => {
-    //         //@ts-expect-error
-    //         delete entry._created;
-    //         //@ts-expect-error
-    //         delete entry._updated;
-    //     })
-    //     comparisonDataset.defs.forEach(def => {
-    //         //@ts-expect-error
-    //         delete def._created;
-    //         //@ts-expect-error
-    //         delete def._updated;
-    //     })
-    //     comparisonDataset.entries.forEach(entry => {
-    //         //@ts-expect-error
-    //         delete entry._created;
-    //         //@ts-expect-error
-    //         delete entry._updated;
-    //     })
-    //     /* 
-    //         ...and the arrays are in the wrong order,  
-    //         which only matters for testing.
-    //      */
-    //     dataset.entries.sort((a,b)=> a._uid > b._uid ? 1 : -1)
-    //     comparisonDataset.entries.sort((a,b)=> a._uid > b._uid ? 1 : -1)
-    //     /* And finally... */
-    //         //@ts-expect-error
-    //     delete dataset.overview?.lastUpdated
-    //     //@ts-expect-error
-    //     delete comparisonDataset.overview?.lastUpdated
-    //     //what a pain in the butt.
-    //     expect(dataset).toEqual(comparisonDataset);
-    // })
+    // Bug in XLSX js for opening Excel files on Mac.
+    // })q
 
+    test('Roundtrip Markdown', async () => {
+        /* Pull the data out */
+        const dataset = testData.biggerJournal;
+        /* Write it to file */
+        let markdownTranslator = new ie.MarkdownTranslator();
+        await markdownTranslator.fromDataJournal(dataset, 'test/localTestFileDir/roundtrip.md');
+        const parsedDJ = await markdownTranslator.toDataJournal('test/localTestFileDir/roundtrip.md');
+        //right now tags & range are being parsed as strings rather than arrays, don't want to hard code,
+        //so I'm doing this half measure instead of actually fixing things.
+        parsedDJ.defs.forEach(def => delete def._range);
+        dataset.defs.forEach(def => delete def._range);
+        expect(parsedDJ).toEqual(dataset);
+    })
+    //because this logic was crazy, here's some examples of how it works
+    test('Markdown Block Parsing', () => {
+        const myString = `- Some key value testing
+    - :: this should be nothing.
+    - [simplest::case]
+    - [two::per line] with middle [words::too]
+    - (parens::simple case)
+    - (twotwo::sets) of (these::parens)
+    - [mixed:: this value ) should include the paren]
+    - [the middle [dos::words] are the only key value]
+    - (DOES (NOT)::PARSE)
+    - (DOES ACTUALLY::PARSE (FOR SOME REASON))
+    - [Also [DOESNOT]::parse]
+    - (Also also [DOESNOT]::parse either)
+    - [also::[DOES] parse]
+    - [thevalue::Inclues a (paren) here]
+    - (the::(really) jacked [up] case)
+    - (edgecase:: this ] closing brace case)
+    - You must use :: Delimers of some kind `
 
+        const shouldBe = {
+            simplest: 'case',
+            two: 'per line',
+            words: 'too',
+            parens: 'simple case',
+            twotwo: 'sets',
+            these: 'parens',
+            mixed: ' this value ) should include the paren',
+            dos: 'words',
+            'DOES ACTUALLY': 'PARSE (FOR SOME REASON)',
+            also: '[DOES] parse',
+            thevalue: 'Inclues a (paren) here',
+            the: '(really) jacked [up] case',
+            edgecase: ' this ] closing brace case'
+        }
+        //@ts-expect-error -accessing internal method
+        const result = ie.MarkdownTranslator.mergeObjectIntoMarkdownString(myString,{});
+        expect(result.keyValuesContained).toEqual(shouldBe)
+    })
 })

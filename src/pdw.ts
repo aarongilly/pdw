@@ -1,4 +1,4 @@
-import { QueryObject, Entry, Def, Overview, DataJournal, DJ, HalfTransaction, TransactionObject, DiffReport } from "./DJ.js";
+import { QueryObject, Entry, Def, Overview, DataJournal, DJ, HalfTransaction, TransactionObject, DiffReport } from "./DataJournal.js";
 import { ConnectorListMember, getConnector, getTranslator, TranslatorListMember } from "./ConnectorsAndTranslators.js";
 import { InMemoryDb } from "./connectors/inMemoryConnector.js";
 
@@ -178,8 +178,8 @@ export class PDW {
     }
 
     async getEntries(queryObject?: QueryObject): Promise<Entry[]> {
-        if (queryObject === undefined) queryObject = {}
-        const connectorPromiseArray = this.connectors.map(connector => connector.query(queryObject));
+        if (queryObject === undefined) queryObject! = {}
+        const connectorPromiseArray = this.connectors.map(connector => connector.query(queryObject!));
         const connectedEntries = await Promise.all(connectorPromiseArray);
         const mergedEntries = DJ.mergeEntries(connectedEntries)
         return mergedEntries

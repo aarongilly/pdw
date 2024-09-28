@@ -1,4 +1,4 @@
-import { QueryObject, Entry, Def, Overview, DJ, DataJournal, TransactionObject } from "../DJ.js";
+import { QueryObject, Entry, Def, Overview, DJ, DataJournal, TransactionObject } from "../DataJournal.js";
 import { CommitResponse, Connector } from "../pdw.js";
 
 /**
