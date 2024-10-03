@@ -14,6 +14,10 @@ describe('Round Tripping File Types', () => {
         //The store name only comes with the imported data
         delete comparisonDataset.overview;
         expect(dataset).toEqual(comparisonDataset);
+        /* Now supports using STATIC methods, which creates an instance internally */
+        const datasetTwo = await ie.JsonTranslator.toDataJournal('test/localTestFileDir/roundtrip.json');
+        delete datasetTwo.overview;
+        expect(datasetTwo).toEqual(comparisonDataset);
     })
 
     test('Roundtrip YAML', async () => {

@@ -113,7 +113,7 @@ describe('Data Journal Modification', () => {
     const entryMadeFromFullySpecified = DJ.makeEntry(fullySpecifiedEntry);
     expect(entryMadeFromFullySpecified).toEqual(fullySpecifiedEntry);
   })
-  
+
   test('Simple addDefs and addEntries', () => {
     let localDataJournal = DJ.newBlankDataJournal();
     //Because Data Journal never mutates, calling up any DJ.whatever methods will
@@ -221,28 +221,28 @@ describe('Data Journal Modification', () => {
     newDataJournal = DJ.commit(starterDJ, testData.biggerJournalTransaction);
     //lot of things happened there.
     expect(starterDJ).toEqual(staticCopyToProveNoSideEffects);
-    
+
     const defs = newDataJournal.defs;
     const entries = newDataJournal.entries;
 
     expect(defs.length).toBe(5); //3 original - 1 removed + 3 added
     expect(entries.length).toBe(7); //4 original + 3 added, 1 MARKED deleted,
 
-    const modifiedDef = defs.find(def=>def._id=='WORKOUT_NAME')!;
+    const modifiedDef = defs.find(def => def._id == 'WORKOUT_NAME')!;
     expect(modifiedDef._lbl).toBe("Updated lbl, no more emoji");
     expect(modifiedDef._emoji).toBeUndefined(); //was removed my replacement
-    
-    const replacedDef = defs.find(def=>def._id=='WORKOUT_TYPE')!;
+
+    const replacedDef = defs.find(def => def._id == 'WORKOUT_TYPE')!;
     expect(replacedDef._desc).toBe('Modified Description!'); //changed
     expect(replacedDef._lbl).not.toBeUndefined(); //not deleted implicitly
-    expect(defs.find(def=>def._id==='BOOK_NAME')).toBeUndefined(); //was deleted via delete
+    expect(defs.find(def => def._id === 'BOOK_NAME')).toBeUndefined(); //was deleted via delete
 
-    const modifiedEntry = entries.find(entry=>entry._id === "m0ofacho_poax");
+    const modifiedEntry = entries.find(entry => entry._id === "m0ofacho_poax");
     expect(modifiedEntry?._note).toBe("Undeleted via modification, should retain '_source'");
     expect(modifiedEntry?._deleted).toBe(false); //another modification I made
     expect(modifiedEntry?._source).toBe('Test daaata') //existing property retained
 
-    const replacedEntry = entries.find(entry  => entry._id === "m0ogacof_3fjk");
+    const replacedEntry = entries.find(entry => entry._id === "m0ogacof_3fjk");
     expect(replacedEntry?._note).toBe("Replaced - with no more book BOOK prop");
     expect(replacedEntry?.BOOK_NAME).toBeUndefined(); // was deleted by replacement
 
@@ -487,6 +487,34 @@ describe('Data Journal Filtering', () => {
   })
 })
 
+describe('Data Journal & Entry Sorting', () => {
+  test('Sort Entries', () => {
+    const entriesAsc = DJ.sortBy('_period', testData.biggerJournal.entries, 'asc') as Entry[];
+    const entriesDesc = DJ.sortBy('_period', testData.biggerJournal.entries, 'desc') as Entry[];
+    expect(entriesAsc.map(entry => entry._period)).toEqual([
+      '2024-09-04T18:39:00',
+      '2024-09-05T11:05:00',
+      '2024-09-05T11:09:00',
+      '2024-09-06T10:38:00',
+    ]);
+    expect(entriesDesc.map(entry => entry._period)).toEqual([
+      '2024-09-06T10:38:00',
+      '2024-09-05T11:09:00',
+      '2024-09-05T11:05:00',
+      '2024-09-04T18:39:00',
+    ])
+  })
+  test('Sort Entries by Journal', () => {
+    const sortedDJ = DJ.sortBy('_id', testData.biggerJournal, 'asc') as DataJournal;
+    expect(sortedDJ.entries.map(entry => entry._id)).toEqual([
+      "m0ofacho_poax",
+      "m0ofgfio_gjlp",
+      "m0ogacof_3fjk",
+      "m0ogdggg_ca3t",
+    ])
+  })
+})
+
 describe('Data Journal Quality Checks', () => {
   test('Absence of error on good data', () => {
     const properDataJournal = testData.biggerJournal;
@@ -598,7 +626,7 @@ describe('Data Journal Quality Checks', () => {
 describe('Data Journal Diff Reporting', () => {
   const beforeDJ = testData.biggerJournal;
   const afterDJ = DJ.commit(beforeDJ, testData.biggerJournalTransaction);
-  
+
   test('No Differences', () => {
     const diffs = DJ.diffReport(beforeDJ, beforeDJ);
     expect(diffs.createdDefs).toBe(0);
@@ -625,5 +653,48 @@ describe('Data Journal Diff Reporting', () => {
     expect(diffs.sameEntries).toBe(1);
     expect(diffs.defDiffs).toEqual(testData.expectedDefDifferences);
     expect(diffs.entryDiffs).toEqual(testData.expectedEntryDifferences);
+  })
+})
+
+describe('Data Journal Utility Methods', () => {
+  test('Epoch String Validator', () => {
+    const epochStr = DJ.makeEpochStr();
+    //@ts-expect-error - hacking to private method
+    expect(DJ.isValidEpochStr(epochStr)).toBe(true);
+    //@ts-expect-error - hacking to private method
+    expect(DJ.isValidEpochStr('invalid one')).toBe(false);
+    //@ts-expect-error - hacking to private method
+    expect(DJ.isValidEpochStr('2024-09-20')).toBe(false);
+    //@ts-expect-error - hacking to private method
+    expect(DJ.isValidEpochStr('2024-09-20T10:30:40')).toBe(false);
+    //@ts-expect-error - hacking to private method
+    expect(DJ.isValidEpochStr('')).toBe(false);
+    //@ts-expect-error - hacking to private method
+    expect(DJ.isValidEpochStr('abadluck')).toBe(true); //technically valid
+    //@ts-expect-error - hacking to private method
+    expect(DJ.isValidEpochStr('m0a3!!!!')).toBe(false);
+    
+  })
+
+  test('Standardized String Methods', () => {
+    let myString = '  This is NON-standard  ';
+    expect(DJ.standardizeKey(myString)).toBe('THIS_IS_NON-STANDARD');
+    expect(DJ.stringsAreEqualStandardized(myString, 'THIS_IS_NON-STANDARD')).toBe(true);
+    const myUnstandardArray = ["one ", "tWO", "   three items    "];
+    expect(DJ.strInArrayStandardized('one', myUnstandardArray)).toBe(true);
+    expect(DJ.strInArrayStandardized('ONE', myUnstandardArray)).toBe(true);
+    expect(DJ.strInArrayStandardized('  ONE   ', myUnstandardArray)).toBe(true);
+    expect(DJ.strInArrayStandardized('three items', myUnstandardArray)).toBe(true);
+    expect(DJ.strInArrayStandardized('three_items', myUnstandardArray)).toBe(true);
+    expect(DJ.strInArrayStandardized(' THREE_items ', myUnstandardArray)).toBe(true);
+    //does NOT contain an element that completely matches "three"
+    expect(DJ.strInArrayStandardized('three', myUnstandardArray)).toBe(false);
+    expect(DJ.strInArrayStandardized('not in it', myUnstandardArray)).toBe(false);
+
+    const arrayWithOverlap = [' One', 'other','elements']; //matches "one" after standardization
+    expect(DJ.strArrayShareElementStandardized(myUnstandardArray,arrayWithOverlap)).toBe(true);
+    
+    const arrayWithNoOverlap = ['no','matches','here'];
+    expect(DJ.strArrayShareElementStandardized(myUnstandardArray,arrayWithNoOverlap)).toBe(false);
   })
 })

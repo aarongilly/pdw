@@ -41,6 +41,14 @@ export class JsonTranslator implements Translator {
         return 'JSON Translator'
     }
 
+    /* adding static methods for convenience rather than fully refactoring */
+    static async fromDataJournal(dataJournal: dj.DataJournal, filename: string){
+        return new JsonTranslator().fromDataJournal(dataJournal,filename);
+    }
+    static toDataJournal(filepath:string){
+        return new JsonTranslator().toDataJournal(filepath);
+    }
+
     async fromDataJournal(data: dj.DataJournal, filepath: string) {
         // data = pdw.PDW.flattenCompleteDataset(data); //remove circular references and stuff
         let json = JSON.stringify(data);
@@ -68,6 +76,14 @@ export class JsonTranslator implements Translator {
 export class YamlTranslator implements Translator {
     getServiceName(): string {
         return 'YAML Translator'
+    }
+
+    /* adding static methods for convenience rather than fully refactoring */
+    static async fromDataJournal(dataJournal: dj.DataJournal, filename: string){
+        return new YamlTranslator().fromDataJournal(dataJournal,filename);
+    }
+    static toDataJournal(filepath:string){
+        return new YamlTranslator().toDataJournal(filepath);
     }
 
     async fromDataJournal(data: dj.DataJournal, filepath: string) {
@@ -138,6 +154,20 @@ export class YamlTranslator implements Translator {
 export class CsvTranslator implements Translator {
     getServiceName(): string {
         return 'CSV Translator'
+    }
+
+    /* adding static methods for convenience rather than fully refactoring */
+    static async fromDataJournal(dataJournal: dj.DataJournal, filename: string, useFs = true){
+        return new CsvTranslator().fromDataJournal(dataJournal,filename,useFs);
+    }
+    static toDataJournal(filepath:string, useFs = true){
+        return new CsvTranslator().toDataJournal(filepath, useFs);
+    }
+    static async fromEntries(entries: dj.Entry[], filename: string, useFs = true) {
+        return new CsvTranslator().fromEntries(entries,filename,useFs);
+    }
+    static async fromDefs(defs: dj.Def[], filename: string, useFs = true) {
+        return new CsvTranslator().fromDefs(defs,filename,useFs);
     }
 
     /**
@@ -407,6 +437,14 @@ export class ExcelTranslator implements Translator {
         return 'Excel Translator';
     }
 
+    /* adding static methods for convenience rather than fully refactoring */
+    static async fromDataJournal(dataJournal: dj.DataJournal, filename: string, useFs = true){
+        return new ExcelTranslator().fromDataJournal(dataJournal,filename,useFs);
+    }
+    static toDataJournal(filepath:string, useFs = true){
+        return new ExcelTranslator().toDataJournal(filepath, useFs);
+    }
+
     fromDataJournal(data: dj.DataJournal, filename: string, useFs = true) {
         if (useFs) XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();
@@ -601,7 +639,7 @@ export class MarkdownTranslator implements Translator {
 
         note.blocks.forEach(block => {
             if (MarkdownTranslator.blockIsDef(block)) {
-                let relatedDef: any = aliasedDJ.defs.filter(def => block.text.includes(def[idKey]));
+                let relatedDef: any = aliasedDJ.defs.filter(def => block.text.includes('::'+def[idKey]+']'));
                 if (relatedDef.length > 1) {
                     throw new Error('More than one Def._id match found in block!')
                 }
@@ -634,7 +672,7 @@ export class MarkdownTranslator implements Translator {
             containedDefs = [...containedDefs, ...defsToAppend];
             containedEntries = [...containedEntries, ...entriesToAppend];
 
-            fs.writeFileSync(filepath.slice(0,filepath.length-3)+" (after).md", returnNoteText, 'utf8');
+            fs.writeFileSync(filepath.slice(0,filepath.length-3)+" (new).md", returnNoteText, 'utf8');
         }
 
         const unaliasedDJ = AliasKeyer.unapplyAliases({
@@ -852,15 +890,6 @@ export class MarkdownTranslator implements Translator {
         //using code I already wrote, probably less efficient in terms of runtime,
         //but WAY more efficient in terms of getting this done.
         return this.updateMarkdownDataJournal({defs:[],entries:[]},filepath,{},true);
-    }
-
-    /**
-    * Update the .md files, look for entries, for found entries update them with current values
-    * //#THINK This a good idea? Maybe not.  
-    */
-    async updateInPlace(data: dj.DataJournal, filepath: string) {
-        console.log(data,filepath)//silence errors
-        throw new Error("Method not implemented")
     }
 }
 

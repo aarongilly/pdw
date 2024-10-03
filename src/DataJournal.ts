@@ -517,7 +517,7 @@ export class DJ {
 
         if (trans.defs) trans.defs = DJ.ensureValidDefTransactionObject(trans.defs);
         if (trans.entries) trans.entries = DJ.ensureValidEntryTransactionObject(trans.entries);
-        
+
         //creates
         if (trans.defs.create) {
             newJournal.defs.push(...trans.defs.create as Def[]);
@@ -577,7 +577,7 @@ export class DJ {
                 //this spread notation will replace any existing props with what's in `def`,
                 //while not deleting any other props that may already exist
                 existing = { ...existing, ...def };
-                if(def._updated === undefined) existing._updated = DJ.makeEpochStr(); //force updated change
+                if (def._updated === undefined) existing._updated = DJ.makeEpochStr(); //force updated change
                 newJournal.defs.push(existing);
             })
         }
@@ -615,7 +615,7 @@ export class DJ {
             trans.entries.delete.forEach(entryId => {
                 const standardizedID = DJ.standardizeKey(entryId)
                 let existing = newJournal.entries.find(prev => DJ.standardizeKey(prev._id) === standardizedID);
-                if (existing){
+                if (existing) {
                     existing._deleted = true; //mark as deleted
                     existing._updated = DJ.makeEpochStr(); //set time of update
                 }
@@ -767,10 +767,29 @@ export class DJ {
     }
 
     //not sure this is worth building
-    // static sortBy(field: string, entries: Entry[] | DataJournal) {
-
-    //     throw new Error('Method not implemented')
-    // }
+    static sortBy(field: string, entries: Entry[] | DataJournal, sortOrder: 'asc' | 'desc' = 'asc') {
+        //make static
+        entries = JSON.parse(JSON.stringify(entries));
+        let entriesToSort = entries;
+        let wasDJ = false;
+        if (Object.hasOwn(entries, 'entries')) {
+            wasDJ = true;
+            entriesToSort = entries.entries as Entry[];
+        }
+        const sortedEntries = (<Entry[]>entriesToSort).sort((a, b) => {
+            if (sortOrder === 'asc') {
+                return a[field] > b[field] ? 1 : -1
+            }
+            return a[field] > b[field] ? -1 : 1
+        })
+        if (wasDJ) {
+            return {
+                defs: (<DataJournal>entries).defs,
+                entries: sortedEntries
+            }
+        }
+        return sortedEntries
+    }
 
     /**
      * Takes in either a {@link QueryObject} and applies those filters to the 
@@ -933,31 +952,31 @@ export class DJ {
         let returnObj: DiffReport = {
             createdDefs: 0,
             createdEntries: 0,
-            updatedDefs:  0,
-            updatedEntries:  0,
-            sameDefs:  0,
-            sameEntries:  0,
-            deleteDefs:  0,
-            deleteEntries:  0,
+            updatedDefs: 0,
+            updatedEntries: 0,
+            sameDefs: 0,
+            sameEntries: 0,
+            deleteDefs: 0,
+            deleteEntries: 0,
             defDiffs: [],
             entryDiffs: []
         };
 
         //deletd defs have to be handled differently & also dont' show up in defDiffs
-        from.defs.forEach(fromDef=>{
-            if(to.defs.some(toDef=> toDef._id === fromDef._id)) return;
+        from.defs.forEach(fromDef => {
+            if (to.defs.some(toDef => toDef._id === fromDef._id)) return;
             returnObj.deleteDefs! += 1;
         })
-        
-        to.defs.forEach(toDef=>{
-            const existingFromDef = from.defs.find(fromDef=>fromDef._id === toDef._id);
-            if(existingFromDef === undefined){
+
+        to.defs.forEach(toDef => {
+            const existingFromDef = from.defs.find(fromDef => fromDef._id === toDef._id);
+            if (existingFromDef === undefined) {
                 returnObj.createdDefs! += 1;
                 returnObj.defDiffs?.push(toDef);
                 return
             }
             const defIsSame = existingFromDef._updated === toDef._updated;
-            if(defIsSame){
+            if (defIsSame) {
                 returnObj.sameDefs! += 1;
                 return
             }
@@ -967,20 +986,20 @@ export class DJ {
             returnObj.defDiffs?.push(objectDiff);
         })
 
-        to.entries.forEach(toEntry=>{
-            const existingFromEntry = from.entries.find(fromEntry=>fromEntry._id === toEntry._id);
-            if(existingFromEntry === undefined){
+        to.entries.forEach(toEntry => {
+            const existingFromEntry = from.entries.find(fromEntry => fromEntry._id === toEntry._id);
+            if (existingFromEntry === undefined) {
                 returnObj.createdEntries! += 1;
                 returnObj.entryDiffs?.push(toEntry);
                 return
             }
             const entryIsSame = existingFromEntry._updated === toEntry._updated;
-            if(entryIsSame){
+            if (entryIsSame) {
                 returnObj.sameEntries! += 1;
                 return
             }
             //check if entry was deleted
-            if(toEntry._deleted && (existingFromEntry._deleted === undefined || existingFromEntry._deleted == false)){
+            if (toEntry._deleted && (existingFromEntry._deleted === undefined || existingFromEntry._deleted == false)) {
                 returnObj.deleteEntries! += 1;
                 return
             }
@@ -995,29 +1014,29 @@ export class DJ {
         //local helper function - thanks to AI for this.
         function compareShallowObjects(A: object, B: object): object {
             const differences: { [key: string]: any } = {};
-          
+
             for (const key in A) {
-              if (A.hasOwnProperty(key)) {
-                if (B.hasOwnProperty(key)) {
-                  if (A[key] !== B[key]) {
-                    differences[key] = A[key];
-                  }
-                } else {
-                  differences[key] = A[key];
+                if (A.hasOwnProperty(key)) {
+                    if (B.hasOwnProperty(key)) {
+                        if (A[key] !== B[key]) {
+                            differences[key] = A[key];
+                        }
+                    } else {
+                        differences[key] = A[key];
+                    }
                 }
-              }
             }
-          
+
             for (const key in B) {
-              if (B.hasOwnProperty(key)) {
-                if (!A.hasOwnProperty(key)) {
-                  differences[key] = "- REMOVED: " + B[key] ;
+                if (B.hasOwnProperty(key)) {
+                    if (!A.hasOwnProperty(key)) {
+                        differences[key] = "- REMOVED: " + B[key];
+                    }
                 }
-              }
             }
-          
+
             return differences;
-          }
+        }
     }
 
     static ensureValidDefTransactionObject(defTransaction: HalfTransaction): HalfTransaction {
@@ -1207,14 +1226,35 @@ export class DJ {
      * Turns "my lbl  " turns into "MY_LBL"
      */
     static standardizeKey(lbl: string): string {
-        return lbl.toUpperCase().replaceAll(' ', '_').trim();
+        return lbl.toUpperCase().trim().replaceAll(' ', '_');
+    }
+
+    static strArrayShareElementStandardized(arrOne: string[], arrTwo: string[]) {
+        let array1 = arrOne.map(str=>DJ.standardizeKey(str));
+        let array2 = arrTwo.map(str=>DJ.standardizeKey(str));
+        const set1 = new Set(array1);
+        for (const element of array2) {
+            if (set1.has(element)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static stringsAreEqualStandardized(strOne: string, strTwo: string){
+        return DJ.standardizeKey(strOne) === DJ.standardizeKey(strTwo);
+    }
+
+    static strInArrayStandardized(str: string, strArr: string[]){
+        const standardizedArr = strArr.map(str=>DJ.standardizeKey(str));
+        const standardizedStr = DJ.standardizeKey(str);
+        return standardizedArr.some(element=>element===standardizedStr);
     }
 
     private static isValidEpochStr(epochStr: string): boolean {
         if (typeof epochStr !== 'string') return false;
-        if (epochStr.length !== 8) return false; //not supporting way in the past or future
+        if (!/^[a-z0-9]{8}$/.test(epochStr)) return false; //not supporting way in the past or future
         //☝️ technically creates a 2059 problem... but that's my problem when I'm 2x as old as I am now
-        if (epochStr.includes('-') || epochStr.includes(':') || epochStr.includes(' ')) return false
         return true
     }
     //#endregion

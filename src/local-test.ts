@@ -1,65 +1,57 @@
-// import * as pdw from './pdw.js'
-// import * as ie from './translators/fileTranslators.js'
+import * as pdw from './pdw.js'
+import * as ie from './translators/fileTranslators.js'
+import * as fs from 'fs'
+// import * as obs from './translators/obsidianTranslator.js'
+// import * as XLSX from 'xlsx'
 // import * as fs from 'fs'
-// // import * as obs from './translators/obsidianTranslator.js'
-// // import * as XLSX from 'xlsx'
-// // import * as fs from 'fs'
-// import * as testData from '../test/test_datasets.js'
-// import { Def, DefType, DJ, DataJournal, Entry } from './DataJournal.js'
-// import { AliasKeyer, AliasKeyes } from './AliasKeyer.js';
-// import { JsonTranslator, MarkdownTranslator } from './translators/fileTranslators.js';
-// import { Note } from './translators/MarkdownParsers.js'
+import * as testData from '../test/test_datasets.js'
+import { Def, DefType, DJ, DataJournal, Entry } from './DataJournal.js'
+import { AliasKeyer, AliasKeyes } from './AliasKeyer.js';
+import { JsonTranslator, MarkdownTranslator } from './translators/fileTranslators.js';
+import { Note } from './translators/MarkdownParsers.js'
+import { QueryBuilder } from './QueryMaker.js'
 
-// // const translator = new JsonTranslator();
+// const myDj = await ie.JsonTranslator.toDataJournal('test/localTestFileDir/roundtrip.json');
 
-// // const singleTranslatorConfig: pdw.Config = {
-// //     translators: [
-// //         {
-// //             serviceName: 'JSON',
-// //             filePath: 'test/localTestFileDir/dataset.json'
-// //         }
-// //     ]
-// // }
+const myDj = testData.biggerJournal;
+const starterQueryObject = {
+    deleted: false,
+}
+const obj = QueryBuilder.makeQueryObject({ queryObject: starterQueryObject, params: { 'updatedAfter': 'm2m2m2m2' } });
 
-// // const myString = '- How much [thing::wood] would a (animal::woodchuck with more) [action::[hard] chuck] if a ((tricky) thing::woodchuck)'
-// const myString = `- Some key value testing
-//     - :: this should be nothing.
-// 	- [simplest::case]
-// 	- [two::per line] with middle [words::too]
-// 	- (parens::simple case)
-// 	- (twotwo::sets) of (these::parens)
-// 	- [mixed:: this value ) should include the paren]
-// 	- [the middle [dos::words] are the only key value]
-// 	- (DOES (NOT)::PARSE)
-// 	- (DOES ACTUALLY::PARSE (FOR SOME REASON))
-// 	- [Also [DOESNOT]::parse]
-// 	- (Also also [DOESNOT]::parse either)
-// 	- [also::[DOES] parse]
-// 	- [thevalue::Inclues a (paren) here]
-// 	- (the::(really) jacked [up] case)
-// 	- (edgecase:: this ] closing brace case)
-//     - forcing :: that engecasere`
+// import sqlite3 from 'sqlite3';
 
-// const shouldBe = {
-//     simplest: 'case',
-//     two: 'per line',
-//     words: 'too',
-//     parens: 'simple case',
-//     twotwo: 'sets',
-//     these: 'parens',
-//     mixed: ' this value ) should include the paren',
-//     dos: 'words',
-//     'DOES ACTUALLY': 'PARSE (FOR SOME REASON)',
-//     also: '[DOES] parse',
-//     thevalue: 'Inclues a (paren) here',
-//     the: '(really) jacked [up] case',
-//     edgecase: ' this ] closing brace case'
-// }
+// Create a new database
+// const db = new sqlite3.Database('test/localTestFileDir/mydatabase.db', (err) => {
+//   if (err) {
+//     return console.error(err.message);
+//   }
+//   console.log('Database created.');
+// });
 
-// new MarkdownTranslator().updateMarkdownDataJournal(testData.biggerJournal, 'test/localTestFileDir/small.md', {})
+// // Create a table
+// // db.run(`CREATE TABLE users (
+// //   id INTEGER PRIMARY KEY AUTOINCREMENT,
+// //   name TEXT NOT NULL
+// // )`, (err) => {
+// //   if (err) {
+// //     return console.error(err.message);
+// //   }
+// //   console.log('Table created.');
+// // });
 
+// // Insert a record
+// const insertStmt = db.prepare('INSERT INTO users (name) VALUES (?)');
+// insertStmt.run('Alice');
+// insertStmt.finalize();
 
-
+// // Close the database
+// db.close((err) => {
+//   if (err) {
+//     return console.error(err.message);
+//   }
+//   console.log('Database closed.');
+// });
 
 // //#region ---- WHERE YOU ARE GOING
 // /*

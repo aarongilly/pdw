@@ -1,414 +1,305 @@
-//@ts-nocheck
-import fs from 'fs'
-import path from 'path'
-import { DataJournal } from '../DataJournal';
-import * as pdw from '../pdw'
-import { Block, Note } from './MarkdownParsers';
-//#TODO - probably refactor this as the whole-folder-based translator AND split out a Markdown trasnlator too,
-//#THINK - if your folder structure doesn't have a guaranteed file title = ISODate String how do you import Entries into it?
+import * as fs from 'fs';
+import * as dj from '../DataJournal.js';
+import { Translator } from '../pdw.js';
+import { AliasKeyer, AliasKeyes } from '../AliasKeyer.js';
+import { Note, Block } from './MarkdownParsers.js'
 
-export class ObsidianTranslator implements pdw.Translator {
-    vaultPath: string;
-    topTag?: string;
-    configFilePath: string;
-    subpathToFolderWithEntries: string;
-    /**
-     * For using inside the Obsidian Translator - not reaching outside anywhere.
-     * Shouldn't be accessed outside this module.
-     */
-    private _internalPDW: pdw.PDW;
-    /**
-     * Need a factory to allow for effectively async construction to occur.
-     * @param vaultPath 
-     * @param configFileSubpath 
-     */
-    private constructor(vaultPath: string, configFileSubpath: string, pdwRef: pdw.PDW) {
-        this.configFilePath = vaultPath + "/" + configFileSubpath;
-        this.vaultPath = vaultPath;
-        this.subpathToFolderWithEntries = '';
-        this._internalPDW = pdwRef;
+/**
+ * Obsidian Translator is basically just a Markdown Translator that
+ * expects filenames to be dates & also uses the "^" as block ID shorthand
+ */
+export class ObsidianTranslator implements Translator {
+
+    getServiceName(): string {
+        return 'Markdown Translator'
     }
 
-    static async NewObsidianTranslator(vaultPath: string, configFileSubpath: string): Promise<ObsidianTranslator>{
-        const localPDW = await pdw.PDW.newPDW([]);
-        const instance = new ObsidianTranslator(vaultPath, configFileSubpath, localPDW);
-        await instance.loadDefsAndTopTagFromConfig();
-        return instance;
-    }
-
-    /**
-     * 
-     * @param defs list of defs to build the config file for
-     * @param folderLocation a place to put the newly created '/ConfigOutput' directory
-     * @param topTag do not include the hashtag. Default: "pdw"
-     */
-    static async BuildConfigFileAndTemplatesForDefs(defs: pdw.Def[] | pdw.DefData[], folderLocation: string, topTag = 'pdw') {
-        const stats = fs.statSync(folderLocation);
+    async fromDataJournal(data: dj.DataJournal, filepath: string, aliasKeys: AliasKeyes = {}) {
+        const stats = fs.statSync(filepath);
         if (!stats.isDirectory()) {
-            console.warn('Given path is not a folder. Please provide a folder path where the new "ConfigOutput" subfolder can be made.')
-            throw new Error(folderLocation + " is not a folder");
+            throw new Error("Supplied file path is NOT a folder, please supply a path to a folder of .md files")
         }
-        const newFolderPath = folderLocation + '/ConfigOutput'
-        if(!fs.existsSync(newFolderPath)) fs.mkdirSync(newFolderPath);
-        
-        if(!(defs[0] instanceof pdw.Def)){
-            //DefData were passed in, creating a whole temporary pdw just to create defs,
-            //probably just to flatten them immediately, not my best work - but I"m tired.
-            const superTempPDW = await pdw.PDW.newPDW([]);
-            superTempPDW.setDefs((<pdw.DefData[]>defs));
-            defs = await superTempPDW.getDefs(true)
-        }
-        let defsString = JSON.stringify(pdw.PDW.flatten((<pdw.Def[]>defs)), null, 2);
+        this.updateMarkdownDataJournal(data, filepath, aliasKeys);
+        //if that doesn't error, the file exists.
 
+    }
 
-        let configContent = `Copy/paste most of this to the active PDW Config, I reckon.
-# Tag
-- [tag::${topTag}]
-# Paths
-- [folderWithNotesContainingEntries::]
-# Defs
-\`\`\`json
-${defsString}
-\`\`\``;
+    async updateMarkdownDataJournal(data: dj.DataJournal, filepath: string, aliasKeys: AliasKeyes = {}, readOnly = false): Promise<dj.DataJournal> {
+        const note = new Note(filepath);
+        const staticDJ = JSON.parse(JSON.stringify(data));
 
-        fs.writeFileSync(newFolderPath + "/Generated Config Contents" + ".md", configContent);
+        let containedAliases: object = {}
 
-        /** 
-         * Create Template Files - using the Templater approach, this is very specific to my current approach.
-         * but that's fine I'm codifying it here.
-         */
-        defs.forEach(def=> {
-            const content = makeTemplateStringForDef((<pdw.Def>def));
-            fs.writeFileSync(newFolderPath + '/a' + def.lbl + ".md", content);
+        //obtain all aliases contained in the note
+        note.blocks.forEach(block => {
+            if (ObsidianTranslator.blockIsAliasKey(block)) {
+                let mergeObj = ObsidianTranslator.mergeObjectIntoMarkdownString(block.text, aliasKeys, false);
+                containedAliases = { ...containedAliases, ...mergeObj.keyValuesContained };
+                block.text = mergeObj.resultString;
+            }
         })
 
-        function makeTemplateStringForDef(def: pdw.Def): string {
-            let returnStr = `
-- <% tp.date.now('HH:mm') %> #${topTag}/${def.lbl.replace(' ', '_')} ^<%new Date().getTime().toString(36)%>`
+        //create aliased Data Journal applying aliases passed in AND read from the file, where passed-in trumps
+        const combinedAliases = { ...aliasKeys, ...containedAliases };
+        const aliasedDJ = AliasKeyer.applyAliases(staticDJ, combinedAliases);
 
-            def.pts.forEach(pd => {
-                returnStr = returnStr + `
-    - [${pd.lbl}::]`
-            })
-            returnStr = returnStr + `
-	- [note::]
-	- [source::Added in Obsidian] [created::<% tp.date.now('YYYY-MM-DDTHH:MM') %>]`
-            return returnStr
-        }
-    }
+        let containedDefs: object[] = [];
+        let containedEntries: object[] = [];
 
-    async fromDataJournal(canonicalDataset: pdw.CanonicalDataset) {
-        if(canonicalDataset.defs === undefined) throw new Error("No 'defs' key found in CanonicalDataset");
-        if(canonicalDataset.defs.length === 0) throw new Error("No defs found in CanonicalDataset. Import requires Defs");
-        /* Load pre-existing defs */
-        await this.loadDefsAndTopTagFromConfig();
-        console.log("defs loaded")
-        /* merge with passed-in defs */
-        await this._internalPDW.setAll(canonicalDataset);
-        console.log("internal PDW loaded")
-        /* Parallelizing the two async functions. I should do this more. */
-        const promises = [this._internalPDW.getDefs(true), this._internalPDW.getEntries({includeDeleted: 'yes'})];
-        const [defs, entries] = await Promise.all(promises);
-        console.log("writing to defs: " + defs.length)
-        this.overwriteDefsInConfigFile((<pdw.Def[]>defs));
-        console.log("writing to entries: " + entries.length)
-        this.mergeInEntries((<pdw.Entry[]>entries));
-    }
-
-    async toDataJournal(): Promise<pdw.CanonicalDataset> {
-        //ensure clear DataStores - basically this should have been a static method, but it's not.
-        //@ts-expect-error - hacking this
-        this._internalPDW.dataStore.entries = [];
-
-        //traverse folders, accumulate Blocks
-        const notes: Note[] = [];
-        recursivelyAddToNotesList(this.vaultPath + "/" + this.subpathToFolderWithEntries);
-        
-        const that = this; //for use in functions without passing.
-        notes.forEach(note => {
-            note.blocks.forEach(block => {
-                if (that.blockIsEntry(block)) {
-                    blockToEntry(block, note);
-                }
-            })
+        let defsToAppend = JSON.parse(JSON.stringify(aliasedDJ.defs));
+        let entriesToAppend = JSON.parse(JSON.stringify(aliasedDJ.entries));
+        let aliasesToAppend = JSON.parse(JSON.stringify(aliasKeys));
+        //this is untested.
+        Object.keys(containedAliases).forEach(containedKey => {
+            if (Object.hasOwn(aliasesToAppend, containedKey)) delete aliasesToAppend[containedKey]
         })
 
-        return this._internalPDW.getAll({includeDeleted:'yes'});
+        //do other stuff
+        let idKey = '_id';
+        const positionOfIdAlias = Object.values(combinedAliases).findIndex(canonKey => canonKey === idKey);
+        if (positionOfIdAlias !== -1) idKey = Object.keys(combinedAliases)[positionOfIdAlias];
 
-        function recursivelyAddToNotesList(pathIn: string) {
-            const pathNames = fs.readdirSync(pathIn);
-
-            pathNames.forEach(fileName => {
-                const filePath = pathIn + "/" + fileName;
-                const fileStats = fs.statSync(filePath)
-
-                /* Resurse for folders */
-                if (fileStats.isDirectory()) {
-                    recursivelyAddToNotesList(filePath);
+        note.blocks.forEach(block => {
+            if (ObsidianTranslator.blockIsDef(block)) {
+                let relatedDef: any = aliasedDJ.defs.filter(def => block.text.includes('::' + def[idKey] + ']'));
+                if (relatedDef.length > 1) {
+                    throw new Error('More than one Def._id match found in block!')
                 }
-                /* Ignore non-files */
-                if (fs.statSync(filePath).isFile() == false) return
+                if (relatedDef.length === 1) defsToAppend = defsToAppend.filter(def => dj.DJ.standardizeKey(def[idKey]) !== dj.DJ.standardizeKey(relatedDef[0][idKey]))
+                if (relatedDef.length === 0) relatedDef = [{}];
+                let mergeObj = ObsidianTranslator.mergeObjectIntoMarkdownString(block.text, relatedDef[0], true);
+                containedDefs.push(mergeObj.keyValuesContained);
+                block.text = mergeObj.resultString;
+            }
+            if (ObsidianTranslator.blockIsEntry(block)) {
+                let relatedEntry: any = aliasedDJ.entries.filter(entry => block.text.includes(entry[idKey]));
+                if (relatedEntry.length > 1) {
+                    throw new Error('More than one Entry._id match found in block!')
+                }
+                if (relatedEntry.length === 1) entriesToAppend = entriesToAppend.filter(entry => dj.DJ.standardizeKey(entry[idKey]) !== dj.DJ.standardizeKey(relatedEntry[0][idKey]))
+                if (relatedEntry.length === 0) relatedEntry = [{}];
+                let mergeObj = ObsidianTranslator.mergeObjectIntoMarkdownString(block.text, relatedEntry[0], true);
+                containedEntries.push(mergeObj.keyValuesContained)
+                block.text = mergeObj.resultString;
+            }
+        })
 
-                /* Ignore non-markdown files */
-                if (path.extname(fileName) !== '.md') return
 
-                notes.push(Note.parseFromPath(filePath))
-            })
+        if (!readOnly) {
+            let returnNoteText = '';
+            note.blocks.forEach(block => returnNoteText += block.text + '\n');
+            if (defsToAppend.length > 0) returnNoteText += ObsidianTranslator.makeBlocksOfDefs(defsToAppend, {});
+            if (entriesToAppend.length > 0) returnNoteText += ObsidianTranslator.makeBlocksOfEntries(entriesToAppend, {});
+            if (aliasesToAppend.length > 0) returnNoteText += ObsidianTranslator.makeBlockOfKeyAliases(aliasesToAppend);
+            containedDefs = [...containedDefs, ...defsToAppend];
+            containedEntries = [...containedEntries, ...entriesToAppend];
+
+            fs.writeFileSync(filepath.slice(0, filepath.length - 3) + " (new).md", returnNoteText, 'utf8');
         }
 
-        /**
-         * Parses & adds the block to the internal _PDWInstance
-         */
-        async function blockToEntry(block: Block, obsidianNote: Note) {
-            const altArray: { key: string, value: any }[] = [];
-            const props: any = {};
-            block.props.forEach(kv => {
-                const key = Object.keys(kv)[0]//.toUpperCase();
-                const value = kv[key];
-                props[key] = value;
-                altArray.push({ key: key, value: value });
-            });
+        const unaliasedDJ = AliasKeyer.unapplyAliases({
+            defs: containedDefs,
+            entries: containedEntries
+        }, aliasKeys)
 
-            const entryTypeLabel = pdwSubTag(block.text)?.replaceAll('_', ' ');
-            if (entryTypeLabel === undefined) throw new Error('Entry Type Label was not found');
-            const assDef = that._internalPDW.getDefFromManifest(entryTypeLabel);
-            if(assDef === undefined) throw new Error('No associated Def found for ' + entryTypeLabel + ' block in ' + obsidianNote.fileName);
+        //convert any entry._deleted into actual boolean
+        unaliasedDJ.entries.forEach(entry => {
+            //@ts-expect-error
+            if (entry._deleted !== undefined && typeof entry._deleted === 'string') entry._deleted = entry._deleted.toUpperCase() === 'TRUE'
+        })
 
-            let id = block.id;
-            if (id === undefined) {
-                id = mkId();
-                console.warn("Block without ID in " + obsidianNote.fileName + ". Made id for it: " + id)
+        return unaliasedDJ
+    }
+
+    private static mergeObjectIntoMarkdownString(str: string, keyVals: object, appendMissingKeys = false): { keyValuesContained: object, resultString: string } {
+        // const unmodified = str;
+        const splitText = str.split('::');
+        const keyValuesToAppend = JSON.parse(JSON.stringify(keyVals));
+        let delimterUsed = ''; //variable shared within nested functions
+        while (splitText.length > 1) {
+            let key = findKey(splitText[0]);
+            if (key === null) {
+                //merge 0th element into 1st
+                splitText[1] = splitText[0] + '::' + splitText[1]
+                //remove 0th element
+                splitText.shift();
+                continue; //back to the top of the loop
             }
-
-            //PROPS ARE AN ARRAY, NOT AN OBJECT.
-            let eid = props.eid;
-            if (eid === undefined) {
-                eid = id;
+            const existsInPassedInObject = Object.hasOwn(keyVals, key);
+            let val = findVal(splitText[1]);
+            if (val === null) {
+                //not sure if this can happen
+                throw new Error('unhandled situation fapeihml');
+            }
+            if (!existsInPassedInObject) {
+                //just reading it into keyVals
+                keyVals[key] = val;
             } else {
-                delete props.eid
+                //replace value in the text that was found with passed in key/value value
+                splitText[1] = keyVals[key] + splitText[1].substring(val!.length);
+                delete keyValuesToAppend[key];
             }
 
-            let period = obsidianNote.fileNameNoExtension;
-            if (period === undefined) throw new Error('No filename?');
-            const time = blockTime(block.text);
-            if (time !== undefined) period = period + "T" + time;
-            if (assDef.scope !== pdw.Scope.HOUR &&
-                assDef.scope !== pdw.Scope.MINUTE &&
-                assDef.scope !== pdw.Scope.SECOND
-            ) period = period.split('T')[0];
+            //merge 0th element into 1st
+            splitText[1] = splitText[0] + '::' + splitText[1]
+            //remove 0th element
+            splitText.shift();
+        }
+        //append any remaining keyValuesToAppend
+        let returnStr = splitText[0]
+        let returnValsContained = keyVals;
+        if (appendMissingKeys) {
+            returnStr = appendKeyValues(returnStr, keyValuesToAppend);
+            returnValsContained = { ...keyVals, ...keyValuesToAppend };
+        }
 
-            let created = props.created;
-            if (created === undefined) {
-                created = obsidianNote.stats.ctime.getTime().toString(36);
-            } else {
-                delete props.created
-            }
+        return {
+            keyValuesContained: returnValsContained,
+            resultString: returnStr
+        }
 
-            let updated = props.updated;
-            if (updated === undefined) {
-                updated = obsidianNote.stats.mtime.getTime().toString(36);
-            } else {
-                delete props.updated
-            }
-
-            let source = props.source;
-            if (source === undefined) {
-                source = ''
-            } else {
-                delete props.source
-            }
-
-            let entryNote = props.note;
-            if (entryNote === undefined) {
-                entryNote = ''
-            } else {
-                delete props.note
-            }
-
-            let newEntryData: pdw.EntryData = {
-                _eid: eid,
-                _note: entryNote,
-                _period: period,
-                _did: assDef!.did,
-                _source: source,
-                _uid: id,
-                _deleted: false,
-                _created: created,
-                _updated: updated,
-            }
-
-            // /* For all remaining props, find associated _pid */
-            Object.keys(props).forEach((key: any) => {
-                const match = assDef.getPoint(key.replaceAll('_',' '))
-                let pid = key;
-                if (match === undefined) {
-                    console.warn('No matching pid found under ' + assDef.lbl + ' for point labeled ' + key + ' in file ' + obsidianNote.fileName);
-                } else {
-                    pid = match.pid
-                }
-                newEntryData[pid.replaceAll('_',' ')] = props[key]
+        function appendKeyValues(toText: string, keyValuesToAppend: object): string {
+            let returnText = toText;
+            const middleBit = `\n\t- `;
+            Object.keys(keyValuesToAppend).forEach(key => {
+                returnText = returnText + middleBit + '[' + key + '::' + keyValuesToAppend[key] + ']'
             })
+            return returnText
+        }
 
-            await assDef.newEntry(newEntryData)
+        function findVal(text: string): string | null {
+            if (delimterUsed === 'bracket') return findValWithBracket(text);
+            if (delimterUsed === 'paren') return findValWithParen(text);
+            throw new Error('whelp.')
+        }
 
-            function blockTime(blockText: string): string | undefined {
-                const possibleTimes = blockText.split('\n')[0].match(/([01][0-9]|2[0-3]):[0-5][0-9]/g);
-                if (possibleTimes === null) return undefined;
-                if (possibleTimes!.length > 1) {
-                    // console.warn('Multiple time values are present in block, defaulting to the first. Block text: ',this.text);
+        function findValWithBracket(str: string): string | null {
+            let openCount = 0;
+            let closeCount = 0;
+            for (let i = 0; i < str.length; i++) {
+                if (str[i] === "[") {
+                    openCount++;
+                } else if (str[i] === "]") {
+                    closeCount++;
                 }
-                return possibleTimes[0];
-            }
 
-            function mkId(len = 3) { return new Date().getTime().toString(36) + "-" + Math.random().toString(36).slice(13 - len).padStart(len, "0") }
-
-            function pdwSubTag(blockText: string): string | undefined {
-                const firstLine = blockText.split('\n')[0];
-                if (!firstLine.includes('#' + that.topTag)) {
-                    throw new Error('No "' + that.topTag + '" tag was found in block.')
+                if (closeCount === openCount
+                    + 1) {
+                    return str.slice(0, i);
                 }
-                let words = firstLine.split(' ');
-                let tagText: string | undefined;
-                words.forEach(word => {
-                    if (tagText !== undefined) return
-                    if (word.startsWith('#' + that.topTag + '/')) tagText = word;
-                })
-                //full tag captured, including "#pdw/", splitting to get subtag
-                return tagText?.split('/')[1]
             }
+            return null; // If no valid closing bracket is found
+        }
+
+        function findValWithParen(str: string): string | null {
+            let openCount = 0;
+            let closeCount = 0;
+            for (let i = 0; i < str.length; i++) {
+                if (str[i] === "(") {
+                    openCount++;
+                } else if (str[i] === ")") {
+                    closeCount++;
+                }
+
+                if (closeCount === openCount
+                    + 1) {
+                    return str.slice(0, i);
+                }
+            }
+            return null; // If no valid closing bracket is found
+        }
+
+        function findKey(text: string): string | null {
+            delimterUsed = 'bracket';
+            let key = findKeyWithBracket(text);
+            if (key !== null) return key;
+            delimterUsed = 'paren';
+            return findKeyWithParen(text)
+        }
+
+        function findKeyWithBracket(text: string) {
+            //key cannot have any () or [] in it
+            const bracketSplit = text.split('[');
+            if (bracketSplit.length === 1) return null
+            let candidateKey = bracketSplit.pop()!;
+            //key cannot have any other delimiters in it
+            if (!candidateKey?.includes(']') &&
+                !candidateKey?.includes('(') &&
+                !candidateKey?.includes(')')) {
+                return candidateKey;
+            }
+            return null
+        }
+        function findKeyWithParen(text: string) {
+            //key cannot have any () or [] in it
+            const bracketSplit = text.split('(');
+            if (bracketSplit.length === 1) return null
+            let candidateKey = bracketSplit.pop()!;
+            //key cannot have any other delimiters in it
+            if (!candidateKey?.includes(')') &&
+                !candidateKey?.includes('[') &&
+                !candidateKey?.includes(']')) {
+                return candidateKey;
+            }
+            return null
         }
     }
 
-    blockIsEntry(block: Block): boolean {
+    static makeBlockOfKeyAliases(aliasKeys: AliasKeyes): string {
+        const aliases = Object.keys(aliasKeys);
+        let returnStr = '- #keyAlias\n';
+        aliases.forEach(alias => {
+            returnStr += '\t- [' + alias + '::' + aliasKeys[alias] + ']\n';
+        })
+        return returnStr
+    }
+    static makeBlocksOfDefs(defs: dj.Def[], aliasKeys: AliasKeyes): string {
+        const keyAliases = AliasKeyer.flipToKeyAlias(aliasKeys);
+        let returnStr = ''
+        defs.forEach(def => {
+            returnStr += '- #def ^' + def._id +'\n';
+            let rawKeys = Object.keys(def);
+            rawKeys = rawKeys.filter(key=>key!=='_id');
+            rawKeys.forEach(rawKey => {
+                let aliasedKey = rawKey;
+                if (keyAliases[rawKey] !== undefined) aliasedKey = keyAliases[rawKey];
+                returnStr += '\t- [' + aliasedKey + '::' + def[rawKey] + ']\n';
+            })
+        })
+        return returnStr
+    }
+    static makeBlocksOfEntries(entries: dj.Entry[], aliasKeys: AliasKeyes): string {
+        let returnStr = ''
+        entries.forEach(entry => {
+            returnStr += '- ' + entry._period.slice(10) + ' #entry^' + entry._id +'\n';
+            let rawKeys = Object.keys(entry);
+            rawKeys = rawKeys.filter(key=>key!=='_id' && key !== '_period');
+            rawKeys.forEach(rawKey => {
+                let aliasedKey = rawKey;
+                if (aliasKeys[rawKey] !== undefined) aliasedKey = aliasKeys[rawKey];
+                returnStr += '\t- [' + aliasedKey + '::' + entry[rawKey] + ']\n';
+            })
+        })
+        return returnStr;
+    }
+
+    static blockIsEntry(block: Block): boolean {
         const firstLine = block.text.split('\n')[0];
-        return firstLine.includes('#' + this.topTag);
+        return firstLine.toUpperCase().includes('#ENTRY');
+    }
+    static blockIsDef(block: Block): boolean {
+        const firstLine = block.text.split('\n')[0];
+        return firstLine.toUpperCase().includes('#DEF');
+    }
+    static blockIsAliasKey(block: Block): boolean {
+        const firstLine = block.text.split('\n')[0];
+        return firstLine.toUpperCase().includes('#KEYALIAS');
     }
 
-    async mergeInEntries(entries: pdw.Entry[]){
-        console.log('beginning summarization')
-        const summaries = pdw.PDW.summarize(entries,pdw.Scope.DAY);
-        let entryCount = 0;
-        let filesWritten = 0;
-        console.log('begin looping over summaries: ' + summaries.length)
-        summaries.forEach(summary=>{
-            console.log('Doing day ' + summary.period);
-            entryCount = entryCount + 1;
-            if(summary.entries.length === 0) return;
-            const filePath = this.vaultPath + "/" + this.subpathToFolderWithEntries + "/" + summary.period + ".md"
-            if(fs.existsSync(filePath)){
-                // //handle previously existing file
-                let obsidianNote = Note.parseFromPath(filePath);
-                obsidianNote.blocks.forEach(block=>{
-                    if(!this.blockIsEntry(block)) return
-                    //make all attempts to find a uid, through the "^" approach or a "uid" dataview prop
-                    let blockId = block.id;
-                    if(blockId === undefined){
-                        const uidProp = block.props.find(prop=>Object.keys(prop)[0]==='uid');
-                        if(uidProp===undefined) return
-                        blockId = Object.values(uidProp)[0];
-                    }
-                    if(blockId === undefined) return
-                    //remove the matching entry, if it exists
-                    summary.entries = summary.entries.filter(entry => entry._uid !== blockId);
-                })
-                //append all remaining entries to the bottom of the file
-                    const contentToAppendToFile = summary.entries.map(e=>this.entryToBlockText(e)).join('');
-                    const newFileContent = obsidianNote._rawContent + contentToAppendToFile;
-                    fs.writeFileSync(filePath, newFileContent, 'utf-8');
-            }else{
-                //create new file
-                const newFileContent = summary.entries.map(e=>this.entryToBlockText(e)).join('');
-                fs.writeFileSync(filePath, newFileContent, 'utf-8');
-                filesWritten = filesWritten + 1;
-                console.log(filesWritten);
-            }
-        })
-    }
-
-    entryToBlockText(entry: pdw.EntryData): string{
-        let blockText = `\n- `;
-        let assDef = this._internalPDW.getDefFromManifest(entry._did);
-        if(assDef === undefined) throw new Error('No Def found for Entry. FPEIUPA')
-        if(scopeNeedsTimeAdded(assDef.scope)){
-            let timeText = entry._period.toString().split('T')[1];
-            if(assDef.scope === pdw.Scope.SECOND) timeText = timeText.substring(0,5);
-            blockText = blockText + timeText + ' ';
-        }
-
-        blockText = blockText + '#' + this.topTag + '/' + assDef.lbl.replaceAll(' ','_') + ' ';
-        blockText = blockText + "^" + entry._uid + '\n';
-        const entryPoints = Object.keys(entry).filter(key=>!key.startsWith('_')).map(key=>{
-            return {
-                lbl: assDef.getPoint(key)!.lbl,
-                val: entry[key]
-            }});
-        entryPoints.forEach(entryPoint=>{
-            blockText = blockText + `\t- [${entryPoint.lbl.replaceAll(' ', '_')}::${entryPoint.val}]\n`
-        })
-        if(entry._note !== '') blockText = blockText + '\t- [note::' +  entry._note +']\n'
-        const createdStr = pdw.parseTemporalFromEpochStr(entry._created).toString().substring(0,16)
-        const updatedStr = pdw.parseTemporalFromEpochStr(entry._updated).toString().substring(0,16)
-        blockText = blockText + '\t- [source::' +  entry._source + '] [created::' + createdStr + '] [updated::' + updatedStr + ']'
-
-        return blockText
-
-        //local helper function
-        function scopeNeedsTimeAdded(scope: string){
-            return scope === pdw.Scope.SECOND || scope === pdw.Scope.MINUTE || scope === pdw.Scope.HOUR;
-        }
-    }
-   
-    private async overwriteDefsInConfigFile(defs: pdw.Def[]){
-        const configFileContent = await this.getConfigFileText();
-        const jsonBlockSplit = configFileContent.split('```json');
-        if(jsonBlockSplit.length !== 2) throw new Error('Error in overwriting defs to config file due to the ```json block either not existing or existing multiple times');
-        const newContent = jsonBlockSplit[0] + '```json\n' + JSON.stringify(pdw.PDW.flatten(defs), null, 2) + '\n```';
-        await fs.writeFileSync(this.configFilePath, newContent, 'utf-8');
-    }
-
-    private async loadDefsAndTopTagFromConfig(){
-        const text = await this.getConfigFileText() 
-        const tagStart = text.indexOf('# Tag\n- [tag::');
-        let tag = text.substring(tagStart + 14);
-        this.topTag = tag.split(']')[0];
-        const topHeadingArr = text.split('# ');
-
-        const pathsText = topHeadingArr.filter(content => content.startsWith('Paths\n'))[0];
-        const pathsBlocks = Block.splitStringToBlockArray(pathsText);
-        pathsBlocks.forEach(block => {
-            if(block.text.startsWith('- [folderWithNotesContainingEntries::')){
-                this.subpathToFolderWithEntries = Object.values(block.props[0])[0];
-            } 
-        })
-
-        const defsText = topHeadingArr.filter(content => content.startsWith('Defs\n'))[0];
-        const defsBlocks = Block.splitStringToBlockArray(defsText);
-        
-        /* Look for the defBlock that starts ```json */
-        const jsonBlock = defsBlocks.find(block=> block.text.startsWith("```json"));
-        
-        let jsonBlockSplit = jsonBlock?.text.split('\n');
-        jsonBlockSplit?.pop();
-        jsonBlockSplit?.shift();
-        const jsonContent = jsonBlockSplit?.join('')!;
-        let parsedDefs = JSON.parse(jsonContent);
-        await this._internalPDW.setDefs(undefined, parsedDefs);
-
-        console.log('Obsidian PDW config loaded! Using top tag "' + this.topTag + '", loaded ' + this._internalPDW.manifest.length + ' Defs');
-    }
-
-    private async getConfigFileText(){
-        const configText = fs.readFileSync(this.configFilePath, 'utf8');
-        if (!this.isValidConfig(configText)) throw new Error('Config File did not look right. Run ObsidianAsyncDataStore.logConfigFileTemplate() to see what it should look like.');
-        return configText
-    }
-
-    private isValidConfig(fileText: string): boolean {
-        if (!fileText.includes('# Tag')) return false
-        if (!fileText.includes('[tag::')) return false
-        if (!fileText.includes('# Paths')) return false
-        if (!fileText.includes('folderWithNotesContainingEntries::')) return false
-        if (!fileText.includes('# Defs')) return false
-        return true
+    async toDataJournal(filepath: string): Promise<dj.DataJournal> {
+        //using code I already wrote, probably less efficient in terms of runtime,
+        //but WAY more efficient in terms of getting this done.
+        return this.updateMarkdownDataJournal({ defs: [], entries: [] }, filepath, {}, true);
     }
 }
+//#endregion
