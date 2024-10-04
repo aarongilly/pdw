@@ -41,7 +41,6 @@ export type Markdown = string
  */
 export enum Rollup {
     COUNT = 'COUNT',
-    COUNTUNIQUE = 'COUNTUNIQUE',
     COUNTOFEACH = 'COUNTOFEACH',
     COUNTDISTINCT = 'COUNTDISTINCT',
     SUM = 'SUM',
@@ -273,11 +272,11 @@ export interface QueryObject {
  */
 export interface TransactionObject {
     /**
-     * A {@link HalfTransaction} for Creating, Overwriting, Appending, Deleting {@link Def}s
+     * A {@link HalfTransaction} for Creating, Replacing, Modifying, Deleting {@link Def}s
      */
     defs: HalfTransaction,
     /**
-     * A {@link HalfTransaction} for Creating, Overwriting, Appending, Deleting {@link Entry}s
+     * A {@link HalfTransaction} for Creating, Replacing, Modifying, Deleting {@link Entry}s
      */
     entries: HalfTransaction
 }
@@ -380,7 +379,7 @@ export enum DefType {
      */
     DURATION = 'DURATION',
     /**
-     * A Temporal PlainTime string (no timezone)
+     * A Temporal PlainTime string (no timezone) - e.g. "12:23:30"
      */
     TIME = 'TIME', //Temporal.plainTime
     /**

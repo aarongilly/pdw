@@ -685,6 +685,85 @@ export const expectedGroupingByDays = {
       },
     ],
   }
+
+  export const expectedSummary = [
+    {
+      period: "ALL",
+      entries: [
+        {
+          _id: "m0ofgfio_gjlp",
+          _period: "2024-09-04T18:39:00",
+          _created: "m0ofgfio",
+          _updated: "m0ofgfio",
+          _deleted: false,
+          _note: "A very typical entry",
+          _source: "Test data",
+          BOOK_NAME: "Atomic Habits",
+        },
+        {
+          _id: "m0ogacof_3fjk",
+          _period: "2024-09-05T11:09:00",
+          _created: "m0ogacof",
+          _updated: "m0ogbzzz",
+          _deleted: false,
+          _note: "An *updated* entry, now with 3 points",
+          _source: "Test data, with edit!",
+          BOOK_NAME: "Atomic Habits",
+          WORKOUT_TYPE: "CARDIO",
+          WORKOUT_NAME: "Biked",
+        },
+        {
+          _id: "m0ogdggg_ca3t",
+          _period: "2024-09-05T11:05:00",
+          _created: "m0ogdggg",
+          _updated: "m0ogdggg",
+          _deleted: false,
+          _note: "Got so swole",
+          _source: "Test data",
+          WORKOUT_TYPE: "STRENGTH",
+          WORKOUT_NAME: "Starting Strength A",
+        },
+        {
+          _id: "m0ofacho_poax",
+          _period: "2024-09-06T10:38:00",
+          _created: "m0ofacho",
+          _updated: "m0zzzzzz",
+          _deleted: true,
+          _note: "Demo a deleted entry",
+          _source: "Test daaata",
+        },
+      ],
+      entryRollups: [
+        {
+          defId: "BOOK_NAME",
+          val: 1,
+          method: "COUNTDISTINCT",
+          rawVals: [
+            "Atomic Habits",
+            "Atomic Habits",
+          ],
+        },
+        {
+          defId: "WORKOUT_TYPE",
+          val: 2,
+          method: "COUNT",
+          rawVals: [
+            "CARDIO",
+            "STRENGTH",
+          ],
+        },
+        {
+          defId: "WORKOUT_NAME",
+          val: 2,
+          method: "COUNT",
+          rawVals: [
+            "Biked",
+            "Starting Strength A",
+          ],
+        },
+      ],
+    },
+  ]
 //#endregion
 
 //#region --- Expected Differences

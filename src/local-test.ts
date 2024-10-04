@@ -5,37 +5,90 @@ import * as fs from 'fs';
 // import * as XLSX from 'xlsx'
 // import * as fs from 'fs'
 import * as testData from '../test/test_datasets.js';
-import { Def, DefType, DJ, DataJournal, Entry, Scope } from './DataJournal.js';
+import { Def, DefType, DJ, DataJournal, Entry, Scope, Rollup } from './DataJournal.js';
 import { AliasKeyer, AliasKeyes } from './AliasKeyer.js';
 import { JsonTranslator, MarkdownTranslator } from './translators/fileTranslators.js';
 import { Note } from './translators/MarkdownParsers.js';
 import { QueryBuilder } from './QueryBuilder.js';
+import { Summarizor } from './Summarizor.js';
+import { Temporal } from 'temporal-polyfill';
 
 const myDj = testData.biggerJournal;
+const myBool =
+        {
+            _id: "boolType",
+            _updated: "m2m2m2m2",
+            _type: DefType.BOOL
+        }
+        const myNum =
+        {
+            _id: 'numType',
+            _updated: 'm2m2m2m2',
+            _type: DefType.NUMBER
+        }
+        const myDur =
+        {
+            _id: 'durType',
+            _updated: 'm2m2m2m2',
+            _type: DefType.DURATION
+        }
+        const myTime =
+        {
+            _id: 'timeType',
+            _updated: 'm2m2m2m2',
+            _type: DefType.TIME
+        }
+        const myMulti =
+        {
+            _id: 'multiselType',
+            _updated: 'm2m2m2m2',
+            _type: DefType.MULTISELECT
+        }
+        const myText =
+        {
+            _id: 'textType',
+            _updated: 'm2m2m2m2',
+            _type: DefType.TEXT //covers SELECT, MARKDOWN, LINK 
+        }
 
-const smallLocalEntrySet: Entry[] = [
-    {
-      _id: "one",
-      _period: "2024-09-20T10:30:29",
-      _updated: "m0a3fajl",
-      _note: ''
-    },
-    {
-      _id: "two",
-      _period: "2024-09-27T10:30:29",
-      _updated: "m0a3fajl",
-      _note: ''
-    },{
-      _id: "three",
-      _period: "2024-10-11T10:30:29",
-      _updated: "m0a3fajl",
-      _note: ''
-    }
-  ]
+        let myEntries: Entry[] = [
+            {
+                _id: "one",
+                _period: "2024-08-01T11:12:13",
+                _updated: "m2m2m2m2",
+                boolType: false,
+                numType: 3,
+                durType: 'PT1H',
+                timeType: '22:00:00',
+                multiselType: ['A', 'B'],
+                textType: 'Yo.'
+            },
+            {
+                _id: "two",
+                _period: "2024-08-01T11:12:13",
+                _updated: "m2m2m2m2",
+                boolType: true,
+                numType: 4,
+                durType: 'PT2H',
+                timeType: '23:00:00',
+                multiselType: ['B', 'C'],
+                textType: 'Ay.'
+            },
+            {
+                _id: "three",
+                _period: "2024-08-01T11:12:13",
+                _updated: "m2m2m2m2",
+                boolType: false,
+                numType: 6,
+                durType: 'PT1H',
+                timeType: '02:00:00',
+                multiselType: ['C', 'D'],
+                textType: 'HI MOM.'
+            }
+        ]
 
-let grouped = DJ.groupByPeriod(smallLocalEntrySet, Scope.WEEK, false);
+        Summarizor.rollupEntryPoint(myEntries, myDur, Rollup.AVERAGE).val
 
-console.log(grouped);
 // import sqlite3 from 'sqlite3';
 
 // Create a new database

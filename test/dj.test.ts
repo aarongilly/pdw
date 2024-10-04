@@ -462,15 +462,15 @@ describe('Data Journal Grouping with groupBy', () => {
           _id: "one",
           _period: "2024-09-20T10:30:29",
           _updated: "m0a3fajl",
-          _note: "",
+        _note: 'Week 38'
         },
       ],
-      "2024-W39": [
+      "2024-W39": [ 
         {
           _id: "two",
           _period: "2024-09-27T10:30:29",
           _updated: "m0a3fajl",
-          _note: "",
+        _note: 'Week 39'
         },
       ],
       "2024-W40": [],
@@ -479,7 +479,7 @@ describe('Data Journal Grouping with groupBy', () => {
           _id: "three",
           _period: "2024-10-11T10:30:29",
           _updated: "m0a3fajl",
-          _note: "",
+        _note: 'Week 41'
         },
       ],
     }
