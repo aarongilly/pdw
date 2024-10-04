@@ -141,7 +141,6 @@ export class QueryBuilder {
     scope(scopes: Scope[] | Scope) {
         if (!Array.isArray(scopes)) scopes = [scopes];
         if(this._defs.length === 0) throw new Error('There are no defs loaded in the QueryBuilder')
-        //@ts-expect-error - should be the same
         this._queryObject.defs = this._defs.filter(def => scopes.some(s => s === def._scope)).map(def=>def._id);
         return this
     }

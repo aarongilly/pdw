@@ -7,7 +7,7 @@ export const bookDef: dj.Def = {
     _emoji: "📖",
     _desc: "The name of the book you read.",
     _updated: "m0ofg4dw",
-    _scope: dj.DefScope.MINUTE,
+    _scope: dj.Scope.MINUTE,
     _rollup: dj.Rollup.COUNTDISTINCT,
     _type: dj.DefType.TEXT,
     _tags: ['media'],
@@ -20,7 +20,7 @@ export const movieDef: dj.Def = {
     _emoji: "🎬",
     _desc: "The name of the movie you watched.",
     _updated: "m0ofg4dw",
-    _scope: dj.DefScope.MINUTE,
+    _scope: dj.Scope.MINUTE,
     _type: dj.DefType.TEXT,
     _tags: ['media'],
     _range: []
@@ -32,7 +32,7 @@ const newMovieDef: dj.Def = {
     _emoji: "🎞️",
     _desc: "Is this the first time you've seen this movie?",
     _updated: "m0ofg4dw",
-    _scope: dj.DefScope.MINUTE,
+    _scope: dj.Scope.MINUTE,
     _type: dj.DefType.BOOL,
     _tags: ['media'],
     _range: []
@@ -44,7 +44,7 @@ const sleepDef: dj.Def = {
     _emoji: "🛌",
     _desc: "How long your ring says you slept.",
     _updated: "m0ofg4dw",
-    _scope: dj.DefScope.DAY,
+    _scope: dj.Scope.DAY,
     _type: dj.DefType.DURATION,
     _tags: ['health'],
     _range: []
@@ -56,7 +56,7 @@ const runDef: dj.Def = {
     _emoji: "🏃‍♂️‍➡️",
     _desc: "How far you jogged.",
     _updated: "m0ofg4dw",
-    _scope: dj.DefScope.HOUR,
+    _scope: dj.Scope.HOUR,
     _type: dj.DefType.NUMBER,
     _tags: ['health'],
     _range: ['>', '0']
@@ -68,7 +68,7 @@ const updatedRunDef: dj.Def = {
     _emoji: "🏃‍♂️‍➡️",
     _desc: "How far you jogged, in miles",
     _updated: "m0ofg6rt", //is newer
-    _scope: dj.DefScope.HOUR,
+    _scope: dj.Scope.HOUR,
     _type: dj.DefType.NUMBER,
     _tags: ['health'],
     _range: ['>', '0']
@@ -80,7 +80,7 @@ const ateOutDef: dj.Def = {
     _emoji: "🍔",
     _desc: "You ate out. This is the name of the place you ate out at.",
     _updated: "m0ofg4dw",
-    _scope: dj.DefScope.MINUTE,
+    _scope: dj.Scope.MINUTE,
     _type: dj.DefType.TEXT,
     _tags: ['health', 'money'],
     _range: []
@@ -92,7 +92,7 @@ const workoutTypeDef: dj.Def = {
     _emoji: "🏋️",
     _desc: "You did a broad workout of this type",
     _updated: "m0ofg4dw",
-    _scope: dj.DefScope.HOUR,
+    _scope: dj.Scope.HOUR,
     _type: dj.DefType.SELECT,
     _tags: ['health'],
     _range: ['CARDIO', 'STRENGTH', 'MOBILITY']
@@ -104,7 +104,7 @@ const workoutNameDef: dj.Def = {
     _emoji: "💪",
     _desc: "The name of the routine, or brief description of it.",
     _updated: "m0ofg4dw",
-    _scope: dj.DefScope.HOUR,
+    _scope: dj.Scope.HOUR,
     _type: dj.DefType.TEXT,
     _tags: ['health'],
     _range: []
@@ -386,7 +386,7 @@ export const biggerJournalTransaction: dj.TransactionObject = {
                 _lbl: "Updated lbl, no more emoji",
                 _updated: 'm0ogg4dw', //newer
                 _desc: "The name of the routine, or brief description of it.", //unmodifed
-                _scope: dj.DefScope.HOUR,
+                _scope: dj.Scope.HOUR,
                 _type: dj.DefType.TEXT,
                 _tags: ['health'],
                 _range: []
@@ -587,6 +587,104 @@ export const expectedGroupingByDefs = {
         },
     ],
 }
+
+export const expectedGroupingByDays = {
+    "2024-09-04": [
+      {
+        _id: "m0ofgfio_gjlp",
+        _period: "2024-09-04T18:39:00",
+        _created: "m0ofgfio",
+        _updated: "m0ofgfio",
+        _deleted: false,
+        _note: "A very typical entry",
+        _source: "Test data",
+        BOOK_NAME: "Atomic Habits",
+      },
+    ],
+    "2024-09-05": [
+      {
+        _id: "m0ogdggg_ca3t",
+        _period: "2024-09-05T11:05:00",
+        _created: "m0ogdggg",
+        _updated: "m0ogdggg",
+        _deleted: false,
+        _note: "Got so swole",
+        _source: "Test data",
+        WORKOUT_TYPE: "STRENGTH",
+        WORKOUT_NAME: "Starting Strength A",
+      },
+      {
+        _id: "m0ogacof_3fjk",
+        _period: "2024-09-05T11:09:00",
+        _created: "m0ogacof",
+        _updated: "m0ogbzzz",
+        _deleted: false,
+        _note: "An *updated* entry, now with 3 points",
+        _source: "Test data, with edit!",
+        BOOK_NAME: "Atomic Habits",
+        WORKOUT_TYPE: "CARDIO",
+        WORKOUT_NAME: "Biked",
+      },
+    ],
+    "2024-09-06": [
+      {
+        _id: "m0ofacho_poax",
+        _period: "2024-09-06T10:38:00",
+        _created: "m0ofacho",
+        _updated: "m0zzzzzz",
+        _deleted: true,
+        _note: "Demo a deleted entry",
+        _source: "Test daaata",
+      },
+    ],
+  }
+
+  export const expectedGroupingByWeek = {
+    "2024-W36": [
+      {
+        _id: "m0ofgfio_gjlp",
+        _period: "2024-09-04T18:39:00",
+        _created: "m0ofgfio",
+        _updated: "m0ofgfio",
+        _deleted: false,
+        _note: "A very typical entry",
+        _source: "Test data",
+        BOOK_NAME: "Atomic Habits",
+      },
+      {
+        _id: "m0ogdggg_ca3t",
+        _period: "2024-09-05T11:05:00",
+        _created: "m0ogdggg",
+        _updated: "m0ogdggg",
+        _deleted: false,
+        _note: "Got so swole",
+        _source: "Test data",
+        WORKOUT_TYPE: "STRENGTH",
+        WORKOUT_NAME: "Starting Strength A",
+      },
+      {
+        _id: "m0ogacof_3fjk",
+        _period: "2024-09-05T11:09:00",
+        _created: "m0ogacof",
+        _updated: "m0ogbzzz",
+        _deleted: false,
+        _note: "An *updated* entry, now with 3 points",
+        _source: "Test data, with edit!",
+        BOOK_NAME: "Atomic Habits",
+        WORKOUT_TYPE: "CARDIO",
+        WORKOUT_NAME: "Biked",
+      },
+      {
+        _id: "m0ofacho_poax",
+        _period: "2024-09-06T10:38:00",
+        _created: "m0ofacho",
+        _updated: "m0zzzzzz",
+        _deleted: true,
+        _note: "Demo a deleted entry",
+        _source: "Test daaata",
+      },
+    ],
+  }
 //#endregion
 
 //#region --- Expected Differences

@@ -1,28 +1,34 @@
-// //#TODO
+import { Entry, DataJournal, Def } from "./DataJournal";
+import { PeriodStr, Scope } from "./Period";
 
-export const temp = "todo"
+export const temp = "todo";
 
-// export interface PointRollup {
-//     val: any;
-//     method: dj.Rollup;
-//     vals: any[];
-// }
+export type RollupMethod = "COUNT" | 
+    "COUNTOFEACH" |
+    "COUNTUNIQUE" |
+    "SUM" |
+    "AVERAGE";
 
-// export interface EntryRollup {
-//     def: dj.Def;
-//     pts: PointRollup[];
-// }
+export interface EntryRollup {
+    defId: string,
+	val: any,
+	method: RollupMethod,
+	rawVals: any[],
+}
 
-// export interface PeriodSummary {
-//     period: PeriodStr | "ALL";
-//     entryRollups: EntryRollup[];
-//     entries: dj.Entry[]
-// }
+export interface PeriodSummary {
+    period: PeriodStr | "ALL";
+    entryRollups: EntryRollup[];
+    entries: Entry[]
+}
 
-// export class Summarizor{
-    
-// }
+export class Summarizor{
+    static summarize(dataJournal: DataJournal, toScope: Scope | "ALL" = "ALL", includeEmpty = false){
+        
+    }
 
+    // static summarize
+}
 
 //     /**
 //      * Takes in an array of {@link Entry} instances sharing a common Def and applies the default rollup to 

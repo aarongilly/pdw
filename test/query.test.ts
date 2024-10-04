@@ -1,6 +1,6 @@
-import { DataJournal, DJ, Entry, Def, DefType, DefScope, QueryObject } from "../src/DataJournal";
+import { DataJournal, DJ, Entry, Def, DefType, QueryObject } from "../src/DataJournal";
 import { Period, Scope } from "../src/Period";
-import { QueryBuilder, StandardParams } from "../src/QueryMaker";
+import { QueryBuilder, StandardParams } from "../src/QueryBuilder.js";
 import { describe, test, expect } from "vitest";
 import * as testData from './test_datasets';
 
@@ -50,9 +50,8 @@ describe('Building QueryObjects', () => {
         }
         expect(() => q.forDefs([defToSearchFor])).toThrowError()
         expect(() => q.forDefsLbld(['BOOK_NAME'])).toThrowError()
-        expect(() => q.tags('tagname')).toThrowError()
-        //@ts-expect-error
-        expect(() => q.scope(DefScope.DAY)).toThrowError()
+        expect(() => q.tags('tagname')).toThrowError();
+        expect(() => q.scope(Scope.DAY)).toThrowError()
     })
 
     test("With Defs", () => {

@@ -1,4 +1,4 @@
-import { DataJournal, DJ, Entry, Def, DefType, DefScope } from "../src/DataJournal";
+import { DataJournal, DJ, Entry, Def, DefType, Scope } from "../src/DataJournal";
 import { describe, test, expect } from "vitest";
 import * as testData from './test_datasets';
 import { Temporal } from "temporal-polyfill";
@@ -74,7 +74,7 @@ describe('Data Journal Modification', () => {
       _emoji: "🎬",
       _desc: "The name of the movie you watched.",
       _updated: "m0ofg4dw",
-      _scope: DefScope.MINUTE,
+      _scope: Scope.MINUTE,
       _type: DefType.TEXT,
       _tags: ['media'],
       _range: []
@@ -431,6 +431,64 @@ describe('Data Journal Grouping with groupBy', () => {
   test('Group By Defs', () => {
     const dataJournalToGroup = testData.smallJournalABC;
     expect(DJ.groupByDefs(dataJournalToGroup)).toEqual(testData.expectedGroupingByDefs);
+  })
+
+  test('Group By Period', () => {
+    const dataJournalToGroup = testData.biggerJournal;
+    expect(DJ.groupByPeriod(dataJournalToGroup,Scope.DAY)).toEqual(testData.expectedGroupingByDays);
+    expect(DJ.groupByPeriod(dataJournalToGroup,Scope.WEEK)).toEqual(testData.expectedGroupingByWeek);
+    const smallLocalEntrySet: Entry[] = [
+      {
+        _id: "one",
+        _period: "2024-09-20T10:30:29",
+        _updated: "m0a3fajl",
+        _note: 'Week 38'
+      },
+      {
+        _id: "two",
+        _period: "2024-09-27T10:30:29",
+        _updated: "m0a3fajl",
+        _note: 'Week 39'
+      },{
+        _id: "three",
+        _period: "2024-10-11T10:30:29",
+        _updated: "m0a3fajl",
+        _note: 'Week 41'
+      }
+    ]
+    let expectedResult = {
+      "2024-W38": [
+        {
+          _id: "one",
+          _period: "2024-09-20T10:30:29",
+          _updated: "m0a3fajl",
+          _note: "",
+        },
+      ],
+      "2024-W39": [
+        {
+          _id: "two",
+          _period: "2024-09-27T10:30:29",
+          _updated: "m0a3fajl",
+          _note: "",
+        },
+      ],
+      "2024-W40": [],
+      "2024-W41": [
+        {
+          _id: "three",
+          _period: "2024-10-11T10:30:29",
+          _updated: "m0a3fajl",
+          _note: "",
+        },
+      ],
+    }
+    expect(DJ.groupByPeriod(smallLocalEntrySet,Scope.WEEK)).toEqual(expectedResult);
+    // passing in "false" for the 3rd param will not include empty periods
+    //@ts-expect-error
+    delete expectedResult["2024-W40"]
+    expect(DJ.groupByPeriod(smallLocalEntrySet,Scope.WEEK,false)).toEqual(expectedResult);
+
   })
 })
 

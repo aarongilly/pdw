@@ -169,6 +169,12 @@ export class CsvTranslator implements Translator {
     static async fromDefs(defs: dj.Def[], filename: string, useFs = true) {
         return new CsvTranslator().fromDefs(defs,filename,useFs);
     }
+    static async toEntries(filepath: string, useFs = true): Promise<dj.Entry[]>{
+        return new CsvTranslator().toEntries(filepath,useFs);
+    }
+    static async toDefs(filepath: string, useFs = true): Promise<dj.Def[]>{
+        return new CsvTranslator().toDefs(filepath,useFs);
+    }
 
     /**
      * Builds a csv file representing an entire data journal. 

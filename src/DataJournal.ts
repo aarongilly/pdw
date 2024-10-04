@@ -1,4 +1,8 @@
 //#region ---- Types
+import { Period, PeriodStr, Scope } from './Period.js';
+
+/* Re-export the imported "Scope" enum */
+export { Scope } from './Period.js';
 
 /**
  * A alias for string, one that's globally-unique. 
@@ -43,24 +47,6 @@ export enum Rollup {
     SUM = 'SUM',
     AVERAGE = 'AVERAGE',
 }
-/**
- * Literal copy of code from Period. Not DRY. Quite wet actually.
- * 
- * Note - all Entries take place at Scope.SECOND.  
- * Def._scope is for use by the PDW class or as a general
- * flag for quality checks elsewhere.
- */
-export enum DefScope {
-    SECOND = 'SECOND',
-    MINUTE = 'MINUTE',
-    HOUR = 'HOUR',
-    DAY = 'DAY',
-    WEEK = 'WEEK',
-    MONTH = 'MONTH',
-    QUARTER = 'QUARTER',
-    YEAR = 'YEAR',
-}
-
 
 //#endregion
 
@@ -161,11 +147,11 @@ export interface Def {
     _tags?: string[]
     // #### PROPS USED BY OTHER CODE BASES ####
     /**
-     * A {@link DefScope} for what level of granularity this kind of Def uses. 
-     * While all {@link Entry}s are at a DefScope.SCOPE level. In this code base it
+     * A {@link Scope} for what level of granularity this kind of Def uses. 
+     * While all {@link Entry}s are at a Scope.SCOPE level. In this code base it
      * does nothing at all. Used by other code bases that import this one.
      */
-    _scope?: DefScope
+    _scope?: Scope
     /**
      * A {@link Rollup} describing what opeartion should be performed when multiple
      * entries containing this Def are aggregated.. 
@@ -741,6 +727,44 @@ export class DJ {
         return returnMap;
     }
 
+    static groupByPeriod(entries: Entry[] | DataJournal, scope: Scope, includeEmptyPeriods = true): { [period: PeriodStr]: Entry[] } {
+        if (scope === Scope.MINUTE || scope === Scope.HOUR || scope === Scope.SECOND) throw new Error("Don't do groupBy with anything less than Day");
+        let staticEntries = entries;
+        if (Object.hasOwn(staticEntries, 'entries')) staticEntries = entries.entries as Entry[];
+        //if there are no entries, toss out a warning & return an empty object.
+        if((<Entry[]>staticEntries).length === 0) {
+            console.warn("Tried to group by Period an empty set of Entries");
+            return {};
+        }
+
+        staticEntries = JSON.parse(JSON.stringify(staticEntries)) as Entry[];
+        let earliestPeriod = "2999-12-31T23:59:59"
+        let latestPeriod = "1099-12-31T23:59:59"
+        staticEntries.forEach(entry => {
+            if (entry._period < earliestPeriod) earliestPeriod = entry._period;
+            if (entry._period > latestPeriod) latestPeriod = entry._period;
+        })
+        earliestPeriod = new Period(earliestPeriod).zoomTo(scope).toString();
+        latestPeriod = new Period(latestPeriod).zoomTo(scope).toString();
+        let currentPeriod = new Period(earliestPeriod);
+        
+        let returnObj: { [period: PeriodStr]: Entry[] } = {}
+
+        /* The sort & splice method made this 10x faster */
+        staticEntries = staticEntries.sort((a, b) => a._period > b._period ? 1 : -1)
+        do {
+            const spliceSpot = staticEntries.findIndex(entry => !currentPeriod.contains(entry._period));
+            if(spliceSpot === -1){
+                returnObj[currentPeriod.toString()] = staticEntries; //for the last one
+            }else if(includeEmptyPeriods || spliceSpot !== 0){
+                returnObj[currentPeriod.toString()] = staticEntries.splice(0, spliceSpot)
+            }
+            currentPeriod = new Period(currentPeriod).getNext();
+        } while (currentPeriod.toString() <= latestPeriod);
+
+        return returnObj;
+    }
+
     static groupByDefs(entries: Entry[] | DataJournal): { [field: string]: Entry[] } {
         //make static
         let staticEntries: Entry[] = [];
@@ -803,6 +827,10 @@ export class DJ {
      */
     static filterTo(queryObject: QueryObject, entriesOrJournal: Entry[] | DataJournal): Entry[] | DataJournal {
         const isFullJournal = Object.hasOwn(entriesOrJournal, 'entries');
+
+        //if queryObject has "to" and "from", they may not be at the right level of scope
+        if(Object.hasOwn(queryObject,'from')) queryObject.from = new Period(queryObject.from!).getStart().toString()
+        if(Object.hasOwn(queryObject,'to')) queryObject.to = new Period(queryObject.to!).getEnd().toString()
 
         if (isFullJournal) {
             //make static copy
@@ -1230,8 +1258,8 @@ export class DJ {
     }
 
     static strArrayShareElementStandardized(arrOne: string[], arrTwo: string[]) {
-        let array1 = arrOne.map(str=>DJ.standardizeKey(str));
-        let array2 = arrTwo.map(str=>DJ.standardizeKey(str));
+        let array1 = arrOne.map(str => DJ.standardizeKey(str));
+        let array2 = arrTwo.map(str => DJ.standardizeKey(str));
         const set1 = new Set(array1);
         for (const element of array2) {
             if (set1.has(element)) {
@@ -1241,14 +1269,14 @@ export class DJ {
         return false;
     }
 
-    static stringsAreEqualStandardized(strOne: string, strTwo: string){
+    static stringsAreEqualStandardized(strOne: string, strTwo: string) {
         return DJ.standardizeKey(strOne) === DJ.standardizeKey(strTwo);
     }
 
-    static strInArrayStandardized(str: string, strArr: string[]){
-        const standardizedArr = strArr.map(str=>DJ.standardizeKey(str));
+    static strInArrayStandardized(str: string, strArr: string[]) {
+        const standardizedArr = strArr.map(str => DJ.standardizeKey(str));
         const standardizedStr = DJ.standardizeKey(str);
-        return standardizedArr.some(element=>element===standardizedStr);
+        return standardizedArr.some(element => element === standardizedStr);
     }
 
     private static isValidEpochStr(epochStr: string): boolean {

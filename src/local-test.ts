@@ -1,24 +1,41 @@
-import * as pdw from './pdw.js'
-import * as ie from './translators/fileTranslators.js'
-import * as fs from 'fs'
+import * as pdw from './pdw.js';
+import * as ie from './translators/fileTranslators.js';
+import * as fs from 'fs';
 // import * as obs from './translators/obsidianTranslator.js'
 // import * as XLSX from 'xlsx'
 // import * as fs from 'fs'
-import * as testData from '../test/test_datasets.js'
-import { Def, DefType, DJ, DataJournal, Entry } from './DataJournal.js'
+import * as testData from '../test/test_datasets.js';
+import { Def, DefType, DJ, DataJournal, Entry, Scope } from './DataJournal.js';
 import { AliasKeyer, AliasKeyes } from './AliasKeyer.js';
 import { JsonTranslator, MarkdownTranslator } from './translators/fileTranslators.js';
-import { Note } from './translators/MarkdownParsers.js'
-import { QueryBuilder } from './QueryMaker.js'
-
-// const myDj = await ie.JsonTranslator.toDataJournal('test/localTestFileDir/roundtrip.json');
+import { Note } from './translators/MarkdownParsers.js';
+import { QueryBuilder } from './QueryBuilder.js';
 
 const myDj = testData.biggerJournal;
-const starterQueryObject = {
-    deleted: false,
-}
-const obj = QueryBuilder.makeQueryObject({ queryObject: starterQueryObject, params: { 'updatedAfter': 'm2m2m2m2' } });
 
+const smallLocalEntrySet: Entry[] = [
+    {
+      _id: "one",
+      _period: "2024-09-20T10:30:29",
+      _updated: "m0a3fajl",
+      _note: ''
+    },
+    {
+      _id: "two",
+      _period: "2024-09-27T10:30:29",
+      _updated: "m0a3fajl",
+      _note: ''
+    },{
+      _id: "three",
+      _period: "2024-10-11T10:30:29",
+      _updated: "m0a3fajl",
+      _note: ''
+    }
+  ]
+
+let grouped = DJ.groupByPeriod(smallLocalEntrySet, Scope.WEEK, false);
+
+console.log(grouped);
 // import sqlite3 from 'sqlite3';
 
 // Create a new database
