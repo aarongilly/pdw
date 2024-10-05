@@ -1,9 +1,8 @@
 import * as pdw from './pdw.js';
 import * as ie from './translators/fileTranslators.js';
 import * as fs from 'fs';
-// import * as obs from './translators/obsidianTranslator.js'
-// import * as XLSX from 'xlsx'
-// import * as fs from 'fs'
+import * as obs from './translators/obsidianTranslator.js'
+import * as XLSX from 'xlsx'
 import * as testData from '../test/test_datasets.js';
 import { Def, DefType, DJ, DataJournal, Entry, Scope, Rollup } from './DataJournal.js';
 import { AliasKeyer, AliasKeyes } from './AliasKeyer.js';
@@ -12,85 +11,62 @@ import { Note } from './translators/MarkdownParsers.js';
 import { QueryBuilder } from './QueryBuilder.js';
 import { Summarizor } from './Summarizor.js';
 import { Temporal } from 'temporal-polyfill';
+import { Validator } from './Validator.js';
 
-const myDj = testData.biggerJournal;
-const myBool =
-        {
-            _id: "boolType",
-            _updated: "m2m2m2m2",
-            _type: DefType.BOOL
-        }
-        const myNum =
-        {
-            _id: 'numType',
-            _updated: 'm2m2m2m2',
-            _type: DefType.NUMBER
-        }
-        const myDur =
-        {
-            _id: 'durType',
-            _updated: 'm2m2m2m2',
-            _type: DefType.DURATION
-        }
-        const myTime =
-        {
-            _id: 'timeType',
-            _updated: 'm2m2m2m2',
-            _type: DefType.TIME
-        }
-        const myMulti =
-        {
-            _id: 'multiselType',
-            _updated: 'm2m2m2m2',
-            _type: DefType.MULTISELECT
-        }
-        const myText =
-        {
-            _id: 'textType',
-            _updated: 'm2m2m2m2',
-            _type: DefType.TEXT //covers SELECT, MARKDOWN, LINK 
-        }
+// const entries = await ie.CsvTranslator.toEntries('.archiveOfOutdated/All_PDW_Thru_2024_08_Entries.csv');
+// const defs = await ie.CsvTranslator.toDefs('.archiveOfOutdated/All_PDW_Thru_2024_08_Defs.csv');
 
-        let myEntries: Entry[] = [
-            {
-                _id: "one",
-                _period: "2024-08-01T11:12:13",
-                _updated: "m2m2m2m2",
-                boolType: false,
-                numType: 3,
-                durType: 'PT1H',
-                timeType: '22:00:00',
-                multiselType: ['A', 'B'],
-                textType: 'Yo.'
-            },
-            {
-                _id: "two",
-                _period: "2024-08-01T11:12:13",
-                _updated: "m2m2m2m2",
-                boolType: true,
-                numType: 4,
-                durType: 'PT2H',
-                timeType: '23:00:00',
-                multiselType: ['B', 'C'],
-                textType: 'Ay.'
-            },
-            {
-                _id: "three",
-                _period: "2024-08-01T11:12:13",
-                _updated: "m2m2m2m2",
-                boolType: false,
-                numType: 6,
-                durType: 'PT1H',
-                timeType: '02:00:00',
-                multiselType: ['C', 'D'],
-                textType: 'HI MOM.'
-            }
-        ]
+// const allData = await JsonTranslator.toDataJournal('.archiveOfOutdated/All_PDW.json');
+const mySelect: Def = {
+    _id: "mySelect",
+    _updated: "m2m2m2m2",
+    _type: DefType.SELECT,
+    _range: ['a', 'StAndArdIzed_vals']
+}
+const myMulti: Def = {
+    _id: "myMulti",
+    _updated: "m2m2m2m2",
+    _type: DefType.MULTISELECT,
+    _range: ['a', 'StAndArdIzed_vals', 'b']
+}
+const myNum: Def = {
+    _id: "myNum",
+    _updated: "m2m2m2m2",
+    _type: DefType.NUMBER,
+    _range: ['>=','0','<','10']
+}
+const myDur: Def = {
+    _id: "myDur",
+    _updated: "m2m2m2m2",
+    _type: DefType.DURATION,
+    _range: ['>=', 'PT0H', '<=', 'PT10H']
+}
+const myEntry = DJ.makeEntry({ _id: 'entry1', _period: '2024-10-02T20:33:49'});
+let myDj = {
+    defs: [mySelect, myDur, myMulti, myNum],
+    entries: [myEntry]
+}
 
-        Summarizor.rollupEntryPoint(myEntries, myDur, Rollup.AVERAGE).val
+//select
+myEntry.myDur = 'PT12H'; //forcing out-of-range
+let report = Validator.validate(myDj);
+
+console.log('y')
+// await ie.JsonTranslator.fromDataJournal({defs:defs,entries:allData.entries},'.archiveOfOutdated/All_PDW.json')
+
+// await ie.JsonTranslator.fromDataJournal({defs:defs,entries:entries},'.archiveOfOutdated/All_PDW.json')
+// console.log(entries);
+// const myQuery = new QueryBuilder(allData);
+// myQuery.deleted(false).inPeriod('2024-03').forDids('ATE_OUT')
+// const queryResult = myQuery.runQueryOn(allData) as DataJournal;
+// const mySummary = Summarizor.rollupEntryPoint(queryResult.entries, allData.defs.find(def => def._id === 'ATE_OUT')!, Rollup.COUNTOFEACH);
+// console.log(mySummary)
+
+// Validator.validate(allData);
+
+
 
 // import sqlite3 from 'sqlite3';
-
 // Create a new database
 // const db = new sqlite3.Database('test/localTestFileDir/mydatabase.db', (err) => {
 //   if (err) {

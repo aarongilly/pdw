@@ -335,6 +335,12 @@ export class CsvTranslator implements Translator {
             //since we're reading *everything* as text, need to convert the deleted key
             if (entry._deleted !== undefined && typeof entry._deleted === 'string') entry._deleted = entry._deleted.toUpperCase().trim() === "TRUE"
 
+            //since we're coverting form something likely produced by Excel, need to check if conversion of dates is necessary
+            if(typeof entry._updated === 'number'){
+                //@ts-expect-error
+                let temp = dj.DJ.makeEpochStrFrom(new Date(entry._updated - (25567 + 1)) * 86400 * 1000);
+            }
+
             //probably need some sort of method here to sanity check other entry properties for things like arrays & numbers.
 
             if (!dj.DJ.isValidEntry(entry as Partial<dj.Entry>)) {

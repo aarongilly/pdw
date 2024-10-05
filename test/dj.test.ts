@@ -645,6 +645,46 @@ describe('Data Journal Quality Checks', () => {
     badDef.weirdPropThatShouldNotBeThere = "is a low-priority error"
     expect(() => { DJ.qualityCheck(faultyDataJournal) }).not.toThrowError();
     expect(() => { DJ.qualityCheck(faultyDataJournal, 'all errors thrown') }).toThrowError();
+
+    let journalWithDuplicateDefs: DataJournal = {
+      defs: [
+        {
+          _id: "duplciateDefID",
+          _updated: "m2m2m2m2",
+          _type: DefType.TEXT
+        },
+        {
+          _id: "duplciateDefID",
+          _updated: "m2m2m2m2",
+          _type: DefType.TEXT
+        }
+      ],
+      entries: []
+    }
+    expect(() => {DJ.qualityCheck(journalWithDuplicateDefs)}).toThrowError();
+
+    let journalWithDuplicateEntries: DataJournal = {
+      defs: [
+        {
+          _id: "myDef",
+          _updated: "m2m2m2m2",
+          _type: DefType.TEXT
+        },
+      ],
+      entries: [
+        {
+          _id: "duplicateEntryID",
+          _period: "2020-04-04T20:23:29",
+          _updated: "m2m2m2m2"
+        },
+        {
+          _id: "duplicateEntryID",
+          _period: "2020-04-04T20:23:29",
+          _updated: "m2m2m2m2"
+        }
+      ]
+    }
+    expect(() => {DJ.qualityCheck(journalWithDuplicateEntries)}).toThrowError();
   })
 
   test('Entry checks', () => {

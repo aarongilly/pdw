@@ -74,14 +74,25 @@ export class QueryBuilder {
         return DJ.filterTo(this._queryObject, entriesOrJournal)
     }
 
+    /**
+     * filter entries based on their `_deleted` property
+     */
     deleted(include: boolean) {
         this._queryObject.deleted = include;
+        return this;
     }
 
+    /**
+     * Remove any previous "deleted" query assertion & returns ALL entries regardless of _deleted status
+     */
     deletedAndUndeleted() {
         this._queryObject.deleted = undefined;
+        return this;
     }
 
+    /**
+     * Only include Entries with a property matching the supplied Def._id(s)
+     */
     forDids(didList: string[] | string) {
         if (!Array.isArray(didList)) didList = [didList];
         if(this._defs.length === 0) throw new Error('There are no defs loaded in the QueryBuilder')
@@ -89,6 +100,9 @@ export class QueryBuilder {
         return this
     }
 
+    /**
+     * Only include Entries with a property matching the supplied Def._lbl(s)
+     */
     forDefsLbld(defLbls: string[] | string) {
         if (!Array.isArray(defLbls)) defLbls = [defLbls];
         if(this._defs.length === 0) throw new Error('There are no defs loaded in the QueryBuilder');
@@ -96,6 +110,9 @@ export class QueryBuilder {
         return this
     }
 
+    /**
+     * Only include Entries and Defs updated after the supplied EpochStr, Date, or Temporal
+     */
     updatedAfter(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime) {
         if (epochDateOrTemporal instanceof Temporal.ZonedDateTime) epochDateOrTemporal = new Date(epochDateOrTemporal.epochMilliseconds);
         const epoch = DJ.makeEpochStrFrom(epochDateOrTemporal);
@@ -103,6 +120,9 @@ export class QueryBuilder {
         return this;
     }
 
+    /**
+     * Only include Entries and Defs updated before the supplied EpochStr, Date, or Temporal
+     */
     updatedBefore(epochDateOrTemporal: EpochStr | Date | Temporal.ZonedDateTime) {
         if (epochDateOrTemporal instanceof Temporal.ZonedDateTime) epochDateOrTemporal = new Date(epochDateOrTemporal.epochMilliseconds);
         const epoch = DJ.makeEpochStrFrom(epochDateOrTemporal);
@@ -110,6 +130,9 @@ export class QueryBuilder {
         return this;
     }
 
+    /**
+     * Only include Entries with a property matching the supplied Def(s)
+     */
     forDefs(defList: Def[] | Def) {
         if (!Array.isArray(defList)) defList = [defList];
         if(this._defs.length === 0) throw new Error('There are no defs loaded in the QueryBuilder')
@@ -117,6 +140,9 @@ export class QueryBuilder {
         return this;
     }
 
+    /**
+     * Only include entries with match Entry._id
+     */
     eids(eid: string[] | string) {
         if (!Array.isArray(eid)) eid = [eid];
         this._queryObject.entryIds = eid;
@@ -124,6 +150,7 @@ export class QueryBuilder {
     }
 
     /**
+     * Only include Entries with a property matching a Def with (one of) the supplied tag(s)
      * Cannot be used in conjuction with dids. This sets `_queryObject.did` internally.
      */
     tags(tags: string[] | string) {
@@ -137,7 +164,11 @@ export class QueryBuilder {
         this._queryObject.defs = dids.map(d => d._id);
         return this
     }
-
+    
+    /**
+     * Only include Entries with a property matching a Def with (one of) the supplied scope(s)
+     * Cannot be used in conjuction with dids. This sets `_queryObject.did` internally.
+     */
     scope(scopes: Scope[] | Scope) {
         if (!Array.isArray(scopes)) scopes = [scopes];
         if(this._defs.length === 0) throw new Error('There are no defs loaded in the QueryBuilder')
@@ -145,18 +176,29 @@ export class QueryBuilder {
         return this
     }
 
+    /**
+     * Only include Entries with a property matching a Def with scopes at the supplied level or beyond
+     * Cannot be used in conjuction with dids. This sets `_queryObject.did` internally.
+     */
     scopeMin(scope: Scope) {
         let scopes = Object.values(Scope);
         let index = scopes.indexOf(scope);
         return this.scope(scopes.slice(index));
     }
 
+    /**
+     * Only include Entries with a property matching a Def with scopes up to and including the supplied level
+     * Cannot be used in conjuction with dids. This sets `_queryObject.did` internally.
+     */
     scopeMax(scope: Scope) {
         let scopes = Object.values(Scope);
         let index = scopes.indexOf(scope);
         return this.scope(scopes.slice(0, index + 1));
     }
 
+    /**
+     * Only include Entries who's `_period` comes after the begininning of the supplied Period
+     */
     from(period: Period | PeriodStr) {
         if (typeof period === 'string') {
             period = new Period(period);
@@ -165,6 +207,9 @@ export class QueryBuilder {
         return this
     }
 
+    /**
+     * Only include Entries who's `_period` comes before the begininning of the supplied Period
+     */
     to(period: Period | PeriodStr) {
         if (typeof period === 'string') {
             period = new Period(period)
@@ -173,6 +218,9 @@ export class QueryBuilder {
         return this
     }
 
+    /**
+     * Only include Entries who's `_period` falls within the supplied Period
+     */
     inPeriod(period: Period | PeriodStr) {
         let periodStart, periodEnd;
         if (typeof period === 'string') {

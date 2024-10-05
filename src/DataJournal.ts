@@ -731,7 +731,7 @@ export class DJ {
         let staticEntries = entries;
         if (Object.hasOwn(staticEntries, 'entries')) staticEntries = entries.entries as Entry[];
         //if there are no entries, toss out a warning & return an empty object.
-        if((<Entry[]>staticEntries).length === 0) {
+        if ((<Entry[]>staticEntries).length === 0) {
             console.warn("Tried to group by Period an empty set of Entries");
             return {};
         }
@@ -746,16 +746,16 @@ export class DJ {
         earliestPeriod = new Period(earliestPeriod).zoomTo(scope).toString();
         latestPeriod = new Period(latestPeriod).zoomTo(scope).toString();
         let currentPeriod = new Period(earliestPeriod);
-        
+
         let returnObj: { [period: PeriodStr]: Entry[] } = {}
 
         /* The sort & splice method made this 10x faster */
         staticEntries = staticEntries.sort((a, b) => a._period > b._period ? 1 : -1)
         do {
             const spliceSpot = staticEntries.findIndex(entry => !currentPeriod.contains(entry._period));
-            if(spliceSpot === -1){
+            if (spliceSpot === -1) {
                 returnObj[currentPeriod.toString()] = staticEntries; //for the last one
-            }else if(includeEmptyPeriods || spliceSpot !== 0){
+            } else if (includeEmptyPeriods || spliceSpot !== 0) {
                 returnObj[currentPeriod.toString()] = staticEntries.splice(0, spliceSpot)
             }
             currentPeriod = new Period(currentPeriod).getNext();
@@ -828,8 +828,8 @@ export class DJ {
         const isFullJournal = Object.hasOwn(entriesOrJournal, 'entries');
 
         //if queryObject has "to" and "from", they may not be at the right level of scope
-        if(Object.hasOwn(queryObject,'from')) queryObject.from = new Period(queryObject.from!).getStart().toString()
-        if(Object.hasOwn(queryObject,'to')) queryObject.to = new Period(queryObject.to!).getEnd().toString()
+        if (Object.hasOwn(queryObject, 'from')) queryObject.from = new Period(queryObject.from!).getStart().toString()
+        if (Object.hasOwn(queryObject, 'to')) queryObject.to = new Period(queryObject.to!).getEnd().toString()
 
         if (isFullJournal) {
             //make static copy
@@ -890,7 +890,6 @@ export class DJ {
     }
 
     /**
-     * //#TODO - add check for duplicate IDs
      * - any extra keys in DJ or Defs?
      * - Def missing id
      * - entry missing id or period
@@ -899,7 +898,8 @@ export class DJ {
      * - updated Epoch str is way off?
      * - Overview counts wrong?
      */
-    static qualityCheck(dataJournal: DataJournal, panicLevel: "logs only" | "some errors thrown" | "all errors thrown" = 'some errors thrown'): void {
+    static qualityCheck(dataJournal: DataJournal, panicLevel: "logs only" | "some errors thrown" | "all errors thrown" = 'some errors thrown'): {msg:string,important:boolean}[] {
+        const logs: {msg:string,important:boolean}[] = []
         //overview check
         if (dataJournal.overview && dataJournal.overview.counts) {
             //Def Count bad
@@ -919,11 +919,12 @@ export class DJ {
                 logOrThrow(`No _id on Def! \n ${JSON.stringify(def)}`, true);
             //updated epochstr is bad
             if (Object.hasOwn(def, '_updated') && epochStrIsImplausible(def._updated))
-                logOrThrow(`Def EpochStr is probably wrong! \n ${JSON.stringify(def)}`);
+                logOrThrow(`Def._updated EpochStr is probably wrong! \n ${JSON.stringify(def)}`);
             //def contains extra properties (likely a bad sign)
             if (Object.keys(def).some(key => !key.startsWith('_')))
                 logOrThrow(`Def property found without an underscore prefix! \n ${JSON.stringify(def)}`);
         })
+        if (hasDuplicateIds(dataJournal.defs)) logOrThrow('Duplicate Def IDs found!', true);
         //quality check entries
         dataJournal.entries.forEach(entry => {
             //Entry missing id
@@ -937,15 +938,31 @@ export class DJ {
                 logOrThrow(`_period on Entry looks wrong! \n ${JSON.stringify(entry)}`, true);
             //updated epochstr is bad
             if (Object.hasOwn(entry, '_updated') && epochStrIsImplausible(entry._updated))
-                logOrThrow(`Entry EpochStr is probably wrong! \n ${JSON.stringify(entry)}`);
+                logOrThrow(`Entry._updated EpochStr is probably wrong! \n ${JSON.stringify(entry)}`);
             //no associated def 
             const defKeys = Object.keys(entry).filter(key => !key.startsWith('_'));
             defKeys.forEach(key => {
-                if (!dataJournal.defs.some(def => DJ.standardizeKey(def._id) === key || DJ.standardizeKey(def._lbl ?? def._id) === key))
+                const standardizedKey = DJ.standardizeKey(key)
+                if (!dataJournal.defs.some(def => DJ.standardizeKey(def._id) === standardizedKey || DJ.standardizeKey(def._lbl ?? def._id) === standardizedKey))
                     logOrThrow(`No associated Def found for Entry! \n ${JSON.stringify(entry)}`);
             })
-
         })
+        if (hasDuplicateIds(dataJournal.entries)) logOrThrow('Duplicate Entry IDs found!', true);
+
+        return logs
+
+        function hasDuplicateIds(objects) {
+            const idSet = new Set();
+            for (const obj of objects) {
+                const id = obj._id;
+                if (idSet.has(id)) {
+                    console.error('Duplicate ID: ' + id);
+                    return true; // Duplicate ID found
+                }
+                idSet.add(id);
+            }
+            return false; // No duplicate IDs found
+        }
 
         function secondIsProperlyFormatted(secondStr: string): boolean {
             return /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d/i.test(secondStr)
@@ -967,6 +984,7 @@ export class DJ {
          * @returns void
          */
         function logOrThrow(errMessage: string, isImportant = false) {
+            logs.push({msg:errMessage,important:isImportant});
             if (panicLevel === 'all errors thrown') throw new Error(errMessage);
             if (panicLevel === 'logs only') return console.warn(errMessage);
             if (isImportant) throw new Error(errMessage);

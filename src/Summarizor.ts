@@ -77,7 +77,8 @@ export class Summarizor {
             if(valType === DefType.DURATION) return doSumDuration(rawVals);
             throw new Error("Tried to sum an unsupported type: " + valType)
         }
-        if (method === Rollup.COUNTDISTINCT){
+        //@ts-expect-error - supporting an old name
+        if (method === Rollup.COUNTDISTINCT || method === "COUNTUNIQUE"){
             if(valType === DefType.MULTISELECT) return doCountDistinctMultiselect(rawVals)
             return doCountDistinct(rawVals);
         }
