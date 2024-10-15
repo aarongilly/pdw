@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest'
 import * as pdw from '../src/pdw';
-import {InMemoryDb} from '../src/connectors/inMemoryConnector'
 import { Def, DefType, DJ, Entry, TransactionUpdateMember } from '../src/DataJournal';
 // import { Temporal } from 'temporal-polyfill';
 

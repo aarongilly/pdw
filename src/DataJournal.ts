@@ -94,7 +94,11 @@ export interface Overview {
          * Could be used like DataJournal.defs[index[defLblToIdMap[defId]]]
          */
         defLblToIdMap: { [defLbl: string]: string }
-    }
+    },
+    // aliases?: {
+    //     [alias: string]: string
+    // },
+    // filename?: string
     [x: string]: any
 }
 
@@ -433,7 +437,7 @@ export class DJ {
         }
     }
 
-    static isValidDataJournal(data: DataJournal) {
+    static isValidDataJournal(data: {[key:string]:any}) {
         if (data.defs === undefined) {
             console.warn("Invalid DataJournal found - no 'defs' array")
             return false

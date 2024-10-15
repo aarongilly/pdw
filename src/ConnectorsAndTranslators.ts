@@ -7,12 +7,14 @@ import * as file from './translators/fileTranslators.js';
 export type TranslatorListMember = 
     "JSON" |
     "YAML" |
-    "Excel"
+    "Excel" |
+    "CSV"
 
 export function getTranslator(serviceName: TranslatorListMember): Translator {
     if(serviceName === 'JSON') return new file.JsonTranslator();
     if(serviceName === 'YAML') return new file.YamlTranslator();
     if(serviceName === 'Excel') return new file.ExcelTranslator();
+    if(serviceName === 'CSV') return new file.CsvTranslator();
     throw new Error('Invalid Translator Service Name: ' + serviceName);
 }
 

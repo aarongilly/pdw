@@ -21,11 +21,13 @@ out/*
 __notes_to_self.md
 test/localTestFileDir
 .archiveOfOutdated
+secrets.json
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
+.env
 .DS_Store
 *.suo
 *.ntvs*

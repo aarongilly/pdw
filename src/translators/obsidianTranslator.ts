@@ -14,6 +14,14 @@ export class ObsidianTranslator implements Translator {
         return 'Markdown Translator'
     }
 
+    static fromDataJournal(data: dj.DataJournal, filepath: string, aliasKeys: AliasKeyes = {}) {
+        return new ObsidianTranslator().fromDataJournal(data, filepath, aliasKeys);
+    }
+
+    static toDataJournal(filepath: string): Promise<dj.DataJournal> {
+        return new ObsidianTranslator().toDataJournal(filepath);
+    }
+
     async fromDataJournal(data: dj.DataJournal, filepath: string, aliasKeys: AliasKeyes = {}) {
         const stats = fs.statSync(filepath);
         if (!stats.isDirectory()) {
@@ -21,7 +29,6 @@ export class ObsidianTranslator implements Translator {
         }
         this.updateMarkdownDataJournal(data, filepath, aliasKeys);
         //if that doesn't error, the file exists.
-
     }
 
     async updateMarkdownDataJournal(data: dj.DataJournal, filepath: string, aliasKeys: AliasKeyes = {}, readOnly = false): Promise<dj.DataJournal> {

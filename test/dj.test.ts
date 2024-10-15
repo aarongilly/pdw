@@ -17,9 +17,7 @@ describe("Data Journal basics.", () => {
       entries: [],
       overview: {}
     }
-    //@ts-expect-error
     expect(DJ.isValidDataJournal(badDataset)).toBe(false);
-    //@ts-expect-error
     expect(DJ.isValidDataJournal(trickierBadDataset)).toBe(false);
     expect(DJ.isValidDataJournal(testData.emptySet)).toBe(true);
     expect(DJ.isValidDataJournal(emptySetWithOverview)).toBe(true);

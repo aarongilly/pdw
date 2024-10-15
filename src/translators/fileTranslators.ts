@@ -4,12 +4,12 @@ import * as YAML from 'yaml';
 import * as dj from '../DataJournal.js';
 import { Translator } from '../pdw.js';
 import { AliasKeyer, AliasKeyes } from '../AliasKeyer.js';
-import { Note, Block } from './MarkdownParsers.js'
+import { Note, Block } from './MarkdownParsers.js';
 // import { Period } from '../Period.js';
 
 //#region ### EXPORTED FUNCTIONS ###
 export function dataJournalToFile(filepath: string, data: dj.DataJournal) {
-    const fileType = inferFileType(filepath)
+    const fileType = inferFileType(filepath);
     if (fileType === 'excel') return new ExcelTranslator().fromDataJournal(data, filepath);
     if (fileType === 'json') return new JsonTranslator().fromDataJournal(data, filepath);
     if (fileType === 'yaml') return new YamlTranslator().fromDataJournal(data, filepath);
@@ -18,14 +18,22 @@ export function dataJournalToFile(filepath: string, data: dj.DataJournal) {
     throw new Error('Unimplemented export type: ' + fileType);
 }
 
-export async function fileToDataJournal(filepath: string) {
-    const fileType = inferFileType(filepath)
-    if (fileType === 'excel') return await new ExcelTranslator().toDataJournal(filepath);
-    if (fileType === 'json') return await new JsonTranslator().toDataJournal(filepath);
-    if (fileType === 'yaml') return await new YamlTranslator().toDataJournal(filepath);
-    if (fileType === 'csv') return await new CsvTranslator().toDataJournal(filepath);
-    if (fileType === 'markdown') return new MarkdownTranslator().toDataJournal(filepath);
-    throw new Error('Unimplemented import type: ' + fileType);
+export async function fileToDataJournal(filepath: string, breakOnError = false) {
+    const fileType = inferFileType(filepath);
+    try{
+        if (fileType === 'excel') return await new ExcelTranslator().toDataJournal(filepath);
+        if (fileType === 'json') return await new JsonTranslator().toDataJournal(filepath);
+        if (fileType === 'yaml') return await new YamlTranslator().toDataJournal(filepath);
+        if (fileType === 'csv') return await new CsvTranslator().toDataJournal(filepath);
+        if (fileType === 'markdown') return await new MarkdownTranslator().toDataJournal(filepath);
+    }catch(err: any){
+        console.warn('fileToDataJournal could not parse: ' + filepath, err);
+        if(breakOnError) throw new Error('Broke on error. See previous console warning for the offending error.');
+        return null
+    }
+    if(breakOnError) throw new Error('Unimplemented import type: ' + fileType);
+    console.warn('Unimplemented import type: ' + fileType, filepath)
+    return null
 }
 
 //#endregion
@@ -370,10 +378,6 @@ export class CsvTranslator implements Translator {
         })
         return arrayOfDefs as dj.Def[];
     }
-
-    // async loadAliasKeysFromCSV(filepath: string, useFs = true): Promise<AliasKeyes> {
-    //#TODO maybe eventually, support AliasKeying
-    // }
 
     private static build2DArrayFor(dataJournal: dj.DataJournal, entriesOnly = false): string[][] {
         const data: string[][] = [];
@@ -909,7 +913,7 @@ function inferFileType(path: string): "excel" | "json" | "csv" | "yaml" | "markd
     if (path.slice(-5).toUpperCase() === ".XLSX") return 'excel'
     if (path.slice(-5).toUpperCase() === ".JSON") return 'json'
     if (path.slice(-4).toUpperCase() === ".CSV") return 'csv'
-    if (path.slice(-4).toUpperCase() === ".MD") return 'markdown'
+    if (path.slice(-3).toUpperCase() === ".MD") return 'markdown'
     if (path.slice(-5).toUpperCase() === ".YAML" || path.slice(-4).toUpperCase() === ".YML") return 'yaml'
     return "unknown"
 }

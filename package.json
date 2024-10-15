@@ -25,6 +25,7 @@
     "vitest": "^0.28.5"
   },
   "dependencies": {
+    "dotenv": "^16.4.5",
     "sqlite3": "^5.1.7",
     "temporal-polyfill": "^0.1.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.0/xlsx-0.20.0.tgz",

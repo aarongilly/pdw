@@ -245,7 +245,7 @@ export const biggerJournal: dj.DataJournal = {
 export const expectedOverview: dj.Overview = {
     updated: {
         epochStr: "m0zzzzzz", //from the deleted entry
-        localeStr: "9/12/2024, 7:46:32 PM", //translated
+        localeStr: "9/12/2024, 7:46:32 PM", //translated
         isoStr: "2024-09-13T00:46:32.447Z", //translated
     },
     counts: {
