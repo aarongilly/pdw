@@ -446,7 +446,7 @@ export class DJ {
             console.warn("Invalid DataJournal found - 'defs' is not array")
             return false
         }
-        if (data.defs.some(def => !DJ.isValidDef(def))) return false
+        if (data.defs.length > 0 && data.defs.some(def => !DJ.isValidDef(def))) return false
         if (data.entries === undefined) {
             console.warn("Invalid DataJournal found - no 'entries' array")
             return false
@@ -455,7 +455,7 @@ export class DJ {
             console.warn("Invalid DataJournal found - 'entries' is not array")
             return false
         }
-        if (data.entries.some(entry => !DJ.isValidEntry(entry))) return false
+        if (data.entries.length > 0 && data.entries.some(entry => !DJ.isValidEntry(entry))) return false
         return true
     }
 

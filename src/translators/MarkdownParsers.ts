@@ -204,7 +204,7 @@ export class Block {
         //Lists 
         if (firstLineFirstWord === '-' || firstLineFirstWord === '*' || /^\d+[.)]$/.test(firstLineFirstWord)) {
             //Indention of second line means same block
-            if (secondLine.startsWith(' ') || secondLine.startsWith('\t')) return true
+            if (secondLine.startsWith(' ') || secondLine.startsWith('    ') || secondLine.startsWith('\t')) return true
             //No indention means new block
             return false;
         }

@@ -80,7 +80,8 @@ export class FolderTranslator implements Translator {
         }
     }
 
-    fromDataJournal(canonicalDataset: DataJournal, params: any) {
+    fromDataJournal(canonicalDataset: DataJournal) {
+        console.log('Doing nothing with :', canonicalDataset)
         throw new Error('Method not implemented. And probably will not be?');
     }
 

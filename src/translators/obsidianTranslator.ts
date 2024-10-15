@@ -9,17 +9,23 @@ import { Note, Block } from './MarkdownParsers.js'
  * expects filenames to be dates & also uses the "^" as block ID shorthand
  */
 export class ObsidianTranslator implements Translator {
-
+    keyAliasFilePath?: string
+    
     getServiceName(): string {
         return 'Markdown Translator'
+    }
+
+    setKeyAliasFile(pathToConfigMarkdownFile: string){
+        this.keyAliasFilePath = pathToConfigMarkdownFile;
+        return this;
     }
 
     static fromDataJournal(data: dj.DataJournal, filepath: string, aliasKeys: AliasKeyes = {}) {
         return new ObsidianTranslator().fromDataJournal(data, filepath, aliasKeys);
     }
 
-    static toDataJournal(filepath: string): Promise<dj.DataJournal> {
-        return new ObsidianTranslator().toDataJournal(filepath);
+    static toDataJournal(filepath: string, pathToConfigMarkdownFile: string): Promise<dj.DataJournal> {
+        return new ObsidianTranslator().setKeyAliasFile(pathToConfigMarkdownFile).toDataJournal(filepath);
     }
 
     async fromDataJournal(data: dj.DataJournal, filepath: string, aliasKeys: AliasKeyes = {}) {
@@ -79,18 +85,29 @@ export class ObsidianTranslator implements Translator {
                 block.text = mergeObj.resultString;
             }
             if (ObsidianTranslator.blockIsEntry(block)) {
+                const dateStrWithExtension = filepath.split('/').pop();
+                const dateStr = dateStrWithExtension?.substring(0,dateStrWithExtension.length - 3);
+                const timeStr = blockTime(block.text);
+                const phantomPeriod = `${dateStr}T${timeStr}:00`;
+                let carrotId = block.text.split('\n')[0].split(' ').pop();
+                if(carrotId?.startsWith('^')){
+                    carrotId = carrotId.substring(1);
+                }
+                const phantomId = carrotId;
                 let relatedEntry: any = aliasedDJ.entries.filter(entry => block.text.includes(entry[idKey]));
                 if (relatedEntry.length > 1) {
                     throw new Error('More than one Entry._id match found in block!')
                 }
                 if (relatedEntry.length === 1) entriesToAppend = entriesToAppend.filter(entry => dj.DJ.standardizeKey(entry[idKey]) !== dj.DJ.standardizeKey(relatedEntry[0][idKey]))
                 if (relatedEntry.length === 0) relatedEntry = [{}];
+                //this is so hacked together.
+                if(!block.text.includes(`[${idKey}::`)) block.text = block.text + ` [${idKey}::${phantomId}]`
+                if(!block.text.includes('[_period::')) block.text = block.text + ` [_period::${phantomPeriod}]`
                 let mergeObj = ObsidianTranslator.mergeObjectIntoMarkdownString(block.text, relatedEntry[0], true);
                 containedEntries.push(mergeObj.keyValuesContained)
                 block.text = mergeObj.resultString;
             }
         })
-
 
         if (!readOnly) {
             let returnNoteText = '';
@@ -116,6 +133,15 @@ export class ObsidianTranslator implements Translator {
         })
 
         return unaliasedDJ
+
+        function blockTime(blockText: string): string | undefined {
+            const possibleTimes = blockText.split('\n')[0].match(/([01][0-9]|2[0-3]):[0-5][0-9]/g);
+            if (possibleTimes === null) return undefined;
+            if (possibleTimes!.length > 1) {
+                // console.warn('Multiple time values are present in block, defaulting to the first. Block text: ',this.text);
+            }
+            return possibleTimes[0];
+        }
     }
 
     private static mergeObjectIntoMarkdownString(str: string, keyVals: object, appendMissingKeys = false): { keyValuesContained: object, resultString: string } {
@@ -303,10 +329,43 @@ export class ObsidianTranslator implements Translator {
         return firstLine.toUpperCase().includes('#KEYALIAS');
     }
 
-    async toDataJournal(filepath: string): Promise<dj.DataJournal> {
+    async toDataJournal(folderPath: string): Promise<dj.DataJournal> {
         //using code I already wrote, probably less efficient in terms of runtime,
         //but WAY more efficient in terms of getting this done.
-        return this.updateMarkdownDataJournal({ defs: [], entries: [] }, filepath, {}, true);
+        const aliasKeys = this.keyAliasFilePath === undefined ? {} : parseAliasKeysFromFile(this.keyAliasFilePath) as AliasKeyes;
+
+        const stats = fs.statSync(folderPath);
+        if (!stats.isDirectory()) {
+            throw new Error("Supplied file path is NOT a folder, please supply a path to a folder.")
+        }
+
+        const folderFiles = fs.readdirSync(folderPath);
+        const mdFiles = folderFiles.filter(file=>file.endsWith('.md'));
+        const filePromiseArray = mdFiles.map(file=>{
+            const fullpath = folderPath + '/' + file
+            return this.updateMarkdownDataJournal({ defs: [], entries: [] }, fullpath, aliasKeys, true);
+        })
+
+        const individualJournals = await Promise.all(filePromiseArray);
+        const combinedJournal = dj.DJ.merge(individualJournals);
+        return combinedJournal
+
+        function parseAliasKeysFromFile(filepath: string){
+            const note = new Note(filepath);
+    
+            let containedAliases: object = {}
+    
+            //obtain all aliases contained in the note
+            note.blocks.forEach(block => {
+                if (ObsidianTranslator.blockIsAliasKey(block)) {
+                    let mergeObj = ObsidianTranslator.mergeObjectIntoMarkdownString(block.text, {}, false);
+                    containedAliases = { ...containedAliases, ...mergeObj.keyValuesContained };
+                    block.text = mergeObj.resultString;
+                }
+            })
+            
+            return containedAliases
+        }
     }
 }
 //#endregion

@@ -18,8 +18,8 @@ import { FolderTranslator } from './translators/folderTranslator.js';
 
 // mainFunc();
 
-// const allData = await FolderTranslator.toDataJournal('/Users/aaron/Desktop/smaller_testset');
-
+const allData = await obs.ObsidianTranslator.toDataJournal('/Users/aaron/Desktop/Journal_Island/Periods/1 - Daily/','/Users/aaron/Desktop/Journal_Island/PDW/PDW.md');
+console.log(allData)
 // const defTypeMap: { [did: string]: DefType } = {};
 
 // let report = Validator.validate(allData);
