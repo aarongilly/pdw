@@ -1,4 +1,4 @@
-import { Entry, DefType, Rollup } from "../src/DataJournal";
+import { Entry, DefType, Rollup, DataJournal, DJ, Scope } from "../src/DataJournal";
 import { describe, test, expect } from "vitest";
 import * as testData from './test_datasets';
 import { Summarizor } from '../src/Summarizor'
@@ -116,5 +116,67 @@ describe('Summarizor', () => {
         //all other summary types for bool throw error
         expect(() => {Summarizor.rollupEntryPoint(myEntries, myMulti, Rollup.AVERAGE)}).toThrowError();
         expect(() => {Summarizor.rollupEntryPoint(myEntries, myMulti, Rollup.SUM)}).toThrowError();
+    })
+
+    test('One per Period Function', () => {
+        const whateverEpochIsFine = DJ.makeEpochStr();
+        const testJournal: DataJournal = {
+            defs: [{
+                _id: 'TEST_DEF',
+                _type: DefType.TEXT,
+                _updated: whateverEpochIsFine
+            }],
+            entries: [
+                {
+                    _id: "ABC",
+                    _period: "2024-10-01T11:11:11",
+                    _updated: whateverEpochIsFine,
+                    TEST_DEF: "good."
+                },
+                {
+                    _id: "BCD",
+                    _period: "2024-10-02T11:11:11",
+                    _updated: whateverEpochIsFine,
+                    TEST_DEF: "good."
+                },
+                {
+                    _id: "CDE",
+                    _period: "2024-10-05T11:11:11",
+                    _updated: whateverEpochIsFine,
+                    TEST_DEF: "skipped a couple days."
+                },
+                {
+                    _id: "EFG",
+                    _period: "2024-10-06T11:11:11",
+                    _updated: whateverEpochIsFine,
+                    TEST_DEF: "Same day as below"
+                },
+                {
+                    _id: "FGH",
+                    _period: "2024-10-06T01:11:11",
+                    _updated: whateverEpochIsFine,
+                    TEST_DEF: "Same day as above"
+                },
+            ]
+        }
+        const expectedResult = {
+            scope: "DAY",
+            firstPeriod: "2024-10-01",
+            lastPeriod: "2024-10-06",
+            def: {
+              _id: "TEST_DEF",
+              _type: "TEXT",
+              _updated: whateverEpochIsFine,
+            },
+            emptyPeriods: [
+                '2024-10-03',
+                '2024-10-04',
+            ],
+            overFilledPeriods: [
+                '2024-10-06'
+            ],
+          }
+        const onePerPeriodReport = Summarizor.checkOnePerPeriod(testJournal,'TEST_DEF',Scope.DAY);
+        expect(onePerPeriodReport).toEqual(expectedResult);
     })
 })

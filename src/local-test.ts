@@ -13,13 +13,70 @@ import { Summarizor } from './Summarizor.js';
 import { Temporal } from 'temporal-polyfill';
 import { Validator } from './Validator.js';
 import { FolderTranslator } from './translators/folderTranslator.js';
+import * as dotenv from 'dotenv'
+import { SheetsTranslator } from './translators/sheetsTranslator.js';
+
+// const allData =  await ie.JsonTranslator.toDataJournal('.archiveOfOutdated/All_PDW_Cleaned.json');
+
+// let query = new QueryBuilder(allData);
+// query = query.forDefsLbld(['WORKOUT_NAME', 'WORKOUT_TYPE']).limit(30);
+
+// const myDj = DJ.filterTo(query.toQueryObject(),allData) as DataJournal;
+
+// console.log(myDj)
+
+// const result = await SheetsTranslator.fromDataJournal(myDj, 'workouts imported')
+
+const result = await SheetsTranslator.toDataJournal('1hYHA6YmZPYKNKKBKc_ytqb_LLY95-IhKtA3n7mEp4zY')
+
+console.log(result)
+// await SheetsTranslator.toDataJournal('1QyKxdbQfk3v-jovRD1wscMZpS0eYjHH7t-Vb_bplrTE')
+
+// const postData = {
+//     fileName: 'New Test',
+//     dataJournal: testData.biggerJournal
+// };
+
+// const options = {
+//     method: 'POST', //'GET'
+//     headers: {
+//         'Content-Type': 'application/json',
+//         'authorization': "Bearer " + process.env.OAUTH
+//     },
+//     body: JSON.stringify(postData)
+// };
+// const postURL = process.env.LIVE_DEPLOYMENT_URL as string//TEST_DEPLOYMENT_URL as string;
+// const getUrl = postURL + "/toDataJournal?id=" + '1QyKxdbQfk3v-jovRD1wscMZpS0eYjHH7t-Vb_bplrTE';
+//     // + "?foo=bar&myArr=1&myArr=2"
+
+// // fetch(postURL + "/fromDataJournal", options)
+// fetch(getUrl, options)
+//     // fetch('https://script.google.com/macros/s/AKfycbyFc3Wv-RwFCEkOQReK-7GXM18iFZ0d7-ByDoQ_1u5wVwlW5eIqknlk8qfbQe45fPZY/exec', options)
+//     .then(response => response.text())
+//     .then(data =>
+//         workWithFetchedData(data))
+//     .catch(error =>
+//         console.error(error));
+
+// function workWithFetchedData(data: any) {
+//     console.log(typeof data);
+//     console.log(data);
+//     const asObj = JSON.parse(data);
+//     console.log(asObj)
+// }
+
+//https://script.googleusercontent.com/macros/echo?user_content_key=glbhtHNe8AMcFY4EBasO2JATsybLnLlH7jG8V3LClNPuTEjWDJ3Wh1rvOFdspkLhbhse411KiWeG66yQGGJhb46vv3BoHRUgm5_BxDlH2jW0nuo2oDemN9CCS2h10ox_1xSncGQajx_ryfhECjZEnByaZPJX4DtrEkFpTViiiJ5ql48YTmXId3EDC-zuEvNXohQG0f0rS8hDCAx-Vg77dG513cVIztxp4nVuJe11CYdOtjOmrHMgPg&lib=MtFEBosI_mW7E2REnbC-RJfueLKhoaeOI
 
 // import { mainFunc } from './translators/sheetsTranslator.js';
 
 // mainFunc();
 
-const allData = await obs.ObsidianTranslator.toDataJournal('/Users/aaron/Desktop/Journal_Island/Periods/1 - Daily/','/Users/aaron/Desktop/Journal_Island/PDW/PDW.md');
-console.log(allData)
+// const allData =  await ie.JsonTranslator.toDataJournal('.archiveOfOutdated/All_PDW_Cleaned.json');
+
+// const defs = allData.defs
+
+// await ie.JsonTranslator.fromDataJournal({defs:defs, entries:[]},'.archiveOfOutdated/DefsOnly.json')
+
 // const defTypeMap: { [did: string]: DefType } = {};
 
 // let report = Validator.validate(allData);
@@ -27,7 +84,6 @@ console.log(allData)
 
 // await ie.JsonTranslator.fromDataJournal({defs:defs,entries:allData.entries},'.archiveOfOutdated/All_PDW.json')
 
-// await ie.JsonTranslator.fromDataJournal({defs:defs,entries:entries},'.archiveOfOutdated/All_PDW.json')
 // console.log(entries);
 // const myQuery = new QueryBuilder(allData);
 // myQuery.deleted(false).inPeriod('2024-03').forDids('ATE_OUT')

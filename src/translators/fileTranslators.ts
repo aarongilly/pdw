@@ -549,42 +549,6 @@ export class ExcelTranslator implements Translator {
         })
         return converted;
     }
-
-    // static parseExcelDef(defRow: any, points: any): pdw.DefLike {
-    //     //check structure
-    //     if (defRow._deleted == undefined || defRow._did == undefined) throw new Error('Cannot parseExcelDefRow for ', defRow);
-    //     const defData: pdw.DefData = {
-    //         _did: defRow._did.toString(), //in case I got unlucky with an all-numeric SmallID
-    //         _lbl: defRow._lbl,
-    //         _desc: defRow._desc,
-    //         _emoji: defRow._emoji,
-    //         _tags: JSON.parse(defRow._tags),
-    //         _scope: defRow._scope,
-    //         _pts: points.map((point: any) => this.parseExcelPointDefRow(point)),
-    //         _uid: defRow._uid,
-    //         _deleted: defRow._deleted, //checked for type later
-    //         _created: '',
-    //         _updated: ''
-    //     }
-
-    //     if (typeof defRow._deleted === 'string') defData._deleted = defRow._deleted.toUpperCase() === "TRUE";
-    //     defData._created = ExcelTranslator.makeEpochStrFromExcelDate(defRow._created);
-    //     defData._updated = ExcelTranslator.makeEpochStrFromExcelDate(defRow._updated);
-
-    //     if (!pdw.Def.isDefData(defData)) throw new Error('Failed to correctly parseExcelDefRow for ', defRow);
-
-    //     return defData
-    // }
-
-    // static makeEpochStrFromExcelDate(dateCellVal: any): any {
-    //     if (typeof dateCellVal === 'string') {
-    //         if (pdw.isValidEpochStr(dateCellVal)) return pdw.parseTemporalFromEpochStr(dateCellVal);
-    //         return pdw.makeEpochStrFrom(Temporal.Instant.fromEpochMilliseconds(new Date(dateCellVal).getTime()).toZonedDateTimeISO(Temporal.Now.timeZone()));
-    //     }
-    //     if (typeof dateCellVal === 'number') {
-    //         return pdw.makeEpochStrFrom(Temporal.Instant.fromEpochMilliseconds((dateCellVal - (25567 + 1)) * 86400 * 1000).toZonedDateTimeISO(Temporal.Now.timeZone()));
-    //     }
-    // }
 }
 
 export class MarkdownTranslator implements Translator {

@@ -500,7 +500,6 @@ export class DJ {
      * @returns a new {@link DataJournal} with the new data
      */
     static commit(dataJournal: DataJournal, trans: TransactionObject): DataJournal {
-        //#TODO - optimize using Overview index... maybe
         //make static
         const newJournal = JSON.parse(JSON.stringify(dataJournal)) as DataJournal;
 

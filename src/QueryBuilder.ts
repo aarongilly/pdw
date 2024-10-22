@@ -83,6 +83,15 @@ export class QueryBuilder {
     }
 
     /**
+     * Returns only the first supplied nubmer of results
+     * @param number number to return
+     */
+    limit(number: number){
+        this._queryObject.limit = number;
+        return this;
+    }
+
+    /**
      * Remove any previous "deleted" query assertion & returns ALL entries regardless of _deleted status
      */
     deletedAndUndeleted() {

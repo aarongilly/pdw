@@ -1,6 +1,6 @@
 import { Temporal } from "temporal-polyfill";
 import { Entry, DataJournal, Def, DJ, Rollup, DefType } from "./DataJournal.js";
-import { PeriodStr, Scope } from "./Period.js";
+import { Period, PeriodStr, Scope } from "./Period.js";
 
 export const temp = "todo";
 
@@ -15,6 +15,33 @@ export interface PeriodSummary {
     period: PeriodStr | "ALL";
     entryRollups: EntryRollup[];
     entries: Entry[]
+}
+
+export interface OneEntryPerPeriodReport {
+    /**
+     * The level of granularity the report covers
+     */
+    scope: Scope,
+    /**
+     * The Earliest Period found
+     */
+    firstPeriod: PeriodStr
+    /**
+     * The Earliest Period found
+     */
+    lastPeriod: PeriodStr
+    /**
+     * The Def to check for
+     */
+    def: Def,
+    /**
+     * Periods containing no Entries with the Def
+     */
+    emptyPeriods: PeriodStr[],
+    /**
+     * Periods with more than one Entry containing the Def
+     */
+    overFilledPeriods: PeriodStr[]
 }
 
 export class Summarizor {
@@ -64,6 +91,72 @@ export class Summarizor {
         return returnObj
     }
 
+    static checkOnePerPeriod(journal: DataJournal, defId: string, scope: Scope): OneEntryPerPeriodReport {
+        if (!DJ.isValidDataJournal(journal)) throw new Error('The supplied DataJournal is invalid');
+        const defFound = journal.defs.find(def => DJ.stringsAreEqualStandardized(def._id, defId));
+        if (defFound === undefined) throw new Error('The supplied defId was not found in the supplied Journal');
+        if (scope === Scope.SECOND || scope === Scope.MINUTE || scope === Scope.HOUR) throw new Error("Scopes less than Scope.DAY not supported");
+
+        const periodsContained = journal.entries
+            .filter(entry=> entry[defId] !== undefined)
+            .map(entry => new Period(entry._period).zoomTo(scope).toString())
+            .sort((a: string, b: string) => a > b ? 1 : -1);
+        
+        const returnObj: OneEntryPerPeriodReport = {
+            scope: scope,
+            firstPeriod: new Period(periodsContained[0]).zoomTo(scope).toString(),
+            lastPeriod: new Period(periodsContained[periodsContained.length - 1]).zoomTo(scope).toString(),
+            def: defFound,
+            emptyPeriods: [],
+            overFilledPeriods: []
+        }
+
+        const allPeriodsInRange = Period.allPeriodsIn(new Period(returnObj.firstPeriod), new Period(returnObj.lastPeriod), scope, true) as string[];
+        const [missing, duplicated] = compareSortedArrays(allPeriodsInRange, periodsContained);
+        
+
+        //make periods reflect the granularity of the request
+        returnObj.firstPeriod = new Period(returnObj.firstPeriod).zoomTo(scope).toString();
+        returnObj.lastPeriod = new Period(returnObj.lastPeriod).zoomTo(scope).toString();
+        returnObj.emptyPeriods = missing;
+        returnObj.overFilledPeriods = duplicated;
+        return returnObj;
+
+        function compareSortedArrays(allPeriodsInRange: string[], periodsContained: string[]): [string[], string[]] {
+            const missingPeriods: string[] = [];
+            const duplicatePeriods: string[] = [];
+            let i = 0;
+            let j = 0;
+          
+            while (i < allPeriodsInRange.length && j < periodsContained.length) {
+              if (allPeriodsInRange[i] < periodsContained[j]) {
+                missingPeriods.push(allPeriodsInRange[i]);
+                i++;
+              } else if (allPeriodsInRange[i] > periodsContained[j]) {
+                j++;
+              } else {
+                let count = 0;
+                while (i < allPeriodsInRange.length && allPeriodsInRange[i] === periodsContained[j]) {
+                  count++;
+                  j++;
+                }
+                i++;
+                if (count > 1) {
+                    duplicatePeriods.push(allPeriodsInRange[i - 1]);
+                }
+              }
+            }
+          
+            // Add any remaining elements from allPeriodsInRange to missingPeriods
+            while (i < allPeriodsInRange.length) {
+              missingPeriods.push(allPeriodsInRange[i]);
+              i++;
+            }
+          
+            return [missingPeriods, duplicatePeriods];
+          }
+    }
+
     private static applyRollup(rawVals: any[], method: Rollup, valType: DefType) {
         if (method === Rollup.COUNT) return rawVals.length;
         if (method === Rollup.AVERAGE) {
@@ -72,24 +165,22 @@ export class Summarizor {
             if (valType === DefType.TIME) return doAverageTime(rawVals);
             throw new Error("Tried to average an unsupported type: " + valType)
         }
-        if (method === Rollup.SUM) { 
-            if(valType === DefType.NUMBER) return doSum(rawVals);
-            if(valType === DefType.DURATION) return doSumDuration(rawVals);
+        if (method === Rollup.SUM) {
+            if (valType === DefType.NUMBER) return doSum(rawVals);
+            if (valType === DefType.DURATION) return doSumDuration(rawVals);
             throw new Error("Tried to sum an unsupported type: " + valType)
         }
         //@ts-expect-error - supporting an old name
-        if (method === Rollup.COUNTDISTINCT || method === "COUNTUNIQUE"){
-            if(valType === DefType.MULTISELECT) return doCountDistinctMultiselect(rawVals)
+        if (method === Rollup.COUNTDISTINCT || method === "COUNTUNIQUE") {
+            if (valType === DefType.MULTISELECT) return doCountDistinctMultiselect(rawVals)
             return doCountDistinct(rawVals);
         }
-        if (method === Rollup.COUNTOFEACH){
-            if(valType === DefType.MULTISELECT) return doCountOfEachMultiselect(rawVals)
+        if (method === Rollup.COUNTOFEACH) {
+            if (valType === DefType.MULTISELECT) return doCountOfEachMultiselect(rawVals)
             return doCountOfEach(rawVals);
         }
         throw new Error('Tried to rollup and unsuppored Method: ' + method);
     }
-
-    // static summarize
 }
 
 function doAverage(vals: number[]) {
@@ -103,7 +194,7 @@ function doAverageDuration(vals: string[]): string {
     if (typeof vals[0] !== 'string') throw new Error('Period average saw a non-string');
     const sum = vals.reduce((pv, val) => Math.round(pv + Temporal.Duration.from(val).total('seconds')), 0);
     const ave = sum / vals.length;
-    const temp = Temporal.Duration.from({ seconds: ave }).round({largestUnit: 'day'});
+    const temp = Temporal.Duration.from({ seconds: ave }).round({ largestUnit: 'day' });
     return temp.toLocaleString();
 }
 
@@ -137,7 +228,7 @@ function doSumDuration(vals: string[]) {
     if (typeof vals[0] !== 'string') throw new Error('Duration average saw a non-string')
     // let temp = Temporal.Duration.from(vals[0]).total('seconds');
     const sum = vals.reduce((pv, val) => pv + Temporal.Duration.from(val).total('seconds'), 0);
-    const temp = Temporal.Duration.from({ seconds: sum }).round({largestUnit: 'day'});
+    const temp = Temporal.Duration.from({ seconds: sum }).round({ largestUnit: 'day' });
     return temp.toLocaleString();
 }
 
@@ -150,10 +241,10 @@ function doCountOfEach(vals: string[]) {
     return stringCounts.substring(0, stringCounts.length - 2);
 }
 
-function doCountOfEachMultiselect(vals: string[][]): string{
+function doCountOfEachMultiselect(vals: string[][]): string {
     //convert array of arrays into one big array, then just treat same as "count of each"
     const convertedVals: string[] = [];
-    vals.forEach(arr=>{convertedVals.push(...arr)});
+    vals.forEach(arr => { convertedVals.push(...arr) });
     return doCountOfEach(convertedVals);
 }
 
@@ -162,9 +253,9 @@ function doCountDistinct(vals: any[]): number {
 
 }
 
-function doCountDistinctMultiselect(vals: string[][]): number{
+function doCountDistinctMultiselect(vals: string[][]): number {
     //convert array of arrays into one big array, then just treat same as "count of each"
     const convertedVals: string[] = [];
-    vals.forEach(arr=>{convertedVals.push(...arr)});
+    vals.forEach(arr => { convertedVals.push(...arr) });
     return doCountDistinct(convertedVals);
 }

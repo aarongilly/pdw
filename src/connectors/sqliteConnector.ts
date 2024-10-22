@@ -1,6 +1,6 @@
-import * as sql from 'sqlite3'
+// import * as sql from 'sqlite3'
 
-let db = new sql.Database(':memory:');
+// let db = new sql.Database(':memory:');
 
 export {} //delete this line when starting development 
 
