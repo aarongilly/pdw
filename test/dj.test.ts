@@ -12,15 +12,16 @@ describe("Data Journal basics.", () => {
       defs: [],
       entries: {} //not an array, should fail
     }
-    const emptySetWithOverview: DataJournal = {
+    const emptySetWithExtraKeys: DataJournal = {
       defs: [],
       entries: [],
-      overview: {}
+      overview: {}, //may be added by Overviewer.ts
+      whatever: 'other keys are ignored and not deemed an error'
     }
     expect(DJ.isValidDataJournal(badDataset)).toBe(false);
     expect(DJ.isValidDataJournal(trickierBadDataset)).toBe(false);
     expect(DJ.isValidDataJournal(testData.emptySet)).toBe(true);
-    expect(DJ.isValidDataJournal(emptySetWithOverview)).toBe(true);
+    expect(DJ.isValidDataJournal(emptySetWithExtraKeys)).toBe(true);
   });
 
   test("Data Journal Utility Functions", () => {
@@ -120,25 +121,15 @@ describe('Data Journal Modification', () => {
     //directly mutate the Data Journal object itself.
     const newMinimumDef: Partial<Def> = { _id: 'def1' } //Defs only NEED an "_id"
     const newFullDef = DJ.makeDef(newMinimumDef);
+    expect(localDataJournal.defs.length).toBe(0);
     localDataJournal.defs.push(newFullDef);
-    //There's a big-ol' footgun here, though. Doing this will *not* update any attached
-    //Overview (or index contained therein) - so you have to also null out the overview.
-    expect(localDataJournal.overview?.counts?.defs).toEqual(0); //doesn't reflect added def
-    expect(localDataJournal.overview).not.toEqual(DJ.addOverview(localDataJournal));
-    //best practice would be to manually nullify the overview property:
-    localDataJournal.overview = null;
-    //or just recreate a new overview
-    localDataJournal = DJ.addOverview(localDataJournal);
-    //but since dataJournals are just object shapes there's no way to enforce this
-    expect(localDataJournal.overview?.counts?.defs).toEqual(1); //now reflects the change
-
-    //all that can be handled by just using the build in "addDefs" function.
-    localDataJournal = DJ.addDefs(localDataJournal, [testData.bookDef]);
-    expect(localDataJournal.overview?.counts?.defs).toBe(2); //was added
-    //...however if you forget to use the assigment bit, there's still a footgun.
-    //** INTENTIONALLY BAD CODE DON'T DO THIS **
-    DJ.addDefs(localDataJournal, [testData.movieDef]);
-    expect(localDataJournal.overview?.counts?.defs).toBe(2); //movieDef NOT present
+    expect(localDataJournal.defs.length).toBe(1);
+    
+    //calling the addDefs method will call the 'makeDef' method internally, allowing
+    //partial defs to be passed in without issue;
+    const otherMinimumDef: Partial<Def> = {_id: 'def2'}
+    localDataJournal = DJ.addDefsToNewInstance(localDataJournal, [otherMinimumDef]);
+    expect(localDataJournal.defs.length).toBe(2);
 
     //same as above, but for entries.
     localDataJournal = DJ.newBlankDataJournal([testData.bookDef]);
@@ -151,25 +142,16 @@ describe('Data Journal Modification', () => {
       _period: '2024-09-07T20:58:22',
     }
     const newFullEntry = DJ.makeEntry(newMinimumEntry);
+    expect(localDataJournal.entries.length).toBe(0);
     localDataJournal.entries.push(newFullEntry);
-    //There's a big-ol' footgun here, though. Doing this will *not* update any attached
-    //Overview (or index contained therein) - so you have to also null out the overview.
-    expect(localDataJournal.overview?.counts?.activeEntries).toEqual(0); //doesn't reflect added entry
-    expect(localDataJournal.overview).not.toEqual(DJ.addOverview(localDataJournal));
-    //best practice would be to manually nullify the overview property:
-    localDataJournal.overview = null;
-    //or just recreate a new overview
-    localDataJournal = DJ.addOverview(localDataJournal);
-    //but since dataJournals are just object shapes there's no way to enforce this
-    expect(localDataJournal.overview?.counts?.activeEntries).toEqual(1); //now reflects the change
-
-    //all that can be handled by just using the build in "addDefs" function.
-    localDataJournal = DJ.addEntries(localDataJournal, [testData.readEntry]);
-    expect(localDataJournal.overview?.counts?.activeEntries).toBe(2); //was added
-    //...however if you forget to use the assigment bit, there's still a footgun.
-    //** INTENTIONALLY BAD CODE DON'T DO THIS **
-    DJ.addEntries(localDataJournal, [testData.readAndWorkedOutEntry]);
-    expect(localDataJournal.overview?.counts?.activeEntries).toBe(2); //movieDef NOT present 
+    expect(localDataJournal.entries.length).toBe(1);
+    
+    const otherMinimumEntry: Partial<Entry> = {
+      _id: 'm31m2iap_eoap',
+      _period: '2024-09-07T20:20:20'
+    }
+    localDataJournal = DJ.addEntriesToNewInstance(localDataJournal, [otherMinimumEntry]);
+    expect(localDataJournal.entries.length).toBe(2);
   })
 
   test('Full Transaction Handling', () => {
@@ -248,49 +230,6 @@ describe('Data Journal Modification', () => {
     expect(deletedEntry?._deleted).toBe(true); //was MARKED as deleted
     expect(deletedEntry?._updated).not.toBe('m0ofgfio'); //will now reflect time of deletion
   })
-})
-
-describe('Data Journal Overviewing & Indexing', () => {
-  test("DataJournal Overview Creation & Use", () => {
-    let dataJournalWithOverview = DJ.addOverview(testData.biggerJournal);
-    expect(dataJournalWithOverview.overview).toEqual(testData.expectedOverview);
-    //example of designed use:
-    const A = DJ.addOverview(testData.smallJournalA);
-    const B = DJ.addOverview(testData.smallJournalB);
-    const AB = DJ.addOverview(DJ.merge([A, B]));
-    //get some glancable results from the merge
-    expect(AB.overview?.updated).not.toEqual(A.overview?.updated); //A was older
-    expect(AB.overview?.updated).toEqual(B.overview?.updated); //AB is now up-to-date with B
-    expect(AB.overview!.counts?.defs! - A.overview!.counts!.defs!).toBe(1); //one def was added
-    expect(AB.overview!.counts?.activeEntries! - A.overview!.counts!.activeEntries!).toBe(1); //one entry was added
-  });
-
-  test("DataJournal Index Creation & Use", () => {
-    let dataJournalWithOverview = DJ.addOverview(testData.biggerJournal);
-    const index = dataJournalWithOverview.overview!.index!;
-    expect(index).toEqual(testData.expectedOverview.index);
-
-    //example of designed use:
-    const anExistingEntry = { //thie is the same as testData.lifted
-      _id: "m0ogdggg_ca3t",
-      _period: "2024-09-05T11:05:00",
-      _created: "m0ogdggg",
-      _updated: "m0ogdggg",
-      _deleted: false,
-      _note: "Got so swole",
-      _source: "Test data",
-      WORKOUT_TYPE: 'STRENGTH',
-      WORKOUT_NAME: 'Starting Strength A'
-    }
-    //don't need to loop over the entry list
-    expect(dataJournalWithOverview.entries[index.entryMap[DJ.standardizeKey(anExistingEntry._id)]]).toEqual(anExistingEntry);
-    const aNewEntry = {
-      _id: '12345',
-      _note: 'would be new to to the set',
-      _updated: 'm0fepazz'
-    }
-    expect(dataJournalWithOverview.entries[index.entryMap[DJ.standardizeKey(aNewEntry._id)]]).toBeUndefined();
-  });
 })
 
 describe('Data Journal merge behaviors.', () => {
@@ -373,12 +312,12 @@ describe('Data Journal merge behaviors.', () => {
     let staticB = JSON.parse(JSON.stringify(testData.smallJournalB));
 
     //merging with yourself produces no extra stuff
-    const selfMerge = DJ.merge([testData.smallJournalA, testData.smallJournalA], false);
+    const selfMerge = DJ.merge([testData.smallJournalA, testData.smallJournalA]);
     expect(selfMerge).toEqual(testData.smallJournalA);
 
     // merging 2 produces the expected combined result
     //note: the sort is only for testing, merging doesn't gaurantee array position
-    const ABMerge = DJ.merge([testData.smallJournalA, testData.smallJournalB], false);
+    const ABMerge = DJ.merge([testData.smallJournalA, testData.smallJournalB]);
     ABMerge.defs.sort((a: any, b: any) => a._id > b._id ? 1 : -1) // sort for comparison sake
     ABMerge.entries.sort((a: any, b: any) => a._id > b._id ? 1 : -1) // sort for comparison sake
     const sortedABMergeTarget = testData.smallJournalAB;
@@ -386,13 +325,13 @@ describe('Data Journal merge behaviors.', () => {
     sortedABMergeTarget.defs.sort((a, b) => a._id > b._id ? 1 : -1)
     expect(ABMerge).toEqual(sortedABMergeTarget);
     //order of arguments doesn't matter
-    const BAMerge = DJ.merge([testData.smallJournalB, testData.smallJournalA], false);
+    const BAMerge = DJ.merge([testData.smallJournalB, testData.smallJournalA]);
     BAMerge.defs.sort((a: any, b: any) => a._id > b._id ? 1 : -1) // sort for comparison sake
     BAMerge.entries.sort((a: any, b: any) => a._id > b._id ? 1 : -1) // sort for comparison sake
     expect(BAMerge).toEqual(sortedABMergeTarget);
 
     //merging 3
-    const ABCMerge = DJ.merge([testData.smallJournalA, testData.smallJournalB, testData.smallJournalC], false);
+    const ABCMerge = DJ.merge([testData.smallJournalA, testData.smallJournalB, testData.smallJournalC]);
     ABCMerge.entries.sort((a: any, b: any) => a._id > b._id ? 1 : -1) // sort for comparison sake
     ABCMerge.defs.sort((a: any, b: any) => a._id > b._id ? 1 : -1) // sort for comparison sake
     const sortedABCMergeTarget = testData.smallJournalABC;
@@ -513,10 +452,10 @@ describe('Data Journal Filtering', () => {
     //grabbing two entries by id yeilds those two entries
     expect(DJ.filterTo({ entryIds: ['m0ofgfio_gjlp', 'm0ogdggg_ca3t'] }, dataJournal).entries.length).toBe(2);
     //small test dataset, so here's a couple of illustrations of defs filtering
-    expect(DJ.filterTo({ defs: ['BOOK_NAME'] }, dataJournal).entries.length).toBe(2);
-    expect(DJ.filterTo({ defs: ['WORKOUT_TYPE'] }, dataJournal).entries.length).toBe(2);
+    expect(DJ.filterTo({ entriesWithDef: ['BOOK_NAME'] }, dataJournal).entries.length).toBe(2);
+    expect(DJ.filterTo({ entriesWithDef: ['WORKOUT_TYPE'] }, dataJournal).entries.length).toBe(2);
     //one has one, one has the other, one has both, one has neither, so 3 of the 4 show up here
-    expect(DJ.filterTo({ defs: ['WORKOUT_TYPE', 'BOOK_NAME'] }, dataJournal).entries.length).toBe(3);
+    expect(DJ.filterTo({ entriesWithDef: ['WORKOUT_TYPE', 'BOOK_NAME'] }, dataJournal).entries.length).toBe(3);
     //not sure how useful this will be, but here it is working.
     expect(DJ.filterTo({ limit: 3 }, dataJournal).entries.length).toBe(3);
 
@@ -536,7 +475,7 @@ describe('Data Journal Filtering', () => {
     const moreFilters = {
       from: '2024-09-05T00:00:00',
       to: '2024-09-05T23:59:59',
-      defs: ['BOOK_NAME']
+      entriesWithDef: ['BOOK_NAME']
     }
     //selects only the entry with books that day
     expect(DJ.filterTo(moreFilters, dataJournal).entries.length).toBe(1);
@@ -577,35 +516,6 @@ describe('Data Journal Quality Checks', () => {
     expect(() => { DJ.qualityCheck(properDataJournal) }).not.toThrowError();
     //empty data journals are high quality!
     expect(() => { DJ.qualityCheck({ defs: [], entries: [] }) }).not.toThrowError();
-  })
-
-  test('Overview checks', () => {
-    let faultyDataJournal: DataJournal = {
-      defs: [],
-      entries: [],
-      overview: {
-        counts: {
-          defs: 1, //wrong
-        }
-      }
-    }
-    //overview errors are not high priority, a warning is loged & nothing more
-    expect(() => { DJ.qualityCheck(faultyDataJournal) }).not.toThrowError()
-    expect(() => { DJ.qualityCheck(faultyDataJournal, 'all errors thrown') }).toThrowError();
-    faultyDataJournal = {
-      defs: [],
-      entries: [],
-      overview: {
-        counts: {
-          defs: 0, //right
-          activeEntries: 0, //right
-          deletedEntries: 1, //wrong
-        }
-      }
-    }
-    //overview errors are not high priority, a warning is loged & nothing more
-    expect(() => { DJ.qualityCheck(faultyDataJournal) }).not.toThrowError()
-    expect(() => { DJ.qualityCheck(faultyDataJournal, 'all errors thrown') }).toThrowError()
   })
 
   test('Def checks', () => {

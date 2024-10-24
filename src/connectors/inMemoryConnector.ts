@@ -1,4 +1,4 @@
-import { QueryObject, Entry, Def, Overview, DJ, DataJournal, TransactionObject } from "../DataJournal.js";
+import { QueryObject, Entry, Def, DJ, DataJournal, TransactionObject } from "../DataJournal.js";
 import { CommitResponse, Connector } from "../pdw.js";
 
 /**
@@ -36,13 +36,6 @@ export class InMemoryDb implements Connector {
 
     getDefs(): Def[] {
         return this.internalDJ.defs;
-    }
-
-    getOverview(): Promise<Overview> {
-        return new Promise((resolve) => {
-            const overview = DJ.addOverview(this.internalDJ);
-            return resolve(overview.overview!); // Resolve the promise
-        });
     }
 
     connect(): Promise<Def[]> {

@@ -45,6 +45,10 @@ export enum Rollup {
     COUNTDISTINCT = 'COUNTDISTINCT',
     SUM = 'SUM',
     AVERAGE = 'AVERAGE',
+    /**
+     * Will actually provide a comma-delimited response not *truly* a simple concatenation
+     */
+    CONCAT = 'CONCAT'
 }
 
 //#endregion
@@ -57,49 +61,7 @@ export enum Rollup {
 export interface DataJournal {
     defs: Def[],
     entries: Entry[]
-    overview?: Overview | null,
-}
-
-/**
-* Not typically operated on, but used moreso
-* for sanity checking things when merging and whatnot.
-*/
-export interface Overview {
-    updated?: {
-        localeStr?: string,
-        isoStr?: string,
-        epochStr?: string,
-    },
-    counts?: {
-        defs?: number,
-        activeEntries?: number,
-        deletedEntries?: number
-    },
-    index?: {
-        /**
-         * Position of every definition in the corresponding DataJournal.defs.
-         * Could be used like DataJournal.defs[index[defId]]
-         */
-        defMap: { [defId: string]: number }
-        /**
-         * Position of every entry in the corresponding DataJournal.entries.
-         * Could be used like DataJournal.entries[index[entryId]]
-         */
-        entryMap: { [entryId: string]: number }
-        /**
-         * Object containing:
-         * key = def._lbl
-         * value = def._id
-         * 
-         * Could be used like DataJournal.defs[index[defLblToIdMap[defId]]]
-         */
-        defLblToIdMap: { [defLbl: string]: string }
-    },
-    // aliases?: {
-    //     [alias: string]: string
-    // },
-    // filename?: string
-    [x: string]: any
+    [otherKeys: string]: any
 }
 
 export interface Def {
@@ -264,7 +226,7 @@ export interface QueryObject {
     /**
      * returns only entries which have a property that is in the list
      */
-    defs?: string[],
+    entriesWithDef?: string[],
     /**
      * Returns only the first N Entries
      */
@@ -278,11 +240,11 @@ export interface TransactionObject {
     /**
      * A {@link HalfTransaction} for Creating, Replacing, Modifying, Deleting {@link Def}s
      */
-    defs: HalfTransaction,
+    defs?: HalfTransaction,
     /**
      * A {@link HalfTransaction} for Creating, Replacing, Modifying, Deleting {@link Entry}s
      */
-    entries: HalfTransaction
+    entries?: HalfTransaction
 }
 
 /**
@@ -426,14 +388,7 @@ export class DJ {
     static newBlankDataJournal(withDefs: Def[] = []): DataJournal {
         return {
             defs: withDefs,
-            entries: [],
-            overview: {
-                counts: {
-                    defs: 0,
-                    activeEntries: 0,
-                    deletedEntries: 0
-                }
-            }
+            entries: []
         }
     }
 
@@ -507,15 +462,15 @@ export class DJ {
         if (trans.entries) trans.entries = DJ.ensureValidEntryTransactionObject(trans.entries);
 
         //creates
-        if (trans.defs.create) {
+        if (trans.defs && trans.defs.create) {
             newJournal.defs.push(...trans.defs.create as Def[]);
         }
-        if (trans.entries.create) {
+        if (trans.entries && trans.entries.create) {
             newJournal.entries.push(...trans.entries.create as Entry[]);
         }
 
         //replaces
-        if (trans.defs.replace) {
+        if (trans.defs && trans.defs.replace) {
             trans.defs.replace.forEach(def => {
                 const standardizedID = DJ.standardizeKey(def._id)
                 let existing = newJournal.defs.find(prev => DJ.standardizeKey(prev._id) === standardizedID);
@@ -531,7 +486,7 @@ export class DJ {
                 newJournal.defs.push(def);
             })
         }
-        if (trans.entries.replace) {
+        if (trans.entries && trans.entries.replace) {
             trans.entries.replace.forEach(entry => {
                 const standardizedID = DJ.standardizeKey(entry._id)
                 let existing = newJournal.entries.find(prev => DJ.standardizeKey(prev._id) === standardizedID);
@@ -549,7 +504,7 @@ export class DJ {
         }
 
         //modifys
-        if (trans.defs.modify) {
+        if (trans.defs && trans.defs.modify) {
             trans.defs.modify.forEach(def => {
                 const standardizedID = DJ.standardizeKey(def._id)
                 let existing = newJournal.defs.find(prev => DJ.standardizeKey(prev._id) === standardizedID);
@@ -569,7 +524,7 @@ export class DJ {
                 newJournal.defs.push(existing);
             })
         }
-        if (trans.entries.modify) {
+        if (trans.entries && trans.entries.modify) {
             trans.entries.modify.forEach(entry => {
                 const standardizedID = DJ.standardizeKey(entry._id)
                 let existing = newJournal.entries.find(prev => DJ.standardizeKey(prev._id) === standardizedID);
@@ -590,7 +545,7 @@ export class DJ {
         }
 
         //deletes
-        if (trans.defs.delete) {
+        if (trans.defs && trans.defs.delete) {
             trans.defs.delete.forEach(defID => {
                 const standardizedID = DJ.standardizeKey(defID)
                 const foundDefIndex = newJournal.defs.findIndex(def => DJ.standardizeKey(def._id) === standardizedID);
@@ -599,7 +554,7 @@ export class DJ {
                 }
             })
         }
-        if (trans.entries.delete) {
+        if (trans.entries && trans.entries.delete) {
             trans.entries.delete.forEach(entryId => {
                 const standardizedID = DJ.standardizeKey(entryId)
                 let existing = newJournal.entries.find(prev => DJ.standardizeKey(prev._id) === standardizedID);
@@ -613,7 +568,14 @@ export class DJ {
         return newJournal;
     }
 
-    static addDefs(dataJournal: DataJournal, newDefs: Partial<Def>[]): DataJournal {
+    /**
+     * Will create a new Data Journal with the defs added. Accepted minimum viable Defs, will
+     * call {@link DJ.makeDef} internally
+     * @param dataJournal Base data journal
+     * @param newDefs array of new Defs to add
+     * @returns new copy of the Data Journal with Defs added
+     */
+    static addDefsToNewInstance(dataJournal: DataJournal, newDefs: Partial<Def>[]): DataJournal {
         //make static - actually calling 'merge' later does this
         // const newJournal = JSON.parse(JSON.stringify(dataJournal)); //not needed
         const fullDefs = newDefs.map(newDef => DJ.makeDef(newDef));
@@ -624,7 +586,14 @@ export class DJ {
         return DJ.merge([tempDJ, dataJournal])
     }
 
-    static addEntries(dataJournal: DataJournal, newEntries: Partial<Entry>[]): DataJournal {
+    /**
+     * Will create a new Data Journal with the Entries added. Accepted minimum viable Entries, will
+     * call {@link DJ.makeEntry} internally
+     * @param dataJournal Base data journal
+     * @param newEntries array of new Entries to add
+     * @returns new copy of the Data Journal with Entries added
+     */
+    static addEntriesToNewInstance(dataJournal: DataJournal, newEntries: Partial<Entry>[]): DataJournal {
         //make static - actually calling 'merge' later does this
         // const newJournal = JSON.parse(JSON.stringify(dataJournal)); //not needed
         const fullEntries = newEntries.map(newEntry => DJ.makeEntry(newEntry));
@@ -668,22 +637,13 @@ export class DJ {
         return entries.filter(e => e._deleted);
     }
 
-    static addOverview(dataJournal: DataJournal): DataJournal {
-        //make static
-        const newDataJournal = JSON.parse(JSON.stringify(dataJournal));
-        newDataJournal.overview = DJ.makeOverview(newDataJournal);
-        return newDataJournal
-    }
+    
 
-    static merge(dataJournalArray: DataJournal[], andMakeOverview = true) {
-        //#TODO - #MAYBE - optimize this logic to utilize Indexes if they are present
+    static merge(dataJournalArray: DataJournal[]) {
         if (!Array.isArray(dataJournalArray) || !DJ.isValidDataJournal(dataJournalArray[0])) throw new Error('DF.merge expects an array of DataJournals');
         const returnDataJournal: DataJournal = {
             defs: DJ.mergeDefs(dataJournalArray.map(dj => dj.defs)),
             entries: DJ.mergeEntries(dataJournalArray.map(dj => dj.entries))
-        }
-        if (andMakeOverview) {
-            returnDataJournal.overview = DJ.makeOverview(returnDataJournal);
         }
         return returnDataJournal;
     }
@@ -875,8 +835,8 @@ export class DJ {
                 //@ts-expect-error
                 entries = entries.filter(entry => queryObject.entryIds.some(eid => eid === entry._id));
             }
-            if (Object.hasOwn(queryObject, 'defs')) {
-                entries = entries.filter(entry => arraysHaveCommonElement(Object.keys(entry), queryObject.defs));
+            if (Object.hasOwn(queryObject, 'entriesWithDef')) {
+                entries = entries.filter(entry => arraysHaveCommonElement(Object.keys(entry), queryObject.entriesWithDef));
             }
             if (Object.hasOwn(queryObject, 'limit')) {
                 entries = entries.slice(0, queryObject.limit);
@@ -899,22 +859,9 @@ export class DJ {
      * - entries with no associated def (warning)
      * - timestamp is invalid? (Borrow Scope check regex)
      * - updated Epoch str is way off?
-     * - Overview counts wrong?
      */
     static qualityCheck(dataJournal: DataJournal, panicLevel: "logs only" | "some errors thrown" | "all errors thrown" = 'some errors thrown'): {msg:string,important:boolean}[] {
         const logs: {msg:string,important:boolean}[] = []
-        //overview check
-        if (dataJournal.overview && dataJournal.overview.counts) {
-            //Def Count bad
-            if (dataJournal.overview.counts.defs !== dataJournal.defs.length)
-                logOrThrow(`Overview Def count is wrong! \n Overview says: ${dataJournal.overview.counts.defs} & should be ${dataJournal.defs.length}`);
-            const active = dataJournal!.overview!.counts!.activeEntries ?? 0;
-            const deleted = dataJournal.overview.counts.deletedEntries ?? 0;
-            //Entry Count bad
-            const overViewEntryCount = active + deleted;
-            if (overViewEntryCount !== dataJournal.entries.length)
-                logOrThrow(`Overview Entry count is wrong! \n Overview says: ${overViewEntryCount} & should be ${dataJournal.entries.length}`);
-        }
         //quality check defs
         dataJournal.defs.forEach(def => {
             //Def missing id
@@ -1179,61 +1126,6 @@ export class DJ {
     //#endregion
 
     //#region --- private methods 
-    /**
-     * Creates a Data Journal Overview object - but does NOT append it to anything.
-     * To append to a copy of a Data Journal, used {@link addOverview}.
-     */
-    static makeOverview(dataJournal: DataJournal): Overview {
-        if (!this.isValidDataJournal(dataJournal)) throw new Error("Invalid dataset found at fFWPIhaA");
-
-        let deletedEntryCount = 0;
-        let lastUpdated = '0'; //should be the Epoch itself
-
-        let indexObj = {
-            defMap: {},
-            entryMap: {},
-            defLblToIdMap: {}
-        }
-
-        /**
-         * Loop over entries once, capture what's necessary
-         */
-        dataJournal.entries.forEach((entry, index) => {
-            if (entry._deleted) deletedEntryCount += 1;
-            if (entry._updated > lastUpdated) lastUpdated = entry._updated;
-
-            const standardizedKey = DJ.standardizeKey(entry._id);
-            indexObj.entryMap[standardizedKey] = index;
-        })
-
-        /**
-         * Loop over defs once, capture what's necessary
-         */
-        dataJournal.defs.forEach((def, index) => {
-            if (def._updated > lastUpdated) lastUpdated = def._updated;
-
-            const standardizedKey = DJ.standardizeKey(def._id);
-            indexObj.defMap[standardizedKey] = index;
-            indexObj.defLblToIdMap[def._lbl ?? def._id] = def._id;
-        })
-
-        const lastUpdatedDate = DJ.parseDateFromEpochStr(lastUpdated);
-
-        const overview: Overview = {
-            updated: {
-                localeStr: lastUpdatedDate.toLocaleString(),
-                isoStr: lastUpdatedDate.toISOString(),
-                epochStr: lastUpdated,
-            },
-            counts: {
-                defs: dataJournal.defs.length,
-                activeEntries: dataJournal.entries.length - deletedEntryCount,
-                deletedEntries: deletedEntryCount
-            },
-            index: indexObj
-        }
-        return overview;
-    }
 
     /**
      * Both merges use the same logic, just a different key. This is called by the other merge techniques.

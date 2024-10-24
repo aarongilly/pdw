@@ -83,28 +83,40 @@ describe('Summarizor', () => {
         //Count is valid for all types
         expect(Summarizor.rollupEntryPoint(myEntries, myBool).val).toEqual(3);
 
+        //Text Type
+        expect(Summarizor.rollupEntryPoint(myEntries, myText, Rollup.COUNTOFEACH).val).toEqual("HI MOM.: 1, Ay.: 1, Yo.: 1");
+        expect(Summarizor.rollupEntryPoint(myEntries, myText, Rollup.COUNTDISTINCT).val).toEqual(3);
+        expect(Summarizor.rollupEntryPoint(myEntries, myText, Rollup.CONCAT).val).toEqual('Yo., Ay., HI MOM.');
+        //all other summary types for bool throw error
+        expect(() => {Summarizor.rollupEntryPoint(myEntries, myText, Rollup.AVERAGE)}).toThrowError();
+        expect(() => {Summarizor.rollupEntryPoint(myEntries, myText, Rollup.SUM)}).toThrowError();
+        
         //Boolean Type
         expect(Summarizor.rollupEntryPoint(myEntries, myBool, Rollup.COUNTOFEACH).val).toEqual("true: 1, false: 2");
         expect(Summarizor.rollupEntryPoint(myEntries, myBool, Rollup.COUNTDISTINCT).val).toEqual(2);
+        expect(Summarizor.rollupEntryPoint(myEntries, myBool, Rollup.CONCAT).val).toEqual('false, true, false');
         //all other summary types for bool throw error
         expect(() => {Summarizor.rollupEntryPoint(myEntries, myBool, Rollup.AVERAGE)}).toThrowError();
         expect(() => {Summarizor.rollupEntryPoint(myEntries, myBool, Rollup.SUM)}).toThrowError();
-
+        
         //Number type
         expect(Summarizor.rollupEntryPoint(myEntries, myNum, Rollup.COUNTOFEACH).val).toEqual("6: 1, 4: 1, 3: 1");
         expect(Summarizor.rollupEntryPoint(myEntries, myNum, Rollup.COUNTDISTINCT).val).toEqual(3);
         expect(Summarizor.rollupEntryPoint(myEntries, myNum, Rollup.AVERAGE).val).toEqual(4.33); //average always maxes at 2 decimals
         expect(Summarizor.rollupEntryPoint(myEntries, myNum, Rollup.SUM).val).toEqual(13);
+        expect(Summarizor.rollupEntryPoint(myEntries, myNum, Rollup.CONCAT).val).toEqual('3, 4, 6');
         
         //Duration type
         expect(Summarizor.rollupEntryPoint(myEntries, myDur, Rollup.COUNTOFEACH).val).toEqual("PT2H: 1, PT1H: 2");
         expect(Summarizor.rollupEntryPoint(myEntries, myDur, Rollup.COUNTDISTINCT).val).toEqual(2);
         expect(Summarizor.rollupEntryPoint(myEntries, myDur, Rollup.AVERAGE).val).toEqual('PT1H20M'); //average always maxes at 2 decimals
         expect(Summarizor.rollupEntryPoint(myEntries, myDur, Rollup.SUM).val).toEqual('PT4H');
+        expect(Summarizor.rollupEntryPoint(myEntries, myDur, Rollup.CONCAT).val).toEqual('PT1H, PT2H, PT1H');
         
         //Time type
         expect(Summarizor.rollupEntryPoint(myEntries, myTime, Rollup.COUNTOFEACH).val).toEqual("02:00:00: 1, 23:00:00: 1, 22:00:00: 1");
         expect(Summarizor.rollupEntryPoint(myEntries, myTime, Rollup.COUNTDISTINCT).val).toEqual(3);
+        expect(Summarizor.rollupEntryPoint(myEntries, myTime, Rollup.CONCAT).val).toEqual('22:00:00, 23:00:00, 02:00:00');
         //Times are averaged about 4AM, so 00:00:00 to 03:59:59 are treated like 24:00:00 to 27:59:59
         expect(Summarizor.rollupEntryPoint(myEntries, myTime, Rollup.AVERAGE).val).toEqual('23:40:00'); 
         //Sums on times aren't allowed & throw error
@@ -113,9 +125,11 @@ describe('Summarizor', () => {
         //Multiselect type
         expect(Summarizor.rollupEntryPoint(myEntries, myMulti, Rollup.COUNTOFEACH).val).toEqual("D: 1, C: 2, B: 2, A: 1");
         expect(Summarizor.rollupEntryPoint(myEntries, myMulti, Rollup.COUNTDISTINCT).val).toEqual(4); //4 unique elements contained in arrays
+        expect(Summarizor.rollupEntryPoint(myEntries, myMulti, Rollup.CONCAT).val).toEqual('A, B, B, C, C, D'); //dont' love this, but alas
         //all other summary types for bool throw error
         expect(() => {Summarizor.rollupEntryPoint(myEntries, myMulti, Rollup.AVERAGE)}).toThrowError();
         expect(() => {Summarizor.rollupEntryPoint(myEntries, myMulti, Rollup.SUM)}).toThrowError();
+
     })
 
     test('One per Period Function', () => {

@@ -1,4 +1,4 @@
-import { QueryObject, Entry, Def, Overview, DataJournal, DJ, HalfTransaction, TransactionObject, DiffReport } from "./DataJournal.js";
+import { QueryObject, Entry, Def, DataJournal, DJ, HalfTransaction, TransactionObject, DiffReport } from "./DataJournal.js";
 import { ConnectorListMember, getConnector, getTranslator, TranslatorListMember } from "./ConnectorsAndTranslators.js";
 import { InMemoryDb } from "./connectors/inMemoryConnector.js";
 
@@ -18,8 +18,6 @@ export interface Connector {
 
     getDefs(): Def[];
 
-    getOverview(): Promise<Overview>;
-
     connect(...params: any): Promise<Def[]>;
 
     /**
@@ -32,6 +30,7 @@ export interface CommitResponse extends DiffReport {
     success: boolean; //only required field
     error?: string;
     warnings?: string[];
+    [key:string]: any; //arbitrary other things allowed
 }
 
 /**
@@ -127,7 +126,7 @@ export class PDW {
 
             //merge DataJournals from all translators
             const translatorArr = await Promise.all(translatorPromiseArray);
-            const allDJ = DJ.merge(translatorArr, false);
+            const allDJ = DJ.merge(translatorArr);
 
             //push to connectors?
             await Promise.all(connectorPromiseArray);
@@ -200,7 +199,7 @@ export class PDW {
      * @param rawParams an object of any {@link StandardParams} to include
      * @returns a {@link CanonicalDataset} containing a {@link Def}s, {@link Entry}s
      */
-    async getAll(queryObject?: QueryObject, includeOverview = true): Promise<DataJournal> {
+    async getAll(queryObject?: QueryObject): Promise<DataJournal> {
         if (queryObject === undefined) queryObject = {}
         const defs = this.getDefs();
         const entries = await this.getEntries(queryObject);
@@ -208,10 +207,6 @@ export class PDW {
             defs: defs,
             entries: entries
         }
-        if (includeOverview) {
-            dataset.overview = DJ.makeOverview(dataset);
-        }
-
         return dataset;
     }
 

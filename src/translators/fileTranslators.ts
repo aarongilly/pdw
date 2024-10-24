@@ -5,6 +5,7 @@ import * as dj from '../DataJournal.js';
 import { Translator } from '../pdw.js';
 import { AliasKeyer, AliasKeyes } from '../AliasKeyer.js';
 import { Note, Block } from './MarkdownParsers.js';
+import { Overviewer } from '../Overviewer.js';
 // import { Period } from '../Period.js';
 
 //#region ### EXPORTED FUNCTIONS ###
@@ -69,7 +70,7 @@ export class JsonTranslator implements Translator {
             defs: file.defs,
             entries: file.entries
         }
-        return dj.DJ.addOverview(returnData);
+        return Overviewer.addOverviewTo(returnData);
     }
 }
 
@@ -111,7 +112,7 @@ export class YamlTranslator implements Translator {
         }
         const translated = this.translateFromYamlFormat(aliasedDJ);
         const returnDJ = AliasKeyer.unapplyAliases(translated, YamlTranslator.aliasKeys);
-        return dj.DJ.addOverview(returnDJ);
+        return Overviewer.addOverviewTo(returnDJ);
     }
 
     translateToYamlFormat(data: dj.DataJournal) {
@@ -464,7 +465,7 @@ export class ExcelTranslator implements Translator {
     fromDataJournal(data: dj.DataJournal, filename: string, useFs = true) {
         if (useFs) XLSX.set_fs(fs);
         const wb = XLSX.utils.book_new();
-        data.overview = dj.DJ.makeOverview(data);
+        data.overview = Overviewer.addOverviewTo(data);
 
         if (data.overview !== undefined) {
             let aoa: any[] = [];

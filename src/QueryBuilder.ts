@@ -105,7 +105,7 @@ export class QueryBuilder {
     forDids(didList: string[] | string) {
         if (!Array.isArray(didList)) didList = [didList];
         if(this._defs.length === 0) throw new Error('There are no defs loaded in the QueryBuilder')
-        this._queryObject.defs = didList;
+        this._queryObject.entriesWithDef = didList;
         return this
     }
 
@@ -115,7 +115,7 @@ export class QueryBuilder {
     forDefsLbld(defLbls: string[] | string) {
         if (!Array.isArray(defLbls)) defLbls = [defLbls];
         if(this._defs.length === 0) throw new Error('There are no defs loaded in the QueryBuilder');
-        this._queryObject.defs = this._defs.filter(def => defLbls.some(d => DJ.standardizeKey(d) === DJ.standardizeKey(def._lbl!))).map(def => def._id);
+        this._queryObject.entriesWithDef = this._defs.filter(def => defLbls.some(d => DJ.standardizeKey(d) === DJ.standardizeKey(def._lbl!))).map(def => def._id);
         return this
     }
 
@@ -145,7 +145,7 @@ export class QueryBuilder {
     forDefs(defList: Def[] | Def) {
         if (!Array.isArray(defList)) defList = [defList];
         if(this._defs.length === 0) throw new Error('There are no defs loaded in the QueryBuilder')
-        this._queryObject.defs = defList.map(def => def._id);
+        this._queryObject.entriesWithDef = defList.map(def => def._id);
         return this;
     }
 
@@ -170,7 +170,7 @@ export class QueryBuilder {
             if (def._tags === undefined) return false
             return DJ.strArrayShareElementStandardized(def._tags, tags);
         })
-        this._queryObject.defs = dids.map(d => d._id);
+        this._queryObject.entriesWithDef = dids.map(d => d._id);
         return this
     }
     
@@ -181,7 +181,7 @@ export class QueryBuilder {
     scope(scopes: Scope[] | Scope) {
         if (!Array.isArray(scopes)) scopes = [scopes];
         if(this._defs.length === 0) throw new Error('There are no defs loaded in the QueryBuilder')
-        this._queryObject.defs = this._defs.filter(def => scopes.some(s => s === def._scope)).map(def=>def._id);
+        this._queryObject.entriesWithDef = this._defs.filter(def => scopes.some(s => s === def._scope)).map(def=>def._id);
         return this
     }
 

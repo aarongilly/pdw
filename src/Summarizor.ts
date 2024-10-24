@@ -179,6 +179,11 @@ export class Summarizor {
             if (valType === DefType.MULTISELECT) return doCountOfEachMultiselect(rawVals)
             return doCountOfEach(rawVals);
         }
+        if( method === Rollup.CONCAT){
+            if(valType === DefType.MULTISELECT)
+                return rawVals.map(val=>val.join(', ')).join(', ');
+            return rawVals.join(', ');
+        }
         throw new Error('Tried to rollup and unsuppored Method: ' + method);
     }
 }

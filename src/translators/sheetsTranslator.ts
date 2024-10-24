@@ -47,8 +47,11 @@ export class SheetsTranslator implements Translator {
         }
         let returnObj: any = {};
         let sawErr = false;
-        await fetch(postURL, postOptions).then(response => response.json())
-            .then(data => returnObj = data)
+        await fetch(postURL, postOptions).then(response => response.text())
+            .then(data => {
+                console.log(data);
+                returnObj = JSON.parse(data)
+            })
             .catch(error => {
                 sawErr = true;
                 console.error(error)
@@ -59,5 +62,4 @@ export class SheetsTranslator implements Translator {
     getServiceName(): string {
         return 'Sheets Translator'
     }
-
 }

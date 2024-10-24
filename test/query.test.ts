@@ -58,18 +58,18 @@ describe('Building QueryObjects', () => {
         const myDj = testData.biggerJournal;
         const q = new QueryBuilder({ dj: myDj });
         q.forDefs(myDj.defs[2]);
-        expect(q.toQueryObject()).toEqual({ defs: ["WORKOUT_NAME"] });
+        expect(q.toQueryObject()).toEqual({ entriesWithDef: ["WORKOUT_NAME"] });
         q.forDefsLbld(['WORKOUT_TYPE'])
-        expect(q.toQueryObject()).toEqual({ defs: ["WORKOUT_TYPE"] });
+        expect(q.toQueryObject()).toEqual({ entriesWithDef: ["WORKOUT_TYPE"] });
         q.tags('health');
-        expect(q.toQueryObject()).toEqual({ defs: ["WORKOUT_TYPE", "WORKOUT_NAME"] });
+        expect(q.toQueryObject()).toEqual({ entriesWithDef: ["WORKOUT_TYPE", "WORKOUT_NAME"] });
         q.scope(Scope.DAY);
-        expect(q.toQueryObject()).toEqual({ defs: [] });
+        expect(q.toQueryObject()).toEqual({ entriesWithDef: [] });
 
         const otherDJ = testData.defsOnlyABC;
         const otherQ = new QueryBuilder({ defs: otherDJ.defs });
         otherQ.scope(Scope.DAY);
-        expect(otherQ.toQueryObject()).toEqual({ defs: ['SLEEP_DURATION'] });
+        expect(otherQ.toQueryObject()).toEqual({ entriesWithDef: ['SLEEP_DURATION'] });
     })
 
     test('Convenience filtering', () => {

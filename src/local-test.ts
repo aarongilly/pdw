@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as obs from './translators/obsidianTranslator.js'
 import * as XLSX from 'xlsx'
 import * as testData from '../test/test_datasets.js';
-import { Def, DefType, DJ, DataJournal, Entry, Scope, Rollup } from './DataJournal.js';
+import { Def, DefType, DJ, DataJournal, Entry, Scope, Rollup, TransactionObject, QueryObject } from './DataJournal.js';
 import { AliasKeyer, AliasKeyes } from './AliasKeyer.js';
 import { JsonTranslator, MarkdownTranslator } from './translators/fileTranslators.js';
 import { Note } from './translators/MarkdownParsers.js';
@@ -15,61 +15,157 @@ import { Validator } from './Validator.js';
 import { FolderTranslator } from './translators/folderTranslator.js';
 import * as dotenv from 'dotenv'
 import { SheetsTranslator } from './translators/sheetsTranslator.js';
+import { Period } from './Period.js';
+import { SheetsConnector } from './connectors/sheetsConnector.js';
 
-// const allData =  await ie.JsonTranslator.toDataJournal('.archiveOfOutdated/All_PDW_Cleaned.json');
 
-// let query = new QueryBuilder(allData);
-// query = query.forDefsLbld(['WORKOUT_NAME', 'WORKOUT_TYPE']).limit(30);
+
+const allData =  await ie.JsonTranslator.toDataJournal('.archiveOfOutdated/All_PDW_Cleaned.json');
+let query = new QueryBuilder(allData).forDefsLbld(['event']).toQueryObject();
+const queryResult = DJ.filterTo(query, allData) as DataJournal;
+console.log(queryResult);
+await SheetsTranslator.fromDataJournal(queryResult, 'Events')
 
 // const myDj = DJ.filterTo(query.toQueryObject(),allData) as DataJournal;
-
 // console.log(myDj)
 
-// const result = await SheetsTranslator.fromDataJournal(myDj, 'workouts imported')
-
-const result = await SheetsTranslator.toDataJournal('1hYHA6YmZPYKNKKBKc_ytqb_LLY95-IhKtA3n7mEp4zY')
-
-console.log(result)
-// await SheetsTranslator.toDataJournal('1QyKxdbQfk3v-jovRD1wscMZpS0eYjHH7t-Vb_bplrTE')
-
-// const postData = {
-//     fileName: 'New Test',
-//     dataJournal: testData.biggerJournal
-// };
-
+// dotenv.config();
+// const testUrl = process.env.TEST_DEPLOYMENT_URL as string;
 // const options = {
-//     method: 'POST', //'GET'
-//     headers: {
-//         'Content-Type': 'application/json',
-//         'authorization': "Bearer " + process.env.OAUTH
+//             method: 'GET',
+//             headers: {
+//                 'Content-Type': 'application/json',
+//                 'authorization': 'Bearer ' + process.env.OAUTH
+//             },
+//             // body: JSON.stringify(bodyObj)
+//         };
+// const getUrl = testUrl + "?method=query&entryIds=m2me51eq_yxh4";
+// const result = await fetch(getUrl, options);
+// const text = await result.text();
+// const data = JSON.parse(text);
+// console.log(data);
+// const testSht = process.env.TEST_SHEET_ID as string;
+
+// const shtId = '1QyKxdbQfk3v-jovRD1wscMZpS0eYjHH7t-Vb_bplrTE';
+
+// const dj = await SheetsConnector.query({},shtId);
+// const update = await SheetsConnector.commit({
+//     entries: {
+//         modify: [{
+//             _id: 'aprieupae_gooe',
+//             _updated: DJ.makeEpochStr(),
+//             _period: '2024-10-20T20:20:10',
+//             WORKOUT_type: 'Jump rope, yo'
+//         }]
+//     }
+// },shtId)
+
+// const query = await SheetsConnector.query({'entriesWithDef':['WORKOUT_TYPE']},shtId);
+
+console.log(query);
+
+/** NOT SPECIFYING ID WILL USE THE MANIFEST */
+// SIGN OF PROGRESS - GET DEFS WORKS BOTH WAYS
+// const result = await SheetsConnector.getDefs(); //worked
+/** SPECIFYING THE ID WILL USE THAT ONE SHEET ONLY */
+// const result = await SheetsConnector.getDefs('testSht'); //worked
+
+// SIGN OF PROGRESS - QUERY WORKS BOTH WAYS
+// const queryObj: QueryObject = {entriesWithDef: ['WORKOUT_TYPE']}
+// const result = await SheetsConnector.query(queryObj); //worked
+/** SPECIFYING THE ID WILL USE THAT ONE SHEET ONLY */
+// const result = await SheetsConnector.query(queryObj, 'testSht'); //worked
+
+// const commmitObj: TransactionObject = {
+//     defs: {},
+//     entries: {
+//         create: [
+//             {
+//                 _id: DJ.makeID(),
+//                 _period: '2024-10-24T20:20:20',
+//                 _updated: DJ.makeEpochStr(),
+//                 _created: DJ.makeEpochStr(),
+//                 _note: 'Just created',
+//                 WORKOUT_NAME: 'LIFTED',
+//                 WORKOUT_TYPE: 'Strength',
+//             }
+//         ],
+//         modify: [
+//             {
+//                 _id: 'm2mbr4j6_xw6q',
+//                 _note: 'Modified with Source',
+//                 _period: '2024-10-24T10:23:03',
+//                 _source: 'Here now',
+//                 WORKOUT_NAME: 'LIFTED',
+//             }
+//         ],
+//         replace: [
+//             {
+//                 _id: 'testtwo',
+//                 _period: '2024-10-24T05:05:05',
+//                 _updated: DJ.makeEpochStr(),
+//             }
+//         ],
+//         delete: ['testing']
+//     }
+// }
+// SIGN OF PROGRESS - QUERY WORKS BOTH WAYS
+// const result = await SheetsConnector.commit(commmitObj); //worked
+/** SPECIFYING THE ID WILL USE THAT ONE SHEET ONLY */
+// const result = await SheetsConnector.commit(commmitObj, 'testSht'); //worked //worked
+// console.log(result)
+
+// postRequest([
+//     {
+//         _id: DJ.makeID(),
+//         _period: '2024-10-24T20:20:20',
+//         _updated: DJ.makeEpochStr(),
+//         _created: DJ.makeEpochStr(),
+//         _note: 'CREATED TWORE',
+//         WORKOUT_NAME: 'LIFTED',
+//         WORKOUT_TYPE: 'Strength',
 //     },
-//     body: JSON.stringify(postData)
-// };
-// const postURL = process.env.LIVE_DEPLOYMENT_URL as string//TEST_DEPLOYMENT_URL as string;
-// const getUrl = postURL + "/toDataJournal?id=" + '1QyKxdbQfk3v-jovRD1wscMZpS0eYjHH7t-Vb_bplrTE';
-//     // + "?foo=bar&myArr=1&myArr=2"
+//     {
+//         _id: DJ.makeID(),
+//         _period: '2024-10-24T20:20:21',
+//         _updated: DJ.makeEpochStr(),
+//         _created: DJ.makeEpochStr(),
+//         _note: 'HECK YES',
+//         WORKOUT_NAME: 'STRETCHED',
+//         WORKOUT_TYPE: 'Mobility',
+//     }
+// ], 'createOnly')
 
-// // fetch(postURL + "/fromDataJournal", options)
-// fetch(getUrl, options)
-//     // fetch('https://script.google.com/macros/s/AKfycbyFc3Wv-RwFCEkOQReK-7GXM18iFZ0d7-ByDoQ_1u5wVwlW5eIqknlk8qfbQe45fPZY/exec', options)
-//     .then(response => response.text())
-//     .then(data =>
-//         workWithFetchedData(data))
-//     .catch(error =>
-//         console.error(error));
+// async function postRequest(payload: any, method: 'createOnly' | 'commit' | 'query' | 'getDefs', singleFileId?: string) {
+//     const bodyObj: any = {
+//         data: payload
+//     }
+//     if (singleFileId !== undefined) bodyObj.id = singleFileId;
 
-// function workWithFetchedData(data: any) {
-//     console.log(typeof data);
-//     console.log(data);
-//     const asObj = JSON.parse(data);
-//     console.log(asObj)
+//     const options = {
+//         method: 'POST',
+//         headers: {
+//             'Content-Type': 'application/json',
+//         },
+//         body: JSON.stringify(bodyObj)
+//     };
+
+//     //@ts-expect-error - typing complaints
+//     if (true) options.headers.authorization = "Bearer " + process.env.OAUTH;
+
+//     const postURL = process.env.TEST_DEPLOYMENT_URL + "?method=" + method;
+//     let result: any = null;
+//     await fetch(postURL, options)
+//         .then(response => response.text())
+//         .then(data =>
+//             result = JSON.parse(data))
+//         .catch(error =>
+//             console.error(error));
+//     // console.log('Result was:', JSON.parse(result));
+//     return result
 // }
 
-//https://script.googleusercontent.com/macros/echo?user_content_key=glbhtHNe8AMcFY4EBasO2JATsybLnLlH7jG8V3LClNPuTEjWDJ3Wh1rvOFdspkLhbhse411KiWeG66yQGGJhb46vv3BoHRUgm5_BxDlH2jW0nuo2oDemN9CCS2h10ox_1xSncGQajx_ryfhECjZEnByaZPJX4DtrEkFpTViiiJ5ql48YTmXId3EDC-zuEvNXohQG0f0rS8hDCAx-Vg77dG513cVIztxp4nVuJe11CYdOtjOmrHMgPg&lib=MtFEBosI_mW7E2REnbC-RJfueLKhoaeOI
 
-// import { mainFunc } from './translators/sheetsTranslator.js';
-
-// mainFunc();
 
 // const allData =  await ie.JsonTranslator.toDataJournal('.archiveOfOutdated/All_PDW_Cleaned.json');
 

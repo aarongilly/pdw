@@ -1,4 +1,5 @@
 import * as dj from "../src/DataJournal.js"
+import { Overview } from "../src/Overviewer.js"
 
 //#region --- DEFS
 export const bookDef: dj.Def = {
@@ -242,7 +243,7 @@ export const biggerJournal: dj.DataJournal = {
     entries: [readEntry, readAndWorkedOutWithName, lifted, deletedEntry]
 }
 
-export const expectedOverview: dj.Overview = {
+export const expectedOverview: Overview = {
     updated: {
         epochStr: "m0zzzzzz", //from the deleted entry
         localeStr: "9/12/2024, 7:46:32 PM", //translated
