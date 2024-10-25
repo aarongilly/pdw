@@ -1,13 +1,12 @@
-import { DataJournal } from "./DataJournal";
+import { DataJournal, DJ } from "./DataJournal.js";
 
+/**
+ * Alias => Key... like so:
+ * {localName: 'canoncialName'}
+ */
 export type AliasKeyes = { [alias: string]: string };
 
-export type AliasedDataJournal = {
-    defs: any[],
-    entries: any[]
-}
-
-export class AliasKeyer {
+export class Aliaser {
     /**
      * Takes in a regular Data Journal, returns the same DJ but with aliased keys
      * @param dataJournal regular Data Journal
@@ -18,13 +17,15 @@ export class AliasKeyer {
             defs: [],
             entries: []
         };
-        const keyAliases = AliasKeyer.flipToKeyAlias(aliasKeys);
+        const keyAliases = Aliaser.flipToKeyAlias(aliasKeys);
+        const standardizedArray = Aliaser.buildStandardizedArray(keyAliases); 
         dataJournal.defs.forEach(def => {
             let newDef = Object.fromEntries(
                 Object
                     .entries(def)
                     .map(([key, value]) => {
-                        if (keyAliases[key] === undefined) return [key, value]
+                        const foundIndex = standardizedArray.findIndex(obj=> obj.standardizedAlias === DJ.standardizeKey(key));
+                        if(foundIndex === -1) return [key, value]
                         return [keyAliases[key], value]
                     }))
                     //@ts-expect-error
@@ -35,8 +36,9 @@ export class AliasKeyer {
                 Object
                     .entries(entry)
                     .map(([key, value]) => {
-                        if (keyAliases[key] === undefined) return [key, value]
-                        return [keyAliases[key], value]
+                        const foundIndex = standardizedArray.findIndex(obj=> obj.standardizedAlias === DJ.standardizeKey(key));
+                        if(foundIndex === -1) return [key, value]
+                         return [keyAliases[standardizedArray[foundIndex].alias], value]
                     }))
                     //@ts-expect-error
                 returnObj.entries.push(newEntry);
@@ -44,9 +46,19 @@ export class AliasKeyer {
         return returnObj;
     }
 
-    static unapplyAliases(dataJournal: AliasedDataJournal, aliasKeys: AliasKeyes): DataJournal {
+    private static buildStandardizedArray(aliasKeys: AliasKeyes){
+        return Object.keys(aliasKeys).map(alias=>{
+            return {
+                alias: alias,
+                key: aliasKeys[alias],
+                standardizedAlias: DJ.standardizeKey(alias)
+            }
+        })
+    }
+
+    static unapplyAliases(dataJournal: DataJournal, aliasKeys: AliasKeyes): DataJournal {
         //huh, turns out this was pretty simple
-        return AliasKeyer.applyAliases(dataJournal,AliasKeyer.flipToKeyAlias(aliasKeys));
+        return Aliaser.applyAliases(dataJournal,Aliaser.flipToKeyAlias(aliasKeys));
     }
     
     static flipToKeyAlias(aliasKey: AliasKeyes): AliasKeyes /* inverted */ {

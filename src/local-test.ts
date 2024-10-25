@@ -5,7 +5,7 @@ import * as obs from './translators/obsidianTranslator.js'
 import * as XLSX from 'xlsx'
 import * as testData from '../test/test_datasets.js';
 import { Def, DefType, DJ, DataJournal, Entry, Scope, Rollup, TransactionObject, QueryObject } from './DataJournal.js';
-import { AliasKeyer, AliasKeyes } from './AliasKeyer.js';
+import { Aliaser, AliasKeyes } from './Aliaser.js';
 import { JsonTranslator, MarkdownTranslator } from './translators/fileTranslators.js';
 import { Note } from './translators/MarkdownParsers.js';
 import { QueryBuilder } from './QueryBuilder.js';
@@ -18,6 +18,39 @@ import { SheetsTranslator } from './translators/sheetsTranslator.js';
 import { Period } from './Period.js';
 import { SheetsConnector } from './connectors/sheetsConnector.js';
 import { Overviewer } from './Overviewer.js';
+
+// const filepath = '/Users/aaron/Desktop/PDW-export-2024-08-to-2024-10-24.json';
+
+// const fromObsidian = await obs.ObsidianTranslator.toDataJournal('/Users/aaron/Desktop/Periods/1 - Daily/','/Users/aaron/Desktop/PDW/PDW.md');
+const allPrevious = await JsonTranslator.toDataJournal('.archiveOfOutdated/ALL_PDW_DATA.json');
+const aliases: AliasKeyes = {
+    Health: 'NIGHTLY_HEALTH',
+    satisfaction: 'NIGHTLY_SATISFACTION'
+}
+const aliased = Aliaser.unapplyAliases(allPrevious,aliases);
+const myQuery = new QueryBuilder({defs: allPrevious.defs}).from('2024-08');
+const result = DJ.filterTo(myQuery.toQueryObject(), aliased);
+
+// await ie.CsvTranslator.fromDefs(allPrevious.defs,'.archiveOfOutdated/All_Defs.csv')
+const entries = await ie.CsvTranslator.toEntries('.archiveOfOutdated/All_Entries_Post_Fixes.csv');
+const asDJ = {
+    defs: [],
+    entries: entries
+}
+const merged = DJ.merge([asDJ, allPrevious]);
+const validation = Validator.validate(allPrevious);
+const groups: any = {}
+validation.complaints.forEach(comp => {
+    if(groups[comp.type] === undefined) groups[comp.type] = [];
+    groups[comp.type].push(comp)
+})
+// const merged = DJ.merge([fromObsidian, allPrevious]);
+// const diffs = DJ.diffReport(allPrevious, merged);
+
+// // const uptoAugust = await JsonTranslator.toDataJournal(
+// const updated = await JsonTranslator.fromDataJournal(merged,'.archiveOfOutdated/Updated_All_PDW_2.json')
+console.log(allPrevious);
+
 
 // const allData =  await ie.JsonTranslator.toDataJournal('.archiveOfOutdated/All_PDW_Cleaned.json');
 // let query = new QueryBuilder(allData).forDids(defs).toQueryObject();
@@ -375,63 +408,3 @@ import { Overviewer } from './Overviewer.js';
 
 
 // //#endregion
-
-// function someCleaning(allData: DataJournal) {
-//     allData.defs.forEach(def => {
-//         //@ts-expect-error
-//         if (def._tags && !Array.isArray(def._tags)) def._tags = def._tags.split(',').map(str => str.trim())
-//         //@ts-expect-error
-//         if (def._range && !Array.isArray(def._range)) def._range = def._range.split(',').map(str => str.trim())
-//         if (defTypeMap[DJ.standardizeKey(def._id)] === undefined) {
-//             defTypeMap[DJ.standardizeKey(def._id)] = def._type;
-//         }
-//     })
-
-//     allData.entries.forEach(entry => {
-//         if (typeof entry._deleted === 'string') {
-//             //@ts-expect-error
-//             entry._deleted = entry._deleted.toUpperCase() === 'TRUE'
-//         }
-//         Object.keys(entry).filter(key => !key.startsWith('_')).forEach(key => {
-//             const standardizedKey = DJ.standardizeKey(key);
-//             const defType = defTypeMap[standardizedKey];
-//             if (defType === undefined) {
-//                 console.log('No def type found for ' + key)
-//                 return;
-//             }
-//             if (defType === DefType.NUMBER) {
-//                 if (typeof entry[key] === 'string') entry[key] = Number.parseFloat(entry[key]);
-//             }
-//             if (defType === DefType.BOOL) {
-//                 if (typeof entry[key] === 'string') entry[key] = entry[key].toUpperCase() === 'TRUE'
-//             }
-//             if (defType === DefType.TIME) {
-//                 const val = entry[key] as string;
-//                 if (val.length === 19) {
-//                     entry[key] = val.substring(11);
-//                     return
-//                 }
-//                 console.log(entry[key])
-//             }
-//             if (defType === DefType.DURATION) {
-//                 const val = entry[key] as string;
-//                 if (val.startsWith('PT')) return;
-//                 const numSecs = Number.parseFloat(val) * 60;
-//                 const temp = Temporal.Duration.from({ seconds: Math.round(numSecs) })
-//                 const newVal = temp.round({ largestUnit: 'day' }).toString();
-//                 entry[key] = newVal;
-//                 // console.log(entry[key])
-//             }
-//             if (defType === DefType.MULTISELECT) {
-//                 const val = entry[key];
-//                 if (!Array.isArray(val)) {
-//                     if (typeof val === 'string') {
-//                         entry[key] = val.split(',').map(text => text.trim());
-//                         return
-//                     }
-//                     console.log('h')
-//                 }
-//             }
-//         })
-//     })
-// }

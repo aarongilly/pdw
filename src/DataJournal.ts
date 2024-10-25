@@ -529,6 +529,10 @@ export class DJ {
                 const standardizedID = DJ.standardizeKey(entry._id)
                 let existing = newJournal.entries.find(prev => DJ.standardizeKey(prev._id) === standardizedID);
                 if (!existing) {
+                    if(entry._id === undefined || entry._period === undefined){
+                        throw new Error('Cannot create an Entry using "transaction.modify" unless it contains an _id and _period');
+                    }
+                    //@ts-expect-error - for some reason it's not catching that I handled this with the "if" above
                     newJournal.entries.push(DJ.makeEntry(entry));
                     return;
                 }
@@ -593,7 +597,7 @@ export class DJ {
      * @param newEntries array of new Entries to add
      * @returns new copy of the Data Journal with Entries added
      */
-    static addEntriesToNewInstance(dataJournal: DataJournal, newEntries: Partial<Entry>[]): DataJournal {
+    static addEntriesToNewInstance(dataJournal: DataJournal, newEntries: (Partial<Entry> & Required<Pick<Entry, '_id'|'_period'>>)[]): DataJournal {
         //make static - actually calling 'merge' later does this
         // const newJournal = JSON.parse(JSON.stringify(dataJournal)); //not needed
         const fullEntries = newEntries.map(newEntry => DJ.makeEntry(newEntry));
@@ -604,7 +608,7 @@ export class DJ {
         return DJ.merge([tempDJ, dataJournal])
     }
 
-    static makeEntry(partEntry: Partial<Entry>): Entry {
+    static makeEntry(partEntry: Partial<Entry> & Required<Pick<Entry, '_id'|'_period'>>): Entry {
         //make static
         const newEntry = JSON.parse(JSON.stringify(partEntry));
         //don't include footguns
@@ -636,8 +640,6 @@ export class DJ {
     static getDeletedEntries(entries: Entry[]) {
         return entries.filter(e => e._deleted);
     }
-
-    
 
     static merge(dataJournalArray: DataJournal[]) {
         if (!Array.isArray(dataJournalArray) || !DJ.isValidDataJournal(dataJournalArray[0])) throw new Error('DF.merge expects an array of DataJournals');
@@ -866,38 +868,38 @@ export class DJ {
         dataJournal.defs.forEach(def => {
             //Def missing id
             if (!Object.hasOwn(def, '_id'))
-                logOrThrow(`No _id on Def! \n ${JSON.stringify(def)}`, true);
+                logOrThrow(`No _id on Def: \n ${JSON.stringify(def)}`, true);
             //updated epochstr is bad
             if (Object.hasOwn(def, '_updated') && epochStrIsImplausible(def._updated))
-                logOrThrow(`Def._updated EpochStr is probably wrong! \n ${JSON.stringify(def)}`);
+                logOrThrow(`Def._updated EpochStr is probably wrong: \n ${JSON.stringify(def)}`);
             //def contains extra properties (likely a bad sign)
             if (Object.keys(def).some(key => !key.startsWith('_')))
-                logOrThrow(`Def property found without an underscore prefix! \n ${JSON.stringify(def)}`);
+                logOrThrow(`Def property found without an underscore prefix: \n ${JSON.stringify(def)}`);
         })
-        if (hasDuplicateIds(dataJournal.defs)) logOrThrow('Duplicate Def IDs found!', true);
+        if (hasDuplicateIds(dataJournal.defs)) logOrThrow('Duplicate Def IDs found:', true);
         //quality check entries
         dataJournal.entries.forEach(entry => {
             //Entry missing id
             if (!Object.hasOwn(entry, '_id'))
-                logOrThrow(`No _id on Entry! \n ${JSON.stringify(entry)}`, true);
+                logOrThrow(`No _id on Entry: \n ${JSON.stringify(entry)}`, true);
             //Entry missing _period
             if (!Object.hasOwn(entry, '_period'))
-                logOrThrow(`No _period on Entry! \n ${JSON.stringify(entry)}`, true);
+                logOrThrow(`No _period on Entry: \n ${JSON.stringify(entry)}`, true);
             //Entry _period is wrong
             if (!secondIsProperlyFormatted(entry._period))
-                logOrThrow(`_period on Entry looks wrong! \n ${JSON.stringify(entry)}`, true);
+                logOrThrow(`_period on Entry looks wrong: \n ${JSON.stringify(entry)}`, true);
             //updated epochstr is bad
             if (Object.hasOwn(entry, '_updated') && epochStrIsImplausible(entry._updated))
-                logOrThrow(`Entry._updated EpochStr is probably wrong! \n ${JSON.stringify(entry)}`);
+                logOrThrow(`Entry._updated EpochStr is probably wrong: \n ${JSON.stringify(entry)}`);
             //no associated def 
             const defKeys = Object.keys(entry).filter(key => !key.startsWith('_'));
             defKeys.forEach(key => {
                 const standardizedKey = DJ.standardizeKey(key)
                 if (!dataJournal.defs.some(def => DJ.standardizeKey(def._id) === standardizedKey || DJ.standardizeKey(def._lbl ?? def._id) === standardizedKey))
-                    logOrThrow(`No associated Def found for Entry! \n ${JSON.stringify(entry)}`);
+                    logOrThrow(`No associated Def found for Entry: \n ${JSON.stringify(entry)}`);
             })
         })
-        if (hasDuplicateIds(dataJournal.entries)) logOrThrow('Duplicate Entry IDs found!', true);
+        if (hasDuplicateIds(dataJournal.entries)) logOrThrow('Duplicate Entry IDs found:', true);
 
         return logs
 
