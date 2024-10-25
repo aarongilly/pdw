@@ -13,16 +13,21 @@ dist-ssr
 *.local
 # I added this
 real-data
+data-files
 fs-test
 docs
 docs/*
 out/*
 __notes_to_self.md
+test/localTestFileDir
+.archiveOfOutdated
+secrets.json
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
+.env
 .DS_Store
 *.suo
 *.ntvs*

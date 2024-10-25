@@ -1,4 +1,8 @@
-export {} //delete this line when starting development
+// import * as sql from 'sqlite3'
+
+// let db = new sql.Database(':memory:');
+
+export {} //delete this line when starting development 
 
 //import { StorageConnector } from "../pdw";
 // import sql from 'sqlite3';

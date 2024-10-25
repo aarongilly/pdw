@@ -11,13 +11,14 @@
     "strict": true,
     "sourceMap": true,
     "resolveJsonModule": true,
-    "isolatedModules": true,
+    "isolatedModules": false, //true,
     "esModuleInterop": true,
     "declaration": true,
     // "noEmit": true,
     // "noUnusedLocals": true, //uncomment this for prod
     // "noUnusedParameters": true, //uncomment this for prod
     "noImplicitReturns": true,
+    "noImplicitAny": false,
     "skipLibCheck": true,
     "outDir": "out",
     // "strict": true,
@@ -27,14 +28,15 @@
   },
   "include": [
     "src",
-    "out/local-test.js",
+    "out/local-test.js", "data-files/onetimeImports.ts",
     // "out/sampleData.js"
   ],
   "typedocOptions": {
     "entryPoints": [
       "src/pdw.ts",
-      "src/dataStores/fileAsyncDataStores.ts"
+      "src/translators/fileTranslators.ts"
     ],
-    "out": "docs"
+    "out": "docs",
+    "excludeExternals": true
   }
 }
