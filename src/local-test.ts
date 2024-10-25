@@ -17,14 +17,40 @@ import * as dotenv from 'dotenv'
 import { SheetsTranslator } from './translators/sheetsTranslator.js';
 import { Period } from './Period.js';
 import { SheetsConnector } from './connectors/sheetsConnector.js';
+import { Overviewer } from './Overviewer.js';
+
+// const allData =  await ie.JsonTranslator.toDataJournal('.archiveOfOutdated/All_PDW_Cleaned.json');
+// let query = new QueryBuilder(allData).forDids(defs).toQueryObject();
+// const queryResult = DJ.filterTo(query, allData) as DataJournal;
+// console.log(queryResult);
+// const asTransaction: TransactionObject = {
+//     entries: {
+//         replace: queryResult.entries
+//     }
+// }
+// await SheetsConnector.commit(asTransaction,'sheetidhere')
+// await SheetsTranslator.fromDataJournal(queryResult, 'Outings and Fun');
 
 
-
-const allData =  await ie.JsonTranslator.toDataJournal('.archiveOfOutdated/All_PDW_Cleaned.json');
-let query = new QueryBuilder(allData).forDefsLbld(['event']).toQueryObject();
-const queryResult = DJ.filterTo(query, allData) as DataJournal;
-console.log(queryResult);
-await SheetsTranslator.fromDataJournal(queryResult, 'Events')
+// const defs = await SheetsConnector.getDefs();
+// const entries = await SheetsConnector.query({deleted: false}) as unknown as DataJournal;
+// const myDj = {defs:defs,entries:wholeDJ}
+// const overviewed = Overviewer.addOverviewTo(myDj);
+// const validation = Validator.validate(overviewed);
+// const summary = Summarizor.summarize(myDj,Scope.YEAR);
+// const lesserSummary = Summarizor.checkOnePerPeriod(myDj,'NIGHTLY_SUMMARY','DAY')
+// const lesserSummary = summary.map(sum=>{
+//     return {
+//         year: sum.period,
+//         rollups: sum.entryRollups.map(rlp=>{
+//             return {
+//             defId: rlp.defId,
+//             method: rlp.method,
+//             val: rlp.val
+//         }})
+//     }
+// })
+// console.log(lesserSummary);
 
 // const myDj = DJ.filterTo(query.toQueryObject(),allData) as DataJournal;
 // console.log(myDj)
@@ -46,8 +72,6 @@ await SheetsTranslator.fromDataJournal(queryResult, 'Events')
 // console.log(data);
 // const testSht = process.env.TEST_SHEET_ID as string;
 
-// const shtId = '1QyKxdbQfk3v-jovRD1wscMZpS0eYjHH7t-Vb_bplrTE';
-
 // const dj = await SheetsConnector.query({},shtId);
 // const update = await SheetsConnector.commit({
 //     entries: {
@@ -62,7 +86,7 @@ await SheetsTranslator.fromDataJournal(queryResult, 'Events')
 
 // const query = await SheetsConnector.query({'entriesWithDef':['WORKOUT_TYPE']},shtId);
 
-console.log(query);
+// console.log(queryResult);
 
 /** NOT SPECIFYING ID WILL USE THE MANIFEST */
 // SIGN OF PROGRESS - GET DEFS WORKS BOTH WAYS

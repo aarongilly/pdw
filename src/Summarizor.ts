@@ -198,7 +198,7 @@ function doAverage(vals: number[]) {
 function doAverageDuration(vals: string[]): string {
     if (typeof vals[0] !== 'string') throw new Error('Period average saw a non-string');
     const sum = vals.reduce((pv, val) => Math.round(pv + Temporal.Duration.from(val).total('seconds')), 0);
-    const ave = sum / vals.length;
+    const ave = Math.round(sum / vals.length);
     const temp = Temporal.Duration.from({ seconds: ave }).round({ largestUnit: 'day' });
     return temp.toLocaleString();
 }
@@ -207,6 +207,8 @@ function doAverageTime(vals: string[]) {// Temporal.PlainTime {
     //want average to be about 4pm, so any time *before* 4pm I add 1-day's worth of seconds to
     let runningTotalInSeconds = 0;
     vals.forEach(val => {
+        let splitString = val.split('T');
+        if(splitString.length === 2) val = splitString[1].substring(0,8)
         const time = Temporal.PlainTime.from(val)
         let delta = Temporal.PlainTime.from('00:00:00').until(time)
         const hrs = delta.hours;
