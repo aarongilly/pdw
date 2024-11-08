@@ -1,12 +1,16 @@
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx'; //#TODO - remove dependency
 import * as fs from 'fs';
 import * as YAML from 'yaml';
 import * as dj from '../DataJournal.js';
 import { Translator } from '../pdw.js';
-import { AliasKeyer, AliasKeyes } from '../AliasKeyer.js';
+import { Aliaser, AliasKeyes } from '../Aliaser.js';
 import { Note, Block } from './MarkdownParsers.js';
 import { Overviewer } from '../Overviewer.js';
 // import { Period } from '../Period.js';
+
+//#TODO - remove depdendency on xlsxjs
+// - for csv: https://c2fo.github.io/fast-csv/docs/introduction/example
+// - for excel: ...exceljs?
 
 //#region ### EXPORTED FUNCTIONS ###
 export function dataJournalToFile(filepath: string, data: dj.DataJournal) {
@@ -77,7 +81,7 @@ export class JsonTranslator implements Translator {
 /**
  * The Data Journal with minor modifications, output to and input from YAML.
  * Including minor modifications:
- * 1. using {@link AliasKeyer} to standardize prop
+ * 1. using {@link Aliaser} to standardize prop
  * length to make visually parsing Defs & Entries easier.
  * 2. changing the _created & _updated keys (called "cre" and "upd") to use
  * ISO strings.
@@ -97,7 +101,7 @@ export class YamlTranslator implements Translator {
 
     async fromDataJournal(data: dj.DataJournal, filepath: string) {
 
-        const aliasedDJ = AliasKeyer.applyAliases(data, YamlTranslator.aliasKeys);
+        const aliasedDJ = Aliaser.applyAliases(data, YamlTranslator.aliasKeys);
         //crazy simple implementation
         const newData = this.translateToYamlFormat(aliasedDJ);
         const yaml = YAML.stringify(newData);
@@ -111,7 +115,7 @@ export class YamlTranslator implements Translator {
             entries: file.entries
         }
         const translated = this.translateFromYamlFormat(aliasedDJ);
-        const returnDJ = AliasKeyer.unapplyAliases(translated, YamlTranslator.aliasKeys);
+        const returnDJ = Aliaser.unapplyAliases(translated, YamlTranslator.aliasKeys);
         return Overviewer.addOverviewTo(returnDJ);
     }
 
@@ -600,7 +604,7 @@ export class MarkdownTranslator implements Translator {
 
         //create aliased Data Journal applying aliases passed in AND read from the file, where passed-in trumps
         const combinedAliases = { ...aliasKeys, ...containedAliases };
-        const aliasedDJ = AliasKeyer.applyAliases(staticDJ, combinedAliases);
+        const aliasedDJ = Aliaser.applyAliases(staticDJ, combinedAliases);
 
         let containedDefs: object[] = [];
         let containedEntries: object[] = [];
@@ -656,7 +660,7 @@ export class MarkdownTranslator implements Translator {
             fs.writeFileSync(filepath.slice(0,filepath.length-3)+" (new).md", returnNoteText, 'utf8');
         }
 
-        const unaliasedDJ = AliasKeyer.unapplyAliases({
+        const unaliasedDJ = Aliaser.unapplyAliases({
             defs: containedDefs,
             entries: containedEntries
         }, aliasKeys)
@@ -827,7 +831,7 @@ export class MarkdownTranslator implements Translator {
         return returnStr
     }
     static makeBlocksOfDefs(defs: dj.Def[], aliasKeys: AliasKeyes): string {
-        const keyAliases = AliasKeyer.flipToKeyAlias(aliasKeys);
+        const keyAliases = Aliaser.flipToKeyAlias(aliasKeys);
         let returnStr = ''
         defs.forEach(def => {
             returnStr += '- #def\n';

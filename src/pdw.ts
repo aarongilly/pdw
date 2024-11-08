@@ -233,7 +233,7 @@ export class PDW {
         return await Promise.all(connectorPromiseArray);
     }
 
-    async newEntry(entry: Partial<Entry>): Promise<CommitResponse[]> {
+    async newEntry(entry: Partial<Entry> & Required<Pick<Entry, '_id'|'_period'>>): Promise<CommitResponse[]> {
         let newEntry = DJ.makeEntry(entry)
         const transaction: TransactionObject = {
             defs: {

@@ -19,37 +19,81 @@ import { Period } from './Period.js';
 import { SheetsConnector } from './connectors/sheetsConnector.js';
 import { Overviewer } from './Overviewer.js';
 
+const allPrevious = await JsonTranslator.toDataJournal('.archiveOfOutdated/ALL_PDW_DATA.json');
+// const loadedExercise = await ie.CsvTranslator.toEntries('Exercises.csv');
+// const withUpdates = {defs:[],entries: loadedExercise};
+// const merged = DJ.merge([allPrevious, withUpdates]);
+
+// const dif = DJ.diffReport(allPrevious, merged);
+const exercises = DJ.filterTo({entriesWithDef:['WORKOUT_NAME']}, allPrevious) as DataJournal;
+await ie.CsvTranslator.fromEntries(exercises.entries,'Exercises.csv')
+// const summaries = Summarizor.summarize(exercises,Scope.MONTH);
+
+// console.log(summaries);
+// console.log(dif);
+
+// await JsonTranslator.fromDataJournal(merged, '.archiveOfOutdated/ALL_PDW_DATA.json')
+
 // const filepath = '/Users/aaron/Desktop/PDW-export-2024-08-to-2024-10-24.json';
 
-// const fromObsidian = await obs.ObsidianTranslator.toDataJournal('/Users/aaron/Desktop/Periods/1 - Daily/','/Users/aaron/Desktop/PDW/PDW.md');
-const allPrevious = await JsonTranslator.toDataJournal('.archiveOfOutdated/ALL_PDW_DATA.json');
-const aliases: AliasKeyes = {
-    Health: 'NIGHTLY_HEALTH',
-    satisfaction: 'NIGHTLY_SATISFACTION'
-}
-const aliased = Aliaser.unapplyAliases(allPrevious,aliases);
-const myQuery = new QueryBuilder({defs: allPrevious.defs}).from('2024-08');
-const result = DJ.filterTo(myQuery.toQueryObject(), aliased);
+// const todays = await SheetsConnector.query({updatedAfter:"ly3lflsw"});
+// console.log(todays);
+// const asDj = {
+//     defs: [],
+//     entries: todays
+// }
+// ie.JsonTranslator.fromDataJournal(asDj,'Since_July_From_Sheets.json')
 
-// await ie.CsvTranslator.fromDefs(allPrevious.defs,'.archiveOfOutdated/All_Defs.csv')
-const entries = await ie.CsvTranslator.toEntries('.archiveOfOutdated/All_Entries_Post_Fixes.csv');
-const asDJ = {
-    defs: [],
-    entries: entries
-}
-const merged = DJ.merge([asDJ, allPrevious]);
-const validation = Validator.validate(allPrevious);
-const groups: any = {}
-validation.complaints.forEach(comp => {
-    if(groups[comp.type] === undefined) groups[comp.type] = [];
-    groups[comp.type].push(comp)
-})
-// const merged = DJ.merge([fromObsidian, allPrevious]);
-// const diffs = DJ.diffReport(allPrevious, merged);
+// const newOnly = await JsonTranslator.toDataJournal('.archiveOfOutdated/Since_July_From_Sheets.json');
+// const merged = DJ.merge([allPrevious, newOnly]);
+// const dif = DJ.diffReport(allPrevious, merged);
+// console.log(dif);
 
-// // const uptoAugust = await JsonTranslator.toDataJournal(
-// const updated = await JsonTranslator.fromDataJournal(merged,'.archiveOfOutdated/Updated_All_PDW_2.json')
-console.log(allPrevious);
+// const queryResult = DJ.filterTo({from: '2024-07', to: '2024-07'},allPrevious) as DataJournal;
+// const sorted = DJ.sortBy('_updated', queryResult);
+// console.log(queryResult);
+
+// const aliases: AliasKeyes = {
+//     Health: 'NIGHTLY_HEALTH',
+//     satisfaction: 'NIGHTLY_SATISFACTION',
+//     summary: 'NIGHTLY_SUMMARY',
+//     tv_show: 'TV_SHOW_WATCHED',
+//     show: 'TV_SHOW_WATCHED',
+//     tv: 'TV_SHOW_WATCHED',
+//     type: 'DRANK',
+//     pains: 'PAIN_BODY_PARTS',
+//     PAIN_BODY_PART: 'PAIN_BODY_PARTS',
+//     workout: 'WORKOUT_NAME',
+//     book: 'BOOK_READ_NAME',
+//     Treatment: 'PAIN_TREATMENT',
+//     Injury: 'INJURY_DESC',
+//     injured: 'INJURY_BODY_PARTS',
+//     note: '_note',
+// }
+
+// const aliased = Aliaser.unapplyAliases(allPrevious,aliases);
+// const myQuery = new QueryBuilder({defs: allPrevious.defs}).from('2024-08');
+// const result = DJ.filterTo(myQuery.toQueryObject(), aliased);
+
+// // await ie.CsvTranslator.fromDefs(allPrevious.defs,'.archiveOfOutdated/All_Defs.csv')
+// const entries = await ie.CsvTranslator.fromEntries(aliased.entries, '.archiveOfOutdated/All_Entries_Post_Fixes2.csv');
+// const asDJ = {
+//     defs: [],
+//     entries: entries
+// }
+// const merged = DJ.merge([asDJ, allPrevious]);
+// const validation = Validator.validate(allPrevious);
+// const groups: any = {}
+// validation.complaints.forEach(comp => {
+//     if(groups[comp.type] === undefined) groups[comp.type] = [];
+//     groups[comp.type].push(comp)
+// })
+// // const merged = DJ.merge([fromObsidian, allPrevious]);
+// // const diffs = DJ.diffReport(allPrevious, merged);
+
+// // // const uptoAugust = await JsonTranslator.toDataJournal(
+// // const updated = await JsonTranslator.fromDataJournal(merged,'.archiveOfOutdated/Updated_All_PDW_2.json')
+// console.log(allPrevious);
 
 
 // const allData =  await ie.JsonTranslator.toDataJournal('.archiveOfOutdated/All_PDW_Cleaned.json');

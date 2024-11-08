@@ -210,7 +210,7 @@ export class Block {
         }
         //if the first line is a list, and the second line isn't an indentation, then 
         //you may be able to just return true at this point, but want to test
-        if (Block.determineType(firstLine) === 'text' && Block.determineType(secondLine) === 'text') return true;
+        if (Block.determineType(firstLine) === 'text' && (Block.determineType(secondLine) === 'text' || Block.determineType(secondLine) === 'ul')) return true;
         //should not hit this?
         throw new Error(`Line conversion to blocks was unhandled for lines:
             ${firstLine}

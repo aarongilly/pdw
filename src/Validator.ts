@@ -52,6 +52,7 @@ export class Validator {
         return report
 
         function addComplaint(complaint: Complaint) {
+            complaint.type = complaint.text.split(':')[0];
             report.complaints.push(complaint);
         }
 
@@ -82,7 +83,7 @@ export class Validator {
 
             entries.forEach(entry => {
                 if (entry._created && epochStrIsImplausible(entry._created))
-                    addComplaint({ severity: 'LOW', text: 'Entry._created is implausible: ' + entry._created });
+                    addComplaint({ severity: 'LOW', text: 'Entry._created is implausible: ' + entry._created + ' ...created was:' + entry._created });
                 const pointKeys = Object.keys(entry).filter(key => !key.startsWith('_'));
                 pointKeys.forEach(key => {
                     const standardizedID = DJ.standardizeKey(key)
@@ -90,21 +91,21 @@ export class Validator {
                     const val = entry[key];
                     if (type === undefined) return //unknown props should already be reported by DJ.qualityCheck()
                     if (type === DefType.BOOL && typeof val !== 'boolean')
-                        addComplaint({ severity: 'LOW', text: 'Boolean-type point with non-boolean value for: ' + entry._id });
+                        addComplaint({ severity: 'LOW', text: 'Boolean-type point with non-boolean value for: ' + entry._id + ' ...val was: ' + val});
                     if (type === DefType.NUMBER && typeof val !== 'number')
-                        addComplaint({ severity: 'LOW', text: 'Number-type point with non-number value for: ' + entry._id });
+                        addComplaint({ severity: 'LOW', text: 'Number-type point with non-number value for: ' + entry._id + ' ...val was: ' + val });
                     if (type === DefType.MULTISELECT && !Array.isArray(val))
-                        addComplaint({ severity: 'LOW', text: 'Multiselect-type point with non-Array value for: ' + entry._id });
+                        addComplaint({ severity: 'LOW', text: 'Multiselect-type point with non-Array value for: ' + entry._id + ' ...val was: ' + val });
                     if (type === DefType.DURATION && typeof val !== 'string')
-                        addComplaint({ severity: 'LOW', text: 'Duration-type point with non-string value for: ' + entry._id });
+                        addComplaint({ severity: 'LOW', text: 'Duration-type point with non-string value for: ' + entry._id + ' ...val was: ' + val });
                     if (type === DefType.DURATION && typeof val === 'string' && !val.startsWith('PT'))
-                        addComplaint({ severity: 'LOW', text: 'Duration-type point with a wrong-looking string value for: ' + entry._id });
+                        addComplaint({ severity: 'LOW', text: 'Duration-type point with a wrong-looking string value for: ' + entry._id + ' ...val was: ' + val });
                     if (type === DefType.TEXT && typeof val !== 'string')
-                        addComplaint({ severity: 'LOW', text: 'Text-type point with a non-string value for: ' + entry._id });
+                        addComplaint({ severity: 'LOW', text: 'Text-type point with a non-string value for: ' + entry._id + ' ...val was: ' + val });
                     if (type === DefType.SELECT && typeof val !== 'string')
-                        addComplaint({ severity: 'LOW', text: 'Select-type point with a non-string value for: ' + entry._id });
+                        addComplaint({ severity: 'LOW', text: 'Select-type point with a non-string value for: ' + entry._id + ' ...val was: ' + val });
                     if (type === DefType.TIME && !/^([0-1][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/.test(val))
-                        addComplaint({ severity: 'LOW', text: 'Time-type point with a wrong-looking string value for: ' + entry._id });
+                        addComplaint({ severity: 'LOW', text: 'Time-type point with a wrong-looking string value for: ' + entry._id + ' ...val was: ' + val });
 
                     //ranges
                     const range = defRangeMap[standardizedID];

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as dj from '../DataJournal.js';
 import { Translator } from '../pdw.js';
-import { AliasKeyer, AliasKeyes } from '../AliasKeyer.js';
+import { Aliaser, AliasKeyes } from '../Aliaser.js';
 import { Note, Block } from './MarkdownParsers.js'
 
 /**
@@ -54,7 +54,7 @@ export class ObsidianTranslator implements Translator {
 
         //create aliased Data Journal applying aliases passed in AND read from the file, where passed-in trumps
         const combinedAliases = { ...aliasKeys, ...containedAliases };
-        const aliasedDJ = AliasKeyer.applyAliases(staticDJ, combinedAliases);
+        const aliasedDJ = Aliaser.applyAliases(staticDJ, combinedAliases);
 
         let containedDefs: object[] = [];
         let containedEntries: object[] = [];
@@ -121,7 +121,7 @@ export class ObsidianTranslator implements Translator {
             fs.writeFileSync(filepath.slice(0, filepath.length - 3) + " (new).md", returnNoteText, 'utf8');
         }
 
-        const unaliasedDJ = AliasKeyer.unapplyAliases({
+        const unaliasedDJ = Aliaser.unapplyAliases({
             defs: containedDefs,
             entries: containedEntries
         }, aliasKeys)
@@ -287,7 +287,7 @@ export class ObsidianTranslator implements Translator {
         return returnStr
     }
     static makeBlocksOfDefs(defs: dj.Def[], aliasKeys: AliasKeyes): string {
-        const keyAliases = AliasKeyer.flipToKeyAlias(aliasKeys);
+        const keyAliases = Aliaser.flipToKeyAlias(aliasKeys);
         let returnStr = ''
         defs.forEach(def => {
             returnStr += '- #def ^' + def._id +'\n';

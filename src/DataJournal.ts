@@ -980,6 +980,8 @@ export class DJ {
             //def was modified
             returnObj.updatedDefs! += 1;
             const objectDiff = compareShallowObjects(toDef, existingFromDef);
+            //@ts-expect-error
+            objectDiff._id = toDef._id; //add the _id to see which _id was changed
             returnObj.defDiffs?.push(objectDiff);
         })
 
@@ -1003,6 +1005,8 @@ export class DJ {
             //entry was modified
             returnObj.updatedEntries! += 1;
             const objectDiff = compareShallowObjects(toEntry, existingFromEntry);
+            //@ts-expect-error
+            objectDiff._id = toDef._id; //add the _id to see which _id was changed
             returnObj.entryDiffs?.push(objectDiff);
         })
 
